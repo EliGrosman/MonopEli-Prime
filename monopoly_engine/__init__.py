@@ -13,6 +13,7 @@ Modules:
     player: Player state management
     cards: Chance and Community Chest cards
     rules: Game rules (rent, building, etc.)
+    actions: Player actions and validation
     exceptions: Custom exception types
 """
 
@@ -109,6 +110,25 @@ from .exceptions import (
     BankruptcyError,
 )
 
+from .actions import (
+    Action,
+    RollDice,
+    BuyProperty,
+    BuildHouse,
+    BuildHotel,
+    SellHouse,
+    SellHotel,
+    MortgageProperty,
+    UnmortgageProperty,
+    ProposeTrade,
+    AcceptTrade,
+    RejectTrade,
+    PayJailFine,
+    UseJailCard,
+    DeclareBankruptcy,
+    EndTurn,
+)
+
 __version__ = "0.1.0"
 __all__ = [
     # Types
@@ -191,4 +211,21 @@ __all__ = [
     "CannotBuildError",
     "CannotMortgageError",
     "BankruptcyError",
+    # Actions
+    "Action",
+    "RollDice",
+    "BuyProperty",
+    "BuildHouse",
+    "BuildHotel",
+    "SellHouse",
+    "SellHotel",
+    "MortgageProperty",
+    "UnmortgageProperty",
+    "ProposeTrade",
+    "AcceptTrade",
+    "RejectTrade",
+    "PayJailFine",
+    "UseJailCard",
+    "DeclareBankruptcy",
+    "EndTurn",
 ]
