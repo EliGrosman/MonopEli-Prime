@@ -12,3 +12,5 @@ htmlcov/
 
 # Virtual environments
 .venv
+
+.DS_Store
