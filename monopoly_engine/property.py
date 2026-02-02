@@ -1,388 +1,336 @@
-"""
-Property State Management Module
+"""Property state management for the Monopoly game engine.
 
-This module tracks the mutable state of properties, railroads, and utilities
-in a Monopoly game. It manages ownership, house/hotel counts, and mortgage status.
-
-The Property class represents the runtime state of a property (mutable),
-while the immutable property definitions live in board.py.
+This module handles the mutable state of properties - ownership, houses,
+and mortgage status. The immutable property definitions are in board.py.
 """
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from .types import PropertyColor, PropertyStateData, PROPERTY_GROUPS, POSITION_TO_COLOR
+from .board import Board, PropertySpace, RailroadSpace, UtilitySpace
 
 if TYPE_CHECKING:
-    from .types import PropertyColor
+    pass
 
 
 @dataclass
 class Property:
-    """
-    Mutable property state tracking ownership, houses, and mortgage status.
+    """Mutable state for a single property.
 
-    A Property represents the current state of a buyable space on the board.
-    It tracks who owns it, how many houses/hotels are built, and whether
-    it's mortgaged.
-
-    Attributes:
-        position: Board position (0-39) of this property
-        owner: Player ID of owner, or None if unowned
-        houses: Number of houses (0-4) or 5 for hotel
-        mortgaged: Whether the property is currently mortgaged
-
-    Examples:
-        >>> prop = Property(position=1)
-        >>> prop.is_owned
-        False
-        >>> prop.owner = 0
-        >>> prop.is_owned
-        True
-        >>> prop.houses = 3
-        >>> prop.can_build()
-        True
-        >>> prop.houses = 5
-        >>> prop.is_hotel
-        True
+    This tracks ownership, houses built, and mortgage status.
+    The static property data (cost, rent, etc.) is in board.py.
     """
 
     position: int
     owner: int | None = None
-    houses: int = 0  # 0-4 houses, 5 = hotel
+    houses: int = 0  # 0-4 for houses, 5 for hotel
     mortgaged: bool = False
 
     @property
     def is_owned(self) -> bool:
-        """
-        Check if the property is owned by any player.
-
-        Returns:
-            True if the property has an owner, False otherwise
-        """
+        """Check if this property has an owner."""
         return self.owner is not None
 
     @property
-    def is_hotel(self) -> bool:
-        """
-        Check if the property has a hotel (represented as 5 houses).
-
-        Returns:
-            True if the property has a hotel, False otherwise
-        """
+    def has_hotel(self) -> bool:
+        """Check if this property has a hotel."""
         return self.houses == 5
 
+    @property
+    def has_houses(self) -> bool:
+        """Check if this property has any houses (not hotel)."""
+        return 0 < self.houses < 5
+
+    @property
+    def has_buildings(self) -> bool:
+        """Check if this property has any buildings (houses or hotel)."""
+        return self.houses > 0
+
+    @property
+    def color(self) -> PropertyColor | None:
+        """Get the color of this property."""
+        return POSITION_TO_COLOR.get(self.position)
+
     def can_build(self) -> bool:
-        """
-        Check if houses can be built on this property.
-
-        Building is allowed if:
-        - The property is owned
-        - The property is not mortgaged
-        - There are fewer than 5 houses (hotel is max)
-
-        Note: This checks local property state only. Additional game rules
-        (monopoly ownership, even building, house availability) are checked
-        in the rules module.
-
-        Returns:
-            True if building is allowed based on property state
-        """
+        """Check basic buildability (owned, not mortgaged, room for more)."""
         return self.is_owned and not self.mortgaged and self.houses < 5
 
     def can_mortgage(self) -> bool:
-        """
-        Check if the property can be mortgaged.
-
-        Mortgaging is allowed if:
-        - The property is owned
-        - There are no houses on the property
-        - The property is not already mortgaged
-
-        Returns:
-            True if the property can be mortgaged
-        """
+        """Check if property can be mortgaged (no buildings, owned, not mortgaged)."""
         return self.is_owned and self.houses == 0 and not self.mortgaged
 
     def can_unmortgage(self) -> bool:
-        """
-        Check if the property can be unmortgaged.
-
-        Unmortgaging is allowed if:
-        - The property is owned
-        - The property is currently mortgaged
-
-        Note: Player's available funds are checked in the rules module.
-
-        Returns:
-            True if the property can be unmortgaged
-        """
+        """Check if property can be unmortgaged."""
         return self.is_owned and self.mortgaged
 
-    def to_dict(self) -> dict[str, int | bool | None]:
-        """
-        Convert property state to a JSON-serializable dictionary.
-
-        Returns:
-            Dictionary with position, owner, houses, and mortgaged status
-        """
-        return {
-            "position": self.position,
-            "owner": self.owner,
-            "houses": self.houses,
-            "mortgaged": self.mortgaged,
-        }
+    def to_dict(self) -> PropertyStateData:
+        """Serialize to JSON-compatible dict."""
+        return PropertyStateData(
+            position=self.position,
+            owner=self.owner,
+            houses=self.houses,
+            mortgaged=self.mortgaged,
+        )
 
     @classmethod
-    def from_dict(cls, data: dict[str, int | bool | None]) -> "Property":
-        """
-        Create a Property instance from a dictionary.
-
-        Args:
-            data: Dictionary containing property state
-
-        Returns:
-            New Property instance with the specified state
-        """
-        # Extract and convert values with proper type handling
-        position_val: Any = data["position"]
-        owner_val: Any = data["owner"]
-        houses_val: Any = data["houses"]
-        mortgaged_val: Any = data["mortgaged"]
-
-        # Convert to proper types
-        position = int(position_val)
-        houses = int(houses_val)
-        owner = int(owner_val) if owner_val is not None else None
-        mortgaged = bool(mortgaged_val)
-
+    def from_dict(cls, data: PropertyStateData) -> "Property":
+        """Create Property from serialized dict."""
         return cls(
-            position=position,
-            owner=owner,
-            houses=houses,
-            mortgaged=mortgaged,
+            position=data["position"],
+            owner=data.get("owner"),
+            houses=data.get("houses", 0),
+            mortgaged=data.get("mortgaged", False),
         )
 
 
+@dataclass
 class PropertyManager:
-    """
-    Manages all properties in the game.
+    """Manages all properties in the game.
 
-    The PropertyManager maintains the state of all 28 buyable properties
-    (22 properties + 4 railroads + 2 utilities) and provides methods for
-    querying ownership and monopoly status.
-
-    Attributes:
-        properties: Dictionary mapping board position to Property state
-
-    Examples:
-        >>> manager = PropertyManager()
-        >>> len(manager.properties)
-        28
-        >>> prop = manager.properties[1]
-        >>> prop.owner = 0
-        >>> manager.get_owned_by_player(0)
-        [1]
+    This class tracks the state of all 28 buyable properties and provides
+    methods for querying ownership, monopolies, and building eligibility.
     """
 
-    def __init__(self) -> None:
-        """Initialize the PropertyManager with all buyable properties."""
-        self.properties: dict[int, Property] = {}
-        self._init_properties()
+    properties: dict[int, Property] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Initialize all properties if not provided."""
+        if not self.properties:
+            self._init_properties()
 
     def _init_properties(self) -> None:
-        """
-        Initialize all 28 buyable properties on the board.
-
-        This scans the Board.SPACES tuple and creates a Property instance
-        for each space that has a 'cost' attribute (properties, railroads,
-        and utilities).
-        """
-        # Import here to avoid circular dependency
-        from .board import Board
-
+        """Initialize all 28 buyable properties."""
         for i, space in enumerate(Board.SPACES):
-            # Buyable spaces have a 'cost' attribute
-            if hasattr(space, "cost"):
+            if isinstance(space, (PropertySpace, RailroadSpace, UtilitySpace)):
                 self.properties[i] = Property(position=i)
 
-    def get_owned_by_player(self, player_id: int) -> list[int]:
-        """
-        Get all property positions owned by a specific player.
+    def get(self, position: int) -> Property | None:
+        """Get property at a position, or None if not a property."""
+        return self.properties.get(position)
 
-        Args:
-            player_id: The player's ID
-
-        Returns:
-            List of board positions owned by the player, sorted by position
-        """
-        return sorted([
+    def get_owned_by(self, player_id: int) -> list[int]:
+        """Get all property positions owned by a player."""
+        return [
             pos for pos, prop in self.properties.items()
             if prop.owner == player_id
-        ])
+        ]
 
-    def has_monopoly(self, player_id: int, color: "PropertyColor") -> bool:
-        """
-        Check if a player owns all properties of a given color (monopoly).
+    def get_unowned(self) -> list[int]:
+        """Get all unowned property positions."""
+        return [
+            pos for pos, prop in self.properties.items()
+            if prop.owner is None
+        ]
 
-        A monopoly is when a player owns all properties in a color group.
-        This is required for building houses and doubles the base rent.
+    def get_mortgaged_by(self, player_id: int) -> list[int]:
+        """Get all mortgaged property positions owned by a player."""
+        return [
+            pos for pos, prop in self.properties.items()
+            if prop.owner == player_id and prop.mortgaged
+        ]
 
-        Args:
-            player_id: The player's ID
-            color: The property color to check
+    def get_unmortgaged_by(self, player_id: int) -> list[int]:
+        """Get all unmortgaged property positions owned by a player."""
+        return [
+            pos for pos, prop in self.properties.items()
+            if prop.owner == player_id and not prop.mortgaged
+        ]
 
-        Returns:
-            True if the player owns all properties of the specified color
-
-        Examples:
-            >>> manager = PropertyManager()
-            >>> # Brown properties are at positions 1 and 3
-            >>> manager.properties[1].owner = 0
-            >>> manager.properties[3].owner = 0
-            >>> from .types import PropertyColor
-            >>> manager.has_monopoly(0, PropertyColor.BROWN)
-            True
-        """
-        # Import here to avoid circular dependency
-        from .board import Board
-
-        # Get all positions for this color group
-        group = Board.get_property_group(color)
-
-        # Check if player owns all properties in the group
+    def has_monopoly(self, player_id: int, color: PropertyColor) -> bool:
+        """Check if player owns all properties of a color group."""
+        group = PROPERTY_GROUPS.get(color, ())
+        if not group:
+            return False
         return all(
-            self.properties[pos].owner == player_id
+            self.properties.get(pos) is not None
+            and self.properties[pos].owner == player_id
             for pos in group
         )
 
-    def get_monopolies(self, player_id: int) -> list["PropertyColor"]:
-        """
-        Get all color groups where the player has a monopoly.
+    def get_monopolies(self, player_id: int) -> list[PropertyColor]:
+        """Get all color groups where player has a monopoly."""
+        return [
+            color for color in PropertyColor
+            if self.has_monopoly(player_id, color)
+        ]
 
-        Args:
-            player_id: The player's ID
+    def count_railroads_owned(self, player_id: int) -> int:
+        """Count how many railroads a player owns."""
+        return sum(
+            1 for pos in PROPERTY_GROUPS[PropertyColor.RAILROAD]
+            if self.properties.get(pos) is not None
+            and self.properties[pos].owner == player_id
+        )
 
-        Returns:
-            List of PropertyColor enums for which the player has a monopoly
-        """
-        from .types import PropertyColor
-        from .board import Board, PropertySpace
+    def count_utilities_owned(self, player_id: int) -> int:
+        """Count how many utilities a player owns."""
+        return sum(
+            1 for pos in PROPERTY_GROUPS[PropertyColor.UTILITY]
+            if self.properties.get(pos) is not None
+            and self.properties[pos].owner == player_id
+        )
 
-        monopolies: list["PropertyColor"] = []
-
-        # Check each color group
-        checked_colors: set[PropertyColor] = set()
-        for space in Board.SPACES:
-            if isinstance(space, PropertySpace):
-                color = space.color
-                if color not in checked_colors:
-                    checked_colors.add(color)
-                    if self.has_monopoly(player_id, color):
-                        monopolies.append(color)
-
-        return monopolies
-
-    def get_properties_in_group(self, color: "PropertyColor") -> list[int]:
-        """
-        Get all property positions in a color group.
-
-        Args:
-            color: The property color
-
-        Returns:
-            List of board positions for properties of the specified color
-        """
-        from .board import Board
-        return Board.get_property_group(color)
-
-    def count_houses_in_group(self, color: "PropertyColor") -> int:
-        """
-        Count total houses in a color group (for even building rule).
-
-        Args:
-            color: The property color
-
-        Returns:
-            Total number of houses across all properties in the group
-        """
-        group = self.get_properties_in_group(color)
+    def count_houses_in_group(self, player_id: int, color: PropertyColor) -> int:
+        """Count total houses in a color group owned by player."""
+        if not self.has_monopoly(player_id, color):
+            return 0
         return sum(
             self.properties[pos].houses
-            for pos in group
-            if self.properties[pos].houses < 5  # Don't count hotels
+            for pos in PROPERTY_GROUPS.get(color, ())
+            if pos in self.properties and self.properties[pos].houses < 5
         )
 
-    def get_min_houses_in_group(self, color: "PropertyColor") -> int:
+    def count_hotels_in_group(self, player_id: int, color: PropertyColor) -> int:
+        """Count total hotels in a color group owned by player."""
+        if not self.has_monopoly(player_id, color):
+            return 0
+        return sum(
+            1
+            for pos in PROPERTY_GROUPS.get(color, ())
+            if pos in self.properties and self.properties[pos].houses == 5
+        )
+
+    def count_total_houses(self, player_id: int) -> int:
+        """Count total houses owned by player (not hotels)."""
+        return sum(
+            prop.houses
+            for prop in self.properties.values()
+            if prop.owner == player_id and 0 < prop.houses < 5
+        )
+
+    def count_total_hotels(self, player_id: int) -> int:
+        """Count total hotels owned by player."""
+        return sum(
+            1
+            for prop in self.properties.values()
+            if prop.owner == player_id and prop.houses == 5
+        )
+
+    def get_min_houses_in_group(self, color: PropertyColor) -> int:
+        """Get minimum number of houses on any property in a group."""
+        group = PROPERTY_GROUPS.get(color, ())
+        if not group:
+            return 0
+        return min(
+            self.properties[pos].houses
+            for pos in group
+            if pos in self.properties
+        )
+
+    def get_max_houses_in_group(self, color: PropertyColor) -> int:
+        """Get maximum number of houses on any property in a group."""
+        group = PROPERTY_GROUPS.get(color, ())
+        if not group:
+            return 0
+        return max(
+            self.properties[pos].houses
+            for pos in group
+            if pos in self.properties
+        )
+
+    def can_build_house_on(self, player_id: int, position: int) -> bool:
+        """Check if a house can be built on a property (basic check).
+
+        Full validation including money and house supply is in rules.py.
         """
-        Get the minimum number of houses on any property in a color group.
+        prop = self.properties.get(position)
+        if prop is None:
+            return False
 
-        This is used to enforce even building - you can't build if another
-        property in the group has fewer houses.
+        # Must own it
+        if prop.owner != player_id:
+            return False
 
-        Args:
-            color: The property color
+        # Must not be mortgaged
+        if prop.mortgaged:
+            return False
 
-        Returns:
-            Minimum house count in the group (hotels count as 5)
-        """
-        group = self.get_properties_in_group(color)
-        return min(self.properties[pos].houses for pos in group)
+        # Must not already have hotel
+        if prop.houses >= 5:
+            return False
 
-    def get_max_houses_in_group(self, color: "PropertyColor") -> int:
-        """
-        Get the maximum number of houses on any property in a color group.
+        # Must be a regular property (not railroad/utility)
+        space = Board.get_space(position)
+        if not isinstance(space, PropertySpace):
+            return False
 
-        This is used to enforce even building - you can't have more than
-        one house difference between properties in the group.
+        color = POSITION_TO_COLOR.get(position)
+        if color is None:
+            return False
 
-        Args:
-            color: The property color
+        # Must have monopoly
+        if not self.has_monopoly(player_id, color):
+            return False
 
-        Returns:
-            Maximum house count in the group (hotels count as 5)
-        """
-        group = self.get_properties_in_group(color)
-        return max(self.properties[pos].houses for pos in group)
+        # Must build evenly - can only build if at min or tied for min
+        min_houses = self.get_min_houses_in_group(color)
+        if prop.houses > min_houses:
+            return False
 
-    def to_dict(self) -> dict[str, list[dict[str, int | bool | None]]]:
-        """
-        Convert all property states to a JSON-serializable dictionary.
+        return True
 
-        Returns:
-            Dictionary with 'properties' key containing list of property states
-        """
+    def can_sell_house_on(self, player_id: int, position: int) -> bool:
+        """Check if a house can be sold from a property (basic check)."""
+        prop = self.properties.get(position)
+        if prop is None:
+            return False
+
+        # Must own it
+        if prop.owner != player_id:
+            return False
+
+        # Must have at least one building
+        if prop.houses == 0:
+            return False
+
+        # Must be a regular property
+        space = Board.get_space(position)
+        if not isinstance(space, PropertySpace):
+            return False
+
+        color = POSITION_TO_COLOR.get(position)
+        if color is None:
+            return False
+
+        # Must sell evenly - can only sell if at max or tied for max
+        max_houses = self.get_max_houses_in_group(color)
+        if prop.houses < max_houses:
+            return False
+
+        return True
+
+    def transfer_property(self, position: int, to_player: int | None) -> bool:
+        """Transfer property ownership. Returns True if successful."""
+        prop = self.properties.get(position)
+        if prop is None:
+            return False
+        prop.owner = to_player
+        return True
+
+    def reset_property(self, position: int) -> bool:
+        """Reset property to unowned state with no buildings."""
+        prop = self.properties.get(position)
+        if prop is None:
+            return False
+        prop.owner = None
+        prop.houses = 0
+        prop.mortgaged = False
+        return True
+
+    def to_dict(self) -> dict[str, PropertyStateData]:
+        """Serialize all properties to JSON-compatible dict."""
         return {
-            "properties": [
-                prop.to_dict()
-                for prop in sorted(self.properties.values(), key=lambda p: p.position)
-            ]
+            str(pos): prop.to_dict()
+            for pos, prop in self.properties.items()
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, list[dict[str, int | bool | None]]]) -> "PropertyManager":
-        """
-        Create a PropertyManager instance from a dictionary.
-
-        Args:
-            data: Dictionary containing property states
-
-        Returns:
-            New PropertyManager instance with the specified state
-        """
+    def from_dict(cls, data: dict[str, PropertyStateData]) -> "PropertyManager":
+        """Create PropertyManager from serialized dict."""
         manager = cls()
-        for prop_data in data["properties"]:
-            pos_val: Any = prop_data["position"]
-            pos = int(pos_val)
-            manager.properties[pos] = Property.from_dict(prop_data)
+        for pos_str, prop_data in data.items():
+            pos = int(pos_str)
+            if pos in manager.properties:
+                manager.properties[pos] = Property.from_dict(prop_data)
         return manager
-
-    def reset(self) -> None:
-        """
-        Reset all properties to unowned state.
-
-        This clears all ownership, houses, and mortgage status.
-        Useful for starting a new game with the same PropertyManager instance.
-        """
-        for prop in self.properties.values():
-            prop.owner = None
-            prop.houses = 0
-            prop.mortgaged = False

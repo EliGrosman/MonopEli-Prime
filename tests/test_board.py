@@ -1,614 +1,295 @@
-"""
-Comprehensive tests for the board module.
-
-This module tests the board layout, space definitions, property groups,
-and utility methods for accessing board information.
-"""
+"""Tests for board.py module."""
 
 import pytest
-from monopoly_engine.board import (
+
+from monopoly_engine import (
     Board,
     Space,
     PropertySpace,
     RailroadSpace,
     UtilitySpace,
     TaxSpace,
+    SpaceType,
+    PropertyColor,
 )
-from monopoly_engine.types import SpaceType, PropertyColor
 
 
-# =============================================================================
-# Space Class Tests
-# =============================================================================
+class TestBoard:
+    """Tests for Board class."""
 
+    def test_board_has_40_spaces(self) -> None:
+        """Board should have exactly 40 spaces."""
+        assert len(Board.SPACES) == 40
 
-class TestSpace:
-    """Test the base Space class."""
-
-    def test_space_creation(self) -> None:
-        """Verify Space can be created with required attributes."""
-        space = Space(position=0, name="GO", type=SpaceType.GO)
-        assert space.position == 0
+    def test_go_is_first_space(self) -> None:
+        """GO should be at position 0."""
+        space = Board.get_space(0)
         assert space.name == "GO"
-        assert space.type == SpaceType.GO
+        assert space.space_type == SpaceType.GO
 
-    def test_space_immutability(self) -> None:
-        """Verify Space is immutable (frozen dataclass)."""
-        space = Space(position=0, name="GO", type=SpaceType.GO)
-        with pytest.raises(AttributeError):
-            space.position = 1  # type: ignore
+    def test_boardwalk_is_last_property(self) -> None:
+        """Boardwalk should be at position 39."""
+        space = Board.get_space(39)
+        assert isinstance(space, PropertySpace)
+        assert space.name == "Boardwalk"
+        assert space.color == PropertyColor.DARK_BLUE
+
+    def test_get_space_wraps_around(self) -> None:
+        """get_space should wrap positions > 39."""
+        assert Board.get_space(40) == Board.get_space(0)
+        assert Board.get_space(41) == Board.get_space(1)
+        assert Board.get_space(80) == Board.get_space(0)
+
+    def test_jail_at_position_10(self) -> None:
+        """Jail should be at position 10."""
+        space = Board.get_space(10)
+        assert space.space_type == SpaceType.JAIL
+        assert "Jail" in space.name
+
+    def test_go_to_jail_at_position_30(self) -> None:
+        """Go To Jail should be at position 30."""
+        space = Board.get_space(30)
+        assert space.space_type == SpaceType.GO_TO_JAIL
+
+    def test_free_parking_at_position_20(self) -> None:
+        """Free Parking should be at position 20."""
+        space = Board.get_space(20)
+        assert space.space_type == SpaceType.FREE_PARKING
 
 
-class TestPropertySpace:
-    """Test the PropertySpace class."""
+class TestPropertySpaces:
+    """Tests for property spaces on the board."""
 
-    def test_property_space_creation(self) -> None:
-        """Verify PropertySpace can be created with all attributes."""
-        space = PropertySpace(
-            position=1,
-            name="Mediterranean Avenue",
-            type=SpaceType.PROPERTY,
-            color=PropertyColor.BROWN,
-            cost=60,
-            rent=(2, 10, 30, 90, 160, 250),
-            house_cost=50,
-            mortgage_value=30,
-        )
-        assert space.position == 1
+    def test_mediterranean_avenue(self) -> None:
+        """Mediterranean Avenue should be correctly defined."""
+        space = Board.get_space(1)
+        assert isinstance(space, PropertySpace)
         assert space.name == "Mediterranean Avenue"
-        assert space.type == SpaceType.PROPERTY
         assert space.color == PropertyColor.BROWN
         assert space.cost == 60
-        assert space.rent == (2, 10, 30, 90, 160, 250)
+        assert space.rent[0] == 2  # Base rent
         assert space.house_cost == 50
         assert space.mortgage_value == 30
 
-    def test_property_space_rent_tuple(self) -> None:
-        """Verify rent is stored as a tuple with 6 values."""
+    def test_boardwalk(self) -> None:
+        """Boardwalk should be correctly defined."""
+        space = Board.get_space(39)
+        assert isinstance(space, PropertySpace)
+        assert space.name == "Boardwalk"
+        assert space.color == PropertyColor.DARK_BLUE
+        assert space.cost == 400
+        assert space.rent[0] == 50  # Base rent
+        assert space.rent[5] == 2000  # Hotel rent
+        assert space.house_cost == 200
+        assert space.mortgage_value == 200
+
+    def test_property_rent_increases_with_houses(self) -> None:
+        """Property rent should increase with houses."""
         space = Board.get_space(1)
         assert isinstance(space, PropertySpace)
-        assert len(space.rent) == 6
-        assert space.rent[0] < space.rent[1] < space.rent[5]
+        assert len(space.rent) == 6  # Base + 4 houses + hotel
+        # Rent should increase with each house
+        for i in range(1, 6):
+            assert space.rent[i] > space.rent[i - 1]
 
-    def test_property_space_immutability(self) -> None:
-        """Verify PropertySpace is immutable."""
-        space = Board.get_space(1)
-        assert isinstance(space, PropertySpace)
-        with pytest.raises(AttributeError):
-            space.cost = 100  # type: ignore
+    def test_all_properties_have_valid_data(
+        self, all_property_positions: list[int]
+    ) -> None:
+        """All properties should have valid cost, rent, etc."""
+        for pos in all_property_positions:
+            space = Board.get_space(pos)
+            assert isinstance(space, PropertySpace)
+            assert space.cost > 0
+            assert len(space.rent) == 6
+            assert all(r >= 0 for r in space.rent)
+            assert space.house_cost > 0
+            assert space.mortgage_value > 0
 
 
-class TestRailroadSpace:
-    """Test the RailroadSpace class."""
+class TestRailroadSpaces:
+    """Tests for railroad spaces on the board."""
 
-    def test_railroad_space_creation(self) -> None:
-        """Verify RailroadSpace can be created with all attributes."""
-        space = RailroadSpace(
-            position=5,
-            name="Reading Railroad",
-            type=SpaceType.RAILROAD,
-            cost=200,
-            rent=(25, 50, 100, 200),
-            mortgage_value=100,
-        )
-        assert space.position == 5
+    def test_reading_railroad(self) -> None:
+        """Reading Railroad should be correctly defined."""
+        space = Board.get_space(5)
+        assert isinstance(space, RailroadSpace)
         assert space.name == "Reading Railroad"
-        assert space.type == SpaceType.RAILROAD
         assert space.cost == 200
         assert space.rent == (25, 50, 100, 200)
         assert space.mortgage_value == 100
 
-    def test_railroad_rent_tuple(self) -> None:
-        """Verify railroad rent is stored as a tuple with 4 values."""
+    def test_all_railroads_same_cost(self) -> None:
+        """All railroads should cost $200."""
+        for pos in [5, 15, 25, 35]:
+            space = Board.get_space(pos)
+            assert isinstance(space, RailroadSpace)
+            assert space.cost == 200
+
+    def test_railroad_rent_structure(self) -> None:
+        """Railroad rent should double with each owned."""
         space = Board.get_space(5)
         assert isinstance(space, RailroadSpace)
-        assert len(space.rent) == 4
-        assert space.rent[0] == 25
-        assert space.rent[1] == 50
-        assert space.rent[2] == 100
-        assert space.rent[3] == 200
+        assert space.rent[0] == 25   # 1 owned
+        assert space.rent[1] == 50   # 2 owned
+        assert space.rent[2] == 100  # 3 owned
+        assert space.rent[3] == 200  # 4 owned
 
 
-class TestUtilitySpace:
-    """Test the UtilitySpace class."""
+class TestUtilitySpaces:
+    """Tests for utility spaces on the board."""
 
-    def test_utility_space_creation(self) -> None:
-        """Verify UtilitySpace can be created with all attributes."""
-        space = UtilitySpace(
-            position=12,
-            name="Electric Company",
-            type=SpaceType.UTILITY,
-            cost=150,
-            mortgage_value=75,
-        )
-        assert space.position == 12
+    def test_electric_company(self) -> None:
+        """Electric Company should be correctly defined."""
+        space = Board.get_space(12)
+        assert isinstance(space, UtilitySpace)
         assert space.name == "Electric Company"
-        assert space.type == SpaceType.UTILITY
         assert space.cost == 150
         assert space.mortgage_value == 75
 
-    def test_utility_has_no_rent_tuple(self) -> None:
-        """Verify utilities don't have a rent tuple (calculated dynamically)."""
-        space = Board.get_space(12)
+    def test_water_works(self) -> None:
+        """Water Works should be correctly defined."""
+        space = Board.get_space(28)
         assert isinstance(space, UtilitySpace)
-        # Utilities don't have a 'rent' attribute
-        assert not hasattr(space, "rent")
+        assert space.name == "Water Works"
+        assert space.cost == 150
+        assert space.mortgage_value == 75
 
 
-class TestTaxSpace:
-    """Test the TaxSpace class."""
+class TestTaxSpaces:
+    """Tests for tax spaces on the board."""
 
-    def test_tax_space_creation(self) -> None:
-        """Verify TaxSpace can be created with all attributes."""
-        space = TaxSpace(
-            position=4,
-            name="Income Tax",
-            type=SpaceType.TAX,
-            amount=200,
-        )
-        assert space.position == 4
+    def test_income_tax(self) -> None:
+        """Income Tax should be at position 4."""
+        space = Board.get_space(4)
+        assert isinstance(space, TaxSpace)
         assert space.name == "Income Tax"
-        assert space.type == SpaceType.TAX
         assert space.amount == 200
 
-    def test_both_tax_spaces(self) -> None:
-        """Verify both tax spaces have correct amounts."""
-        income_tax = Board.get_space(4)
-        assert isinstance(income_tax, TaxSpace)
-        assert income_tax.amount == 200
-
-        luxury_tax = Board.get_space(38)
-        assert isinstance(luxury_tax, TaxSpace)
-        assert luxury_tax.amount == 100
+    def test_luxury_tax(self) -> None:
+        """Luxury Tax should be at position 38."""
+        space = Board.get_space(38)
+        assert isinstance(space, TaxSpace)
+        assert space.name == "Luxury Tax"
+        assert space.amount == 100
 
 
-# =============================================================================
-# Board Class Tests
-# =============================================================================
+class TestChanceSpaces:
+    """Tests for Chance spaces on the board."""
+
+    def test_chance_positions(self) -> None:
+        """Chance spaces should be at positions 7, 22, 36."""
+        for pos in [7, 22, 36]:
+            space = Board.get_space(pos)
+            assert space.space_type == SpaceType.CHANCE
 
 
-class TestBoardStructure:
-    """Test the Board class structure and layout."""
+class TestCommunityChestSpaces:
+    """Tests for Community Chest spaces on the board."""
 
-    def test_board_has_40_spaces(self) -> None:
-        """Verify the board has exactly 40 spaces."""
-        assert len(Board.SPACES) == 40
-
-    def test_all_positions_sequential(self) -> None:
-        """Verify all positions are sequential from 0 to 39."""
-        for i, space in enumerate(Board.SPACES):
-            assert space.position == i
-
-    def test_board_spaces_immutable(self) -> None:
-        """Verify Board.SPACES tuple is immutable."""
-        with pytest.raises(TypeError):
-            Board.SPACES[0] = Space(0, "Test", SpaceType.GO)  # type: ignore
-
-    def test_corner_spaces(self) -> None:
-        """Verify the four corner spaces are correct."""
-        go = Board.get_space(0)
-        assert go.name == "GO"
-        assert go.type == SpaceType.GO
-
-        jail = Board.get_space(10)
-        assert jail.name == "Just Visiting"
-        assert jail.type == SpaceType.JAIL
-
-        free_parking = Board.get_space(20)
-        assert free_parking.name == "Free Parking"
-        assert free_parking.type == SpaceType.FREE_PARKING
-
-        go_to_jail = Board.get_space(30)
-        assert go_to_jail.name == "Go to Jail"
-        assert go_to_jail.type == SpaceType.GO_TO_JAIL
+    def test_community_chest_positions(self) -> None:
+        """Community Chest should be at positions 2, 17, 33."""
+        for pos in [2, 17, 33]:
+            space = Board.get_space(pos)
+            assert space.space_type == SpaceType.COMMUNITY_CHEST
 
 
-class TestBoardSpaceCounts:
-    """Test that the board has the correct number of each space type."""
+class TestBoardUtilityMethods:
+    """Tests for Board utility methods."""
 
-    def test_property_count(self) -> None:
-        """Verify there are 22 street properties."""
-        properties = [s for s in Board.SPACES if isinstance(s, PropertySpace)]
-        assert len(properties) == 22
-
-    def test_railroad_count(self) -> None:
-        """Verify there are 4 railroads."""
-        railroads = [s for s in Board.SPACES if isinstance(s, RailroadSpace)]
-        assert len(railroads) == 4
-
-    def test_utility_count(self) -> None:
-        """Verify there are 2 utilities."""
-        utilities = [s for s in Board.SPACES if isinstance(s, UtilitySpace)]
-        assert len(utilities) == 2
-
-    def test_chance_count(self) -> None:
-        """Verify there are 3 Chance spaces."""
-        chances = [s for s in Board.SPACES if s.type == SpaceType.CHANCE]
-        assert len(chances) == 3
-        assert all(c.position in [7, 22, 36] for c in chances)
-
-    def test_community_chest_count(self) -> None:
-        """Verify there are 3 Community Chest spaces."""
-        chests = [s for s in Board.SPACES if s.type == SpaceType.COMMUNITY_CHEST]
-        assert len(chests) == 3
-        assert all(c.position in [2, 17, 33] for c in chests)
-
-    def test_tax_count(self) -> None:
-        """Verify there are 2 tax spaces."""
-        taxes = [s for s in Board.SPACES if isinstance(s, TaxSpace)]
-        assert len(taxes) == 2
-
-    def test_total_buyable_properties(self) -> None:
-        """Verify there are 28 total buyable properties (22 + 4 + 2)."""
-        buyable = [s for s in Board.SPACES if hasattr(s, "cost")]
-        assert len(buyable) == 28
-
-
-class TestBoardGetSpace:
-    """Test the Board.get_space() method."""
-
-    def test_get_space_valid_position(self) -> None:
-        """Verify get_space returns correct space for valid positions."""
-        space = Board.get_space(0)
-        assert space.name == "GO"
-        assert space.position == 0
-
-        space = Board.get_space(39)
-        assert space.name == "Boardwalk"
-        assert space.position == 39
-
-    def test_get_space_wraps_around(self) -> None:
-        """Verify get_space wraps around for positions >= 40."""
-        space_0 = Board.get_space(0)
-        space_40 = Board.get_space(40)
-        assert space_0.position == space_40.position
-        assert space_0.name == space_40.name
-
-        space_1 = Board.get_space(1)
-        space_41 = Board.get_space(41)
-        assert space_1.position == space_41.position
-
-        space_39 = Board.get_space(39)
-        space_79 = Board.get_space(79)
-        assert space_39.position == space_79.position
-
-    def test_get_space_large_position(self) -> None:
-        """Verify get_space handles very large positions."""
-        space = Board.get_space(1000)
-        expected_pos = 1000 % 40
-        assert space.position == expected_pos
-
-
-class TestPropertyGroups:
-    """Test property color groups and Board.get_property_group()."""
-
-    def test_brown_properties(self) -> None:
-        """Verify brown property group has 2 properties."""
+    def test_get_property_group(self) -> None:
+        """get_property_group should return correct positions."""
         brown = Board.get_property_group(PropertyColor.BROWN)
-        assert brown == [1, 3]
-        assert len(brown) == 2
+        assert brown == (1, 3)
 
-        # Verify they're actually brown
-        for pos in brown:
-            space = Board.get_space(pos)
-            assert isinstance(space, PropertySpace)
-            assert space.color == PropertyColor.BROWN
-
-    def test_light_blue_properties(self) -> None:
-        """Verify light blue property group has 3 properties."""
-        light_blue = Board.get_property_group(PropertyColor.LIGHT_BLUE)
-        assert light_blue == [6, 8, 9]
-        assert len(light_blue) == 3
-
-    def test_magenta_properties(self) -> None:
-        """Verify magenta property group has 3 properties."""
-        magenta = Board.get_property_group(PropertyColor.MAGENTA)
-        assert magenta == [11, 13, 14]
-        assert len(magenta) == 3
-
-    def test_orange_properties(self) -> None:
-        """Verify orange property group has 3 properties."""
-        orange = Board.get_property_group(PropertyColor.ORANGE)
-        assert orange == [16, 18, 19]
-        assert len(orange) == 3
-
-    def test_red_properties(self) -> None:
-        """Verify red property group has 3 properties."""
-        red = Board.get_property_group(PropertyColor.RED)
-        assert red == [21, 23, 24]
-        assert len(red) == 3
-
-    def test_yellow_properties(self) -> None:
-        """Verify yellow property group has 3 properties."""
-        yellow = Board.get_property_group(PropertyColor.YELLOW)
-        assert yellow == [26, 27, 29]
-        assert len(yellow) == 3
-
-    def test_green_properties(self) -> None:
-        """Verify green property group has 3 properties."""
-        green = Board.get_property_group(PropertyColor.GREEN)
-        assert green == [31, 32, 34]
-        assert len(green) == 3
-
-    def test_blue_properties(self) -> None:
-        """Verify blue property group has 2 properties."""
-        blue = Board.get_property_group(PropertyColor.BLUE)
-        assert blue == [37, 39]
-        assert len(blue) == 2
-
-    def test_all_property_groups_have_correct_counts(self) -> None:
-        """Verify all color groups have expected number of properties."""
-        # Brown and Blue have 2 properties
-        assert len(Board.get_property_group(PropertyColor.BROWN)) == 2
-        assert len(Board.get_property_group(PropertyColor.BLUE)) == 2
-
-        # All others have 3 properties
-        for color in [
-            PropertyColor.LIGHT_BLUE,
-            PropertyColor.MAGENTA,
-            PropertyColor.ORANGE,
-            PropertyColor.RED,
-            PropertyColor.YELLOW,
-            PropertyColor.GREEN,
-        ]:
-            assert len(Board.get_property_group(color)) == 3
-
-    def test_property_groups_sorted(self) -> None:
-        """Verify property group positions are returned in sorted order."""
-        for color in [
-            PropertyColor.BROWN,
-            PropertyColor.LIGHT_BLUE,
-            PropertyColor.MAGENTA,
-            PropertyColor.ORANGE,
-            PropertyColor.RED,
-            PropertyColor.YELLOW,
-            PropertyColor.GREEN,
-            PropertyColor.BLUE,
-        ]:
-            group = Board.get_property_group(color)
-            assert group == sorted(group)
-
-
-class TestRailroadsAndUtilities:
-    """Test railroad and utility groups."""
-
-    def test_get_railroads(self) -> None:
-        """Verify get_railroads returns all 4 railroad positions."""
-        railroads = Board.get_railroads()
-        assert railroads == [5, 15, 25, 35]
-        assert len(railroads) == 4
-
-        # Verify they're actually railroads
-        for pos in railroads:
-            space = Board.get_space(pos)
-            assert isinstance(space, RailroadSpace)
-
-    def test_railroad_names(self) -> None:
-        """Verify railroad names are correct."""
-        names = [
-            "Reading Railroad",
-            "Pennsylvania Railroad",
-            "B & O Railroad",
-            "Short Line",
-        ]
-        for pos, name in zip([5, 15, 25, 35], names):
-            space = Board.get_space(pos)
-            assert isinstance(space, RailroadSpace)
-            assert space.name == name
-
-    def test_get_utilities(self) -> None:
-        """Verify get_utilities returns both utility positions."""
-        utilities = Board.get_utilities()
-        assert utilities == [12, 28]
-        assert len(utilities) == 2
-
-        # Verify they're actually utilities
-        for pos in utilities:
-            space = Board.get_space(pos)
-            assert isinstance(space, UtilitySpace)
-
-    def test_utility_names(self) -> None:
-        """Verify utility names are correct."""
-        electric = Board.get_space(12)
-        assert isinstance(electric, UtilitySpace)
-        assert electric.name == "Electric Company"
-
-        water = Board.get_space(28)
-        assert isinstance(water, UtilitySpace)
-        assert water.name == "Water Works"
-
-    def test_railroads_as_property_group(self) -> None:
-        """Verify railroads don't appear in get_property_group for color groups."""
-        # Railroads shouldn't be in any street property color group
-        for color in [
-            PropertyColor.BROWN,
-            PropertyColor.LIGHT_BLUE,
-            PropertyColor.MAGENTA,
-            PropertyColor.ORANGE,
-            PropertyColor.RED,
-            PropertyColor.YELLOW,
-            PropertyColor.GREEN,
-            PropertyColor.BLUE,
-        ]:
-            group = Board.get_property_group(color)
-            for pos in group:
-                space = Board.get_space(pos)
-                assert isinstance(space, PropertySpace)
-                assert not isinstance(space, RailroadSpace)
-
-
-# =============================================================================
-# Property Details Tests
-# =============================================================================
-
-
-class TestPropertyPrices:
-    """Test that property prices are correct."""
-
-    def test_brown_properties_cheap(self) -> None:
-        """Verify brown properties are the cheapest."""
-        med_ave = Board.get_space(1)
-        baltic = Board.get_space(3)
-        assert isinstance(med_ave, PropertySpace)
-        assert isinstance(baltic, PropertySpace)
-        assert med_ave.cost == 60
-        assert baltic.cost == 60
-
-    def test_blue_properties_expensive(self) -> None:
-        """Verify blue properties are the most expensive."""
-        park_place = Board.get_space(37)
-        boardwalk = Board.get_space(39)
-        assert isinstance(park_place, PropertySpace)
-        assert isinstance(boardwalk, PropertySpace)
-        assert park_place.cost == 350
-        assert boardwalk.cost == 400
-
-    def test_railroad_prices_uniform(self) -> None:
-        """Verify all railroads cost $200."""
-        for pos in Board.get_railroads():
-            railroad = Board.get_space(pos)
-            assert isinstance(railroad, RailroadSpace)
-            assert railroad.cost == 200
-
-    def test_utility_prices_uniform(self) -> None:
-        """Verify both utilities cost $150."""
-        for pos in Board.get_utilities():
-            utility = Board.get_space(pos)
-            assert isinstance(utility, UtilitySpace)
-            assert utility.cost == 150
-
-
-class TestPropertyRent:
-    """Test property rent values."""
-
-    def test_rent_increases_with_houses(self) -> None:
-        """Verify rent increases with each house."""
-        for i in range(1, 40):
-            space = Board.get_space(i)
-            if isinstance(space, PropertySpace):
-                # Rent should increase with each house
-                assert space.rent[0] < space.rent[1] < space.rent[2]
-                assert space.rent[2] < space.rent[3] < space.rent[4]
-                assert space.rent[4] < space.rent[5]
-
-    def test_railroad_rent_progression(self) -> None:
-        """Verify railroad rent doubles with each additional railroad."""
-        railroad = Board.get_space(5)
-        assert isinstance(railroad, RailroadSpace)
-        assert railroad.rent[0] == 25
-        assert railroad.rent[1] == 50
-        assert railroad.rent[2] == 100
-        assert railroad.rent[3] == 200
-
-    def test_brown_rent_values(self) -> None:
-        """Verify specific rent values for brown properties."""
-        med_ave = Board.get_space(1)
-        assert isinstance(med_ave, PropertySpace)
-        assert med_ave.rent[0] == 2  # Base rent
-
-        baltic = Board.get_space(3)
-        assert isinstance(baltic, PropertySpace)
-        assert baltic.rent[0] == 4  # Base rent
-
-
-class TestMortgageValues:
-    """Test property mortgage values."""
-
-    def test_mortgage_half_of_cost(self) -> None:
-        """Verify mortgage values are half the cost for properties."""
-        for i in range(1, 40):
-            space = Board.get_space(i)
-            if isinstance(space, PropertySpace):
-                assert space.mortgage_value == space.cost // 2
-
-    def test_railroad_mortgage_values(self) -> None:
-        """Verify railroad mortgage values."""
-        for pos in Board.get_railroads():
-            railroad = Board.get_space(pos)
-            assert isinstance(railroad, RailroadSpace)
-            assert railroad.mortgage_value == 100
-
-    def test_utility_mortgage_values(self) -> None:
-        """Verify utility mortgage values."""
-        for pos in Board.get_utilities():
-            utility = Board.get_space(pos)
-            assert isinstance(utility, UtilitySpace)
-            assert utility.mortgage_value == 75
-
-
-class TestHouseCosts:
-    """Test house building costs."""
-
-    def test_brown_and_light_blue_house_costs(self) -> None:
-        """Verify cheapest properties have $50 house cost."""
-        for pos in [1, 3, 6, 8, 9]:
-            space = Board.get_space(pos)
-            assert isinstance(space, PropertySpace)
-            assert space.house_cost == 50
-
-    def test_green_and_blue_house_costs(self) -> None:
-        """Verify most expensive properties have $200 house cost."""
-        for pos in [31, 32, 34, 37, 39]:
-            space = Board.get_space(pos)
-            assert isinstance(space, PropertySpace)
-            assert space.house_cost == 200
-
-    def test_house_costs_increase_with_property_value(self) -> None:
-        """Verify house costs generally increase with property cost."""
-        # Check a few specific examples
-        brown = Board.get_space(1)
-        assert isinstance(brown, PropertySpace)
-        assert brown.house_cost == 50
-
-        red = Board.get_space(21)
-        assert isinstance(red, PropertySpace)
-        assert red.house_cost == 150
-
-        blue = Board.get_space(39)
-        assert isinstance(blue, PropertySpace)
-        assert blue.house_cost == 200
-
-
-# =============================================================================
-# Edge Cases and Validation
-# =============================================================================
-
-
-class TestBoardEdgeCases:
-    """Test edge cases and boundary conditions."""
-
-    def test_negative_position_wraps(self) -> None:
-        """Verify negative positions wrap around correctly."""
-        # Python modulo handles this naturally
-        space = Board.get_space(-1)
-        assert space.position == 39
-
-        space = Board.get_space(-40)
-        assert space.position == 0
-
-    def test_all_spaces_have_names(self) -> None:
-        """Verify all spaces have non-empty names."""
-        for space in Board.SPACES:
-            assert space.name
-            assert len(space.name) > 0
-
-    def test_all_buyable_spaces_have_positive_costs(self) -> None:
-        """Verify all buyable properties have positive costs."""
-        for space in Board.SPACES:
-            if hasattr(space, "cost"):
-                assert space.cost > 0
-
-    def test_no_duplicate_positions(self) -> None:
-        """Verify no two spaces have the same position."""
-        positions = [space.position for space in Board.SPACES]
-        assert len(positions) == len(set(positions))
-
-    def test_property_group_returns_empty_for_invalid_color(self) -> None:
-        """Verify property group handling for special colors."""
-        # RAILROAD and UTILITY are special - they're not street properties
-        # but get_property_group still works on them
         railroads = Board.get_property_group(PropertyColor.RAILROAD)
-        assert len(railroads) == 0  # PropertySpace only, not RailroadSpace
+        assert railroads == (5, 15, 25, 35)
 
-        utilities = Board.get_property_group(PropertyColor.UTILITY)
-        assert len(utilities) == 0  # PropertySpace only, not UtilitySpace
+    def test_is_property(self) -> None:
+        """is_property should correctly identify properties."""
+        assert Board.is_property(1)  # Mediterranean
+        assert Board.is_property(39)  # Boardwalk
+        assert not Board.is_property(5)  # Railroad
+        assert not Board.is_property(12)  # Utility
+        assert not Board.is_property(0)  # GO
+
+    def test_is_railroad(self) -> None:
+        """is_railroad should correctly identify railroads."""
+        assert Board.is_railroad(5)
+        assert Board.is_railroad(15)
+        assert Board.is_railroad(25)
+        assert Board.is_railroad(35)
+        assert not Board.is_railroad(1)
+        assert not Board.is_railroad(12)
+
+    def test_is_utility(self) -> None:
+        """is_utility should correctly identify utilities."""
+        assert Board.is_utility(12)
+        assert Board.is_utility(28)
+        assert not Board.is_utility(1)
+        assert not Board.is_utility(5)
+
+    def test_is_buyable(self) -> None:
+        """is_buyable should identify all purchasable spaces."""
+        assert Board.is_buyable(1)  # Property
+        assert Board.is_buyable(5)  # Railroad
+        assert Board.is_buyable(12)  # Utility
+        assert not Board.is_buyable(0)  # GO
+        assert not Board.is_buyable(7)  # Chance
+        assert not Board.is_buyable(4)  # Income Tax
+
+    def test_get_buyable_positions(self) -> None:
+        """get_buyable_positions should return all 28 buyable positions."""
+        positions = Board.get_buyable_positions()
+        assert len(positions) == 28  # 22 properties + 4 railroads + 2 utilities
+
+    def test_get_nearest_railroad(self) -> None:
+        """get_nearest_railroad should return correct railroad."""
+        assert Board.get_nearest_railroad(0) == 5  # From GO
+        assert Board.get_nearest_railroad(5) == 15  # From Reading
+        assert Board.get_nearest_railroad(36) == 5  # Wrap around
+
+    def test_get_nearest_utility(self) -> None:
+        """get_nearest_utility should return correct utility."""
+        assert Board.get_nearest_utility(0) == 12  # Electric Company
+        assert Board.get_nearest_utility(15) == 28  # Water Works
+        assert Board.get_nearest_utility(30) == 12  # Wrap around
+
+    def test_calculate_distance(self) -> None:
+        """calculate_distance should correctly measure board distance."""
+        assert Board.calculate_distance(0, 10) == 10
+        assert Board.calculate_distance(35, 5) == 10  # Wrap around
+        assert Board.calculate_distance(0, 0) == 0
+
+
+class TestSpaceSerialization:
+    """Tests for space serialization."""
+
+    def test_property_space_to_dict(self) -> None:
+        """PropertySpace.to_dict should include all fields."""
+        space = Board.get_space(1)
+        assert isinstance(space, PropertySpace)
+        data = space.to_dict()
+        assert data["position"] == 1
+        assert data["name"] == "Mediterranean Avenue"
+        assert data["space_type"] == "PROPERTY"
+        assert data["color"] == "BROWN"
+        assert data["cost"] == 60
+        assert data["rent"] == [2, 10, 30, 90, 160, 250]
+
+    def test_railroad_space_to_dict(self) -> None:
+        """RailroadSpace.to_dict should include all fields."""
+        space = Board.get_space(5)
+        assert isinstance(space, RailroadSpace)
+        data = space.to_dict()
+        assert data["position"] == 5
+        assert data["name"] == "Reading Railroad"
+        assert data["space_type"] == "RAILROAD"
+        assert data["cost"] == 200
+        assert data["rent"] == [25, 50, 100, 200]
+
+    def test_board_to_dict(self) -> None:
+        """Board.to_dict should serialize entire board."""
+        data = Board.to_dict()
+        assert "spaces" in data
+        assert "property_groups" in data
+        assert len(data["spaces"]) == 40

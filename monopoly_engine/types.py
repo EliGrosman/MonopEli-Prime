@@ -1,37 +1,15 @@
-"""Type definitions, enums, and protocols for the Monopoly game engine.
+"""Type definitions for the Monopoly game engine.
 
-This module provides all type definitions used throughout the game engine,
-including enums for categorizing game elements, TypedDicts for structured
-data, and protocols for duck typing.
-
-All types are designed to be JSON-serializable and compatible with mypy
-strict mode type checking.
+This module contains all enums, TypedDicts, and type aliases used throughout
+the game engine. No dependencies on other engine modules.
 """
 
 from enum import Enum, auto
-from typing import Optional, Protocol, TypedDict
-
-
-# =============================================================================
-# Enums
-# =============================================================================
+from typing import TypedDict
 
 
 class SpaceType(Enum):
-    """Types of spaces on the Monopoly board.
-
-    Attributes:
-        GO: The starting space, awards $200 when passed.
-        PROPERTY: A purchasable property with a color group.
-        RAILROAD: A purchasable railroad (4 total on board).
-        UTILITY: A purchasable utility (2 total on board).
-        CHANCE: Draw a Chance card.
-        COMMUNITY_CHEST: Draw a Community Chest card.
-        TAX: Pay a fixed tax amount.
-        JAIL: Just visiting or in jail (position 10).
-        GO_TO_JAIL: Sends player directly to jail (position 30).
-        FREE_PARKING: Free space with no effect (position 20).
-    """
+    """Types of spaces on the Monopoly board."""
 
     GO = auto()
     PROPERTY = auto()
@@ -39,30 +17,15 @@ class SpaceType(Enum):
     UTILITY = auto()
     CHANCE = auto()
     COMMUNITY_CHEST = auto()
-    TAX = auto()
+    INCOME_TAX = auto()
+    LUXURY_TAX = auto()
     JAIL = auto()
     GO_TO_JAIL = auto()
     FREE_PARKING = auto()
 
 
 class PropertyColor(Enum):
-    """Color groups for properties on the Monopoly board.
-
-    Owning all properties in a color group constitutes a monopoly,
-    which doubles base rent and allows building houses/hotels.
-
-    Attributes:
-        BROWN: Mediterranean Ave, Baltic Ave (2 properties).
-        LIGHT_BLUE: Oriental Ave, Vermont Ave, Connecticut Ave (3 properties).
-        MAGENTA: St. Charles Place, States Ave, Virginia Ave (3 properties).
-        ORANGE: St. James Place, Tennessee Ave, New York Ave (3 properties).
-        RED: Kentucky Ave, Indiana Ave, Illinois Ave (3 properties).
-        YELLOW: Atlantic Ave, Ventnor Ave, Marvin Gardens (3 properties).
-        GREEN: Pacific Ave, N. Carolina Ave, Pennsylvania Ave (3 properties).
-        BLUE: Park Place, Boardwalk (2 properties).
-        RAILROAD: Reading, Pennsylvania, B&O, Short Line (4 railroads).
-        UTILITY: Electric Company, Water Works (2 utilities).
-    """
+    """Property color groups."""
 
     BROWN = auto()
     LIGHT_BLUE = auto()
@@ -71,34 +34,17 @@ class PropertyColor(Enum):
     RED = auto()
     YELLOW = auto()
     GREEN = auto()
-    BLUE = auto()
+    DARK_BLUE = auto()
     RAILROAD = auto()
     UTILITY = auto()
 
 
 class ActionType(Enum):
-    """Types of actions a player can take during the game.
-
-    Attributes:
-        ROLL_DICE: Roll dice to move (required at start of turn).
-        BUY_PROPERTY: Purchase an unowned property after landing on it.
-        BUILD_HOUSE: Build a house on a property (requires monopoly).
-        BUILD_HOTEL: Build a hotel on a property with 4 houses.
-        SELL_HOUSE: Sell a house back to the bank.
-        SELL_HOTEL: Sell a hotel back to the bank (returns 4 houses).
-        MORTGAGE_PROPERTY: Mortgage a property for cash.
-        UNMORTGAGE_PROPERTY: Unmortgage a property (costs 110% of mortgage value).
-        PROPOSE_TRADE: Propose a trade with another player.
-        ACCEPT_TRADE: Accept a pending trade proposal.
-        REJECT_TRADE: Reject a pending trade proposal.
-        PAY_JAIL_FINE: Pay $50 to get out of jail.
-        USE_JAIL_CARD: Use a Get Out of Jail Free card.
-        DECLARE_BANKRUPTCY: Declare bankruptcy when unable to pay debts.
-        END_TURN: End the current turn.
-    """
+    """Types of actions a player can take."""
 
     ROLL_DICE = auto()
     BUY_PROPERTY = auto()
+    AUCTION_PROPERTY = auto()
     BUILD_HOUSE = auto()
     BUILD_HOTEL = auto()
     SELL_HOUSE = auto()
@@ -110,250 +56,170 @@ class ActionType(Enum):
     REJECT_TRADE = auto()
     PAY_JAIL_FINE = auto()
     USE_JAIL_CARD = auto()
+    ATTEMPT_JAIL_ROLL = auto()
     DECLARE_BANKRUPTCY = auto()
     END_TURN = auto()
 
 
 class CardType(Enum):
-    """Types of Chance and Community Chest cards.
+    """Types of Chance and Community Chest cards."""
 
-    Attributes:
-        MOVE: Move to a specific position on the board.
-        MONEY: Receive or pay a fixed amount of money.
-        GET_OUT_OF_JAIL: Receive a Get Out of Jail Free card.
-        PAY_PER_HOUSE: Pay an amount per house/hotel owned.
-        GO_TO_JAIL: Go directly to jail.
-    """
-
-    MOVE = auto()
-    MONEY = auto()
-    GET_OUT_OF_JAIL = auto()
-    PAY_PER_HOUSE = auto()
-    GO_TO_JAIL = auto()
+    MOVE = auto()  # Move to a specific position
+    MOVE_NEAREST = auto()  # Move to nearest railroad/utility
+    MOVE_BACK = auto()  # Move back N spaces
+    COLLECT = auto()  # Collect money from bank
+    PAY = auto()  # Pay money to bank
+    PAY_PER_BUILDING = auto()  # Pay per house/hotel
+    COLLECT_FROM_PLAYERS = auto()  # Collect from each player
+    PAY_TO_PLAYERS = auto()  # Pay to each player
+    GET_OUT_OF_JAIL = auto()  # Get out of jail free card
+    GO_TO_JAIL = auto()  # Go directly to jail
 
 
-# =============================================================================
-# TypedDicts for Structured Data
-# =============================================================================
+class GamePhase(Enum):
+    """Current phase of the game turn."""
+
+    WAITING_FOR_ROLL = auto()
+    ROLLED = auto()
+    LANDED = auto()
+    PURCHASE_DECISION = auto()
+    AUCTION = auto()
+    PAYING_RENT = auto()
+    DRAWING_CARD = auto()
+    IN_JAIL = auto()
+    BANKRUPT = auto()
+    GAME_OVER = auto()
+
+
+# TypedDicts for structured data serialization
 
 
 class PropertyData(TypedDict):
-    """Static data for a purchasable property.
-
-    This represents the immutable characteristics of a property as defined
-    by the board layout. Does not include mutable state like owner or houses.
-
-    Attributes:
-        position: Board position (0-39).
-        name: Display name of the property.
-        color: Color group the property belongs to.
-        cost: Purchase price.
-        rent: List of rent values [base, 1h, 2h, 3h, 4h, hotel].
-              For railroads/utilities, may have fewer elements.
-        house_cost: Cost to build one house (0 for railroads/utilities).
-        mortgage_value: Amount received when mortgaging.
-    """
+    """Static property definition data."""
 
     position: int
     name: str
-    color: PropertyColor
+    color: str  # PropertyColor value name
     cost: int
-    rent: list[int]
+    rent: list[int]  # [base, 1h, 2h, 3h, 4h, hotel]
     house_cost: int
     mortgage_value: int
 
 
-class PlayerState(TypedDict):
-    """Complete state of a single player.
+class RailroadData(TypedDict):
+    """Static railroad definition data."""
 
-    This represents all mutable data associated with a player during
-    the game. Can be serialized to/from JSON for persistence.
+    position: int
+    name: str
+    cost: int
+    rent: list[int]  # [1 owned, 2 owned, 3 owned, 4 owned]
+    mortgage_value: int
 
-    Attributes:
-        id: Unique player identifier (0-7).
-        name: Player's display name.
-        money: Current cash balance.
-        position: Current board position (0-39, or 40 for "in jail").
-        properties: List of owned property positions.
-        houses: Dict mapping property position to house count (5 = hotel).
-        jail_cards: Number of Get Out of Jail Free cards held.
-        in_jail: Whether the player is currently in jail.
-        jail_turns: Number of turns spent in jail (max 3).
-        bankrupt: Whether the player has declared bankruptcy.
-    """
+
+class UtilityData(TypedDict):
+    """Static utility definition data."""
+
+    position: int
+    name: str
+    cost: int
+    mortgage_value: int
+
+
+class PropertyStateData(TypedDict):
+    """Mutable property state for serialization."""
+
+    position: int
+    owner: int | None
+    houses: int  # 0-4 for houses, 5 for hotel
+    mortgaged: bool
+
+
+class PlayerStateData(TypedDict):
+    """Player state for serialization."""
 
     id: int
     name: str
     money: int
     position: int
-    properties: list[int]
-    houses: dict[int, int]
     jail_cards: int
     in_jail: bool
     jail_turns: int
     bankrupt: bool
 
 
-class GameState(TypedDict):
-    """Complete state of the Monopoly game.
+class GameStateData(TypedDict):
+    """Complete game state for serialization."""
 
-    This represents all information needed to fully reconstruct or
-    continue a game. Can be serialized to/from JSON.
-
-    Attributes:
-        players: List of all player states.
-        current_player: Index of the player whose turn it is.
-        turn_number: Total number of turns elapsed.
-        houses_remaining: Number of houses left in the bank (max 32).
-        hotels_remaining: Number of hotels left in the bank (max 12).
-        chance_deck: Ordered list of Chance card IDs (shuffled).
-        community_chest_deck: Ordered list of Community Chest card IDs.
-        last_roll: Last dice roll as (die1, die2), or None.
-        doubles_count: Consecutive doubles rolled this turn (max 3).
-        game_over: Whether the game has ended.
-        winner: Player ID of the winner, or None if game ongoing.
-    """
-
-    players: list[PlayerState]
+    players: list[PlayerStateData]
+    properties: dict[str, PropertyStateData]  # position -> state
     current_player: int
     turn_number: int
+    phase: str  # GamePhase value name
     houses_remaining: int
     hotels_remaining: int
-    chance_deck: list[int]
-    community_chest_deck: list[int]
-    last_roll: Optional[tuple[int, int]]
+    chance_deck: list[int]  # Card IDs in draw order
+    chest_deck: list[int]  # Card IDs in draw order
+    last_roll: tuple[int, int] | None
     doubles_count: int
     game_over: bool
-    winner: Optional[int]
+    winner: int | None
 
 
-class TradeOffer(TypedDict):
-    """Structured data for a trade proposal between players.
+class CardData(TypedDict, total=False):
+    """Card definition data for serialization."""
 
-    Attributes:
-        from_player: ID of the player proposing the trade.
-        to_player: ID of the player receiving the trade offer.
-        from_properties: List of property positions offered by proposer.
-        to_properties: List of property positions requested from recipient.
-        from_money: Amount of money offered by proposer.
-        to_money: Amount of money requested from recipient.
-    """
+    id: int
+    text: str
+    card_type: str  # CardType value name
+    # Optional fields based on card type
+    move_to: int
+    move_to_type: str  # "railroad" or "utility" for nearest
+    move_spaces: int  # For move back cards
+    amount: int  # Money amount
+    per_house: int  # For pay per building
+    per_hotel: int
+
+
+class TradeOfferData(TypedDict):
+    """Trade offer data for serialization."""
 
     from_player: int
     to_player: int
-    from_properties: list[int]
-    to_properties: list[int]
-    from_money: int
-    to_money: int
+    give_properties: list[int]  # Property positions
+    give_money: int
+    want_properties: list[int]  # Property positions
+    want_money: int
 
 
-class CardData(TypedDict):
-    """Static data for a Chance or Community Chest card.
+# Constants
+BOARD_SIZE: int = 40
+STARTING_MONEY: int = 1500
+GO_SALARY: int = 200
+JAIL_POSITION: int = 10
+GO_TO_JAIL_POSITION: int = 30
+TOTAL_HOUSES: int = 32
+TOTAL_HOTELS: int = 12
+JAIL_FINE: int = 50
+MAX_JAIL_TURNS: int = 3
+INCOME_TAX_AMOUNT: int = 200
+LUXURY_TAX_AMOUNT: int = 100
 
-    Attributes:
-        id: Unique card identifier.
-        deck: Which deck the card belongs to ("chance" or "community_chest").
-        type: The type of effect the card has.
-        description: Human-readable card text.
-        value: Numeric value (amount, position, or cost multiplier).
-        keep: Whether this card can be kept (Get Out of Jail Free).
-    """
+# Property color groups - which positions belong to each color
+PROPERTY_GROUPS: dict[PropertyColor, tuple[int, ...]] = {
+    PropertyColor.BROWN: (1, 3),
+    PropertyColor.LIGHT_BLUE: (6, 8, 9),
+    PropertyColor.MAGENTA: (11, 13, 14),
+    PropertyColor.ORANGE: (16, 18, 19),
+    PropertyColor.RED: (21, 23, 24),
+    PropertyColor.YELLOW: (26, 27, 29),
+    PropertyColor.GREEN: (31, 32, 34),
+    PropertyColor.DARK_BLUE: (37, 39),
+    PropertyColor.RAILROAD: (5, 15, 25, 35),
+    PropertyColor.UTILITY: (12, 28),
+}
 
-    id: int
-    deck: str
-    type: CardType
-    description: str
-    value: int
-    keep: bool
-
-
-class SpaceData(TypedDict):
-    """Static data for a board space.
-
-    Attributes:
-        position: Board position (0-39).
-        name: Display name of the space.
-        type: The type of space.
-        value: Associated value (tax amount, 0 for special spaces).
-    """
-
-    position: int
-    name: str
-    type: SpaceType
-    value: int
-
-
-# =============================================================================
-# Protocols for Duck Typing
-# =============================================================================
-
-
-class Serializable(Protocol):
-    """Protocol for objects that can be serialized to dictionaries.
-
-    Any class implementing this protocol can be converted to/from
-    JSON-compatible dictionaries for persistence or network transport.
-    """
-
-    def to_dict(self) -> dict[str, object]:
-        """Convert the object to a JSON-compatible dictionary.
-
-        Returns:
-            A dictionary representation of the object's state.
-        """
-        ...
-
-    @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "Serializable":
-        """Reconstruct an object from a dictionary.
-
-        Args:
-            data: Dictionary representation of the object.
-
-        Returns:
-            A new instance of the object with state from the dictionary.
-        """
-        ...
-
-
-class Validateable(Protocol):
-    """Protocol for actions that can be validated before execution.
-
-    Any action class implementing this protocol must provide a validate
-    method that checks if the action can be legally performed.
-    """
-
-    def validate(self, game_state: GameState) -> tuple[bool, str]:
-        """Check if the action can be legally performed.
-
-        Args:
-            game_state: Current state of the game.
-
-        Returns:
-            A tuple of (is_valid, error_message). If valid, error_message
-            is an empty string.
-        """
-        ...
-
-
-class Executable(Protocol):
-    """Protocol for actions that can be executed to modify game state.
-
-    Any action class implementing this protocol must provide an execute
-    method that performs the action and returns the result.
-    """
-
-    def execute(self, game_state: GameState) -> tuple[bool, str]:
-        """Execute the action and modify the game state.
-
-        This method assumes validation has already been performed.
-        It should modify the game_state in place.
-
-        Args:
-            game_state: Current state of the game to be modified.
-
-        Returns:
-            A tuple of (success, message). If successful, message describes
-            what happened. If failed, message explains why.
-        """
-        ...
+# Reverse mapping: position -> color
+POSITION_TO_COLOR: dict[int, PropertyColor] = {}
+for color, positions in PROPERTY_GROUPS.items():
+    for pos in positions:
+        POSITION_TO_COLOR[pos] = color
