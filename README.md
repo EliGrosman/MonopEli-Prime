@@ -73,7 +73,7 @@ state_json = game.to_json()
 
 ```
 MonopEli-Prime/
-├── monopoly_engine/           # Core game engine package (3,040 lines)
+├── monopoly_engine/           # Core game engine package (1,801 lines)
 │   ├── __init__.py           # Package exports
 │   ├── types.py              # Enums, TypedDicts, Protocols (145 lines)
 │   ├── board.py              # Board definition with 40 spaces (100 lines)
@@ -82,11 +82,11 @@ MonopEli-Prime/
 │   ├── player.py             # Player state and actions (80 lines)
 │   ├── cards.py              # Chance/Community Chest (98 lines)
 │   ├── rules.py              # Game rules and validation (225 lines)
-│   ├── actions.py            # All 15 action types (782 lines)
-│   ├── state.py              # Game state management (coming Week 4)
-│   └── game.py               # Main game orchestrator (coming Week 4)
+│   ├── actions.py            # All 15 action types (407 lines)
+│   ├── state.py              # Game state management (74 lines)
+│   └── game.py               # Main game orchestrator (483 lines)
 │
-├── tests/                     # Test suite (2,972 lines, 281 tests)
+├── tests/                     # Test suite (~3,500 lines, 345 tests)
 │   ├── conftest.py           # Shared fixtures
 │   ├── test_types.py         # Type validation tests (27 tests)
 │   ├── test_board.py         # Board structure tests (32 tests)
@@ -94,7 +94,9 @@ MonopEli-Prime/
 │   ├── test_player.py        # Player state tests (29 tests)
 │   ├── test_cards.py         # Card effect tests (42 tests)
 │   ├── test_rules.py         # Rules validation tests (42 tests)
-│   └── test_actions.py       # Action validation tests (74 tests)
+│   ├── test_actions.py       # Action validation tests (74 tests)
+│   ├── test_state.py         # State management tests (30 tests)
+│   └── test_game.py          # Game orchestration tests (34 tests)
 │
 ├── scripts/                   # Utility scripts
 │   └── (CLI runner, benchmarks - coming Week 5)
@@ -169,11 +171,11 @@ uv sync
 | `player.py` | Player state, money, position, inventory | 80 | 99% | ✅ Complete |
 | `cards.py` | Chance/Community Chest card definitions | 98 | 90% | ✅ Complete |
 | `rules.py` | Rent calculation, building rules, game rules | 225 | 88% | ✅ Complete |
-| `actions.py` | All 15 action types with validation/execution | 782 | 87% | ✅ Complete |
-| `state.py` | Game state container with serialization | TBD | TBD | ⏳ Week 4 |
-| `game.py` | Main game orchestrator and controller | TBD | TBD | ⏳ Week 4 |
+| `actions.py` | All 15 action types with validation/execution | 407 | 87% | ✅ Complete |
+| `state.py` | Game state container with serialization | 74 | 99% | ✅ Complete |
+| `game.py` | Main game orchestrator and controller | 483 | 55% | ✅ Complete |
 
-**Totals**: 3,040 lines of production code, 281 tests, 91% overall coverage
+**Totals**: 1,801 lines of production code, 345 tests, 82% overall coverage
 
 ### Design Principles
 
@@ -300,9 +302,9 @@ Each action follows the validate-then-execute pattern, ensuring all game rules a
 
 ## Roadmap
 
-### Phase 1: Core Engine 🚧 (Current - 80% Complete)
+### Phase 1: Core Engine 🚧 (Current - 67% Complete)
 
-**Completed (Weeks 1-3)**:
+**Completed (Weeks 1-4)**:
 - ✅ Pure Python game engine foundation
 - ✅ Complete board definition with 40 spaces
 - ✅ All property types and ownership tracking
@@ -310,15 +312,21 @@ Each action follows the validate-then-execute pattern, ensuring all game rules a
 - ✅ 32 Chance/Community Chest cards
 - ✅ Complete game rules (rent, building, mortgage)
 - ✅ All 15 action types with validation
-- ✅ 281 tests, 91% coverage
+- ✅ Game state serialization (state.py)
+- ✅ Main game orchestrator with centralized state management (game.py)
+- ✅ Event logging infrastructure
+- ✅ Trade management system
+- ✅ Bankruptcy handling
+- ✅ 345 tests, 82% coverage
 - ✅ Full type safety (mypy strict mode)
 
-**Remaining (Week 4)**:
-- ⏳ Game state serialization (state.py)
-- ⏳ Main game orchestrator (game.py)
-- ⏳ Integration tests and CLI runner
+**Remaining (Weeks 5-6)**:
+- ⏳ Integration tests and validation against legacy implementation (Week 5)
+- ⏳ CLI runner for manual testing (Week 5)
+- ⏳ Performance benchmarking and optimization (Week 6)
+- ⏳ Documentation and polish (Week 6)
 
-**Status**: 8/10 core modules complete, 3,040 lines of production code
+**Status**: 10/10 core modules complete, 1,801 lines of production code
 
 ### Phase 2: Gymnasium Integration (Next)
 - OpenAI Gym/Gymnasium wrapper
@@ -384,6 +392,6 @@ Built as part of the MonopEli project - a multi-phase implementation of Monopoly
 
 ---
 
-**Status**: Phase 1 - 80% Complete (Weeks 1-3 Done, Week 4 Remaining)
-**Version**: 0.3.0 (Week 3)
+**Status**: Phase 1 - 67% Complete (Weeks 1-4 Done, Weeks 5-6 Remaining)
+**Version**: 0.4.0 (Week 4)
 **Last Updated**: 2026-02-02
