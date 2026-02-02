@@ -14,6 +14,7 @@ Modules:
     cards: Chance and Community Chest cards
     rules: Game rules (rent, building, etc.)
     actions: Player actions and validation
+    state: Game state container with serialization
     exceptions: Custom exception types
 """
 
@@ -129,6 +130,14 @@ from .actions import (
     EndTurn,
 )
 
+from .state import (
+    GameState,
+)
+
+from .game import (
+    MonopolyGame,
+)
+
 __version__ = "0.1.0"
 __all__ = [
     # Types
@@ -228,4 +237,8 @@ __all__ = [
     "UseJailCard",
     "DeclareBankruptcy",
     "EndTurn",
+    # State
+    "GameState",
+    # Game
+    "MonopolyGame",
 ]
