@@ -1,11 +1,13 @@
 import { useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Board } from '@/components/board/Board';
 import { ConnectionStatus, Loading } from '@/components/common';
+import { PropertyModal } from '@/components/property';
 import { PlayerPanel } from './PlayerPanel';
 import { ActionPanel } from './ActionPanel';
 import { useGameState } from '@/hooks/useGameState';
 import { useSessionStore } from '@/store/sessionStore';
+import { useGameStore } from '@/store/gameStore';
 import { useUIStore } from '@/store';
 
 /**
@@ -15,6 +17,7 @@ export function GamePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { setCurrentGame, playerId } = useSessionStore();
   const { addToast } = useUIStore();
+  const { gameState } = useGameStore();
   const {
     isLoading,
     error,
@@ -23,6 +26,21 @@ export function GamePage() {
     isMyTurn,
     send,
   } = useGameState();
+
+  // Property modal state
+  const [selectedProperty, setSelectedProperty] = useState<number | null>(null);
+  const isPropertyModalOpen = selectedProperty !== null;
+
+  // Generate CSS variables for player colors
+  const players = gameState?.players;
+  const playerColorStyle = useMemo(() => {
+    if (!players) return {};
+    const styles: Record<string, string> = {};
+    players.forEach((player) => {
+      styles[`--player-${player.id}-color`] = player.color;
+    });
+    return styles;
+  }, [players]);
 
   // Set game ID from URL params
   useEffect(() => {
@@ -57,8 +75,17 @@ export function GamePage() {
     );
   }
 
+  // Handle property space click
+  const handleSpaceClick = (position: number) => {
+    // Only open modal for ownable spaces (properties, railroads, utilities)
+    const property = gameState?.properties[position];
+    if (property !== undefined) {
+      setSelectedProperty(position);
+    }
+  };
+
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4" style={playerColorStyle}>
       {/* Connection Status Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -77,7 +104,11 @@ export function GamePage() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Board section */}
         <div className="flex-1 flex justify-center items-start">
-          <Board />
+          <Board
+            players={gameState?.players}
+            properties={gameState?.properties}
+            onSpaceClick={handleSpaceClick}
+          />
         </div>
 
         {/* Sidebar */}
@@ -95,6 +126,14 @@ export function GamePage() {
           </div>
         </div>
       </div>
+
+      {/* Property Modal */}
+      <PropertyModal
+        position={selectedProperty}
+        isOpen={isPropertyModalOpen}
+        onClose={() => setSelectedProperty(null)}
+        send={send}
+      />
     </div>
   );
 }
