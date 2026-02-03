@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .ai_manager import AIManager
     from .broadcast import ConnectionManager
     from .game_manager import GameManager
 
@@ -83,6 +84,7 @@ class LobbyManager:
         self._lock = asyncio.Lock()
         self._connection_manager: "ConnectionManager | None" = None
         self._game_manager: "GameManager | None" = None
+        self._ai_manager: "AIManager | None" = None
 
     def set_connection_manager(self, manager: "ConnectionManager") -> None:
         """Set connection manager for broadcasts."""
@@ -91,6 +93,10 @@ class LobbyManager:
     def set_game_manager(self, manager: "GameManager") -> None:
         """Set game manager for starting games."""
         self._game_manager = manager
+
+    def set_ai_manager(self, manager: "AIManager") -> None:
+        """Set AI manager for AI opponents."""
+        self._ai_manager = manager
 
     async def create_lobby(
         self,
@@ -539,15 +545,44 @@ class LobbyManager:
 
         try:
             # Prepare player names in slot order
-            player_names = [
-                lobby.players[i].name
-                for i in sorted(lobby.players.keys())
-            ]
+            sorted_slots = sorted(lobby.players.keys())
+            player_names = [lobby.players[i].name for i in sorted_slots]
 
             game_id = await self._game_manager.create_game(
                 num_players=len(player_names),
                 player_names=player_names,
             )
+
+            # Set up AI agents and mark AI player slots
+            active_game = await self._game_manager.get_game(game_id)
+            if active_game is not None:
+                for slot_id in sorted_slots:
+                    player = lobby.players[slot_id]
+                    game_player_id = sorted_slots.index(slot_id)
+
+                    if player.is_ai:
+                        # Mark the slot as AI
+                        if game_player_id in active_game.player_slots:
+                            active_game.player_slots[game_player_id].is_ai = True
+                            active_game.player_slots[game_player_id].ai_type = (
+                                player.ai_type
+                            )
+
+                        # Create AI agent
+                        if self._ai_manager is not None:
+                            self._ai_manager.create_agent(
+                                game_id=game_id,
+                                player_id=game_player_id,
+                                ai_type=player.ai_type or "rule_based",
+                            )
+                    else:
+                        # Claim slot for human player
+                        await self._game_manager.claim_player_slot(
+                            game_id=game_id,
+                            player_id=game_player_id,
+                            session_id=player.session_id,
+                            player_name=player.name,
+                        )
 
             async with self._lock:
                 lobby.status = LobbyStatus.STARTED
@@ -559,6 +594,21 @@ class LobbyManager:
                 LobbyWSMessageType.GAME_STARTED,
                 {"game_id": game_id},
             )
+
+            # Trigger AI turns if first player is AI
+            if (
+                self._ai_manager is not None
+                and self._game_manager is not None
+                and active_game is not None
+            ):
+                first_player = active_game.game.current_player
+                if self._ai_manager.is_ai_player(game_id, first_player):
+                    # Schedule AI turn processing (don't await, let it run)
+                    asyncio.create_task(
+                        self._ai_manager.process_ai_turns_for_game(
+                            self._game_manager, game_id
+                        )
+                    )
 
             return True, "", game_id
 

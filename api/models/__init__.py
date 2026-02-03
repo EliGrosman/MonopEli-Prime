@@ -26,6 +26,12 @@ from .lobby import (
     LobbyStatus,
     LobbyWSMessageType,
 )
+from .player import (
+    CreateSessionRequest,
+    PlayerInfo,
+    SessionResponse,
+    UpdatePlayerRequest,
+)
 from .websocket import (
     WSActionRequest,
     WSActionResult,
@@ -62,6 +68,11 @@ __all__ = [
     "LobbyState",
     "LobbyStatus",
     "LobbyWSMessageType",
+    # Player models
+    "CreateSessionRequest",
+    "PlayerInfo",
+    "SessionResponse",
+    "UpdatePlayerRequest",
     # WebSocket models
     "WSActionRequest",
     "WSActionResult",

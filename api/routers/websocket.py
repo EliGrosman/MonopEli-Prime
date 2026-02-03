@@ -244,6 +244,9 @@ async def websocket_endpoint(
         await websocket.close(code=4004, reason="Game not found")
         return
 
+    # Track if this is a reconnection
+    is_reconnect = False
+
     # Validate player_id if provided
     if player_id is not None:
         if player_id < 0 or player_id >= len(game.player_slots):
@@ -252,7 +255,7 @@ async def websocket_endpoint(
             return
 
         # Try to claim the slot
-        success, error = await game_manager.claim_player_slot(
+        success, error, is_reconnect = await game_manager.claim_player_slot(
             game_id, player_id, session_id, player_name
         )
         if not success:
@@ -286,12 +289,16 @@ async def websocket_endpoint(
             ),
         )
 
-    # Notify others of player join (if player, not spectator)
+    # Notify others of player join or reconnection (if player, not spectator)
     if player_id is not None:
+        event_type = (
+            WSMessageType.PLAYER_RECONNECTED if is_reconnect
+            else WSMessageType.PLAYER_JOINED
+        )
         await conn_manager.broadcast_to_game(
             game_id,
             WSMessage(
-                type=WSMessageType.PLAYER_JOINED,
+                type=event_type,
                 data=WSPlayerEvent(
                     player_id=player_id,
                     name=player_name,

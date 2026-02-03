@@ -41,6 +41,7 @@ class PlayerSlot(BaseModel):
     is_ai: bool = False
     ai_type: str | None = None
     is_ready: bool = False
+    disconnected_at: datetime | None = None  # For reconnection window tracking
 
 
 class GameState(BaseModel):

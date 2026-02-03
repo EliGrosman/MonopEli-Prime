@@ -416,10 +416,11 @@ class TestGameManagerWebSocketIntegration:
         """Test claiming a player slot."""
         game_id = await game_manager.create_game(num_players=2)
 
-        success, msg = await game_manager.claim_player_slot(
+        success, msg, is_reconnect = await game_manager.claim_player_slot(
             game_id, player_id=0, session_id="session1", player_name="Alice"
         )
         assert success is True
+        assert is_reconnect is False
 
         # Verify slot is claimed
         game = await game_manager.get_game(game_id)
@@ -438,7 +439,7 @@ class TestGameManagerWebSocketIntegration:
         )
 
         # Second claim by different session
-        success, msg = await game_manager.claim_player_slot(
+        success, msg, _ = await game_manager.claim_player_slot(
             game_id, player_id=0, session_id="session2"
         )
         assert success is False
@@ -454,18 +455,19 @@ class TestGameManagerWebSocketIntegration:
             game_id, player_id=0, session_id="session1"
         )
 
-        # Reclaim same session
-        success, msg = await game_manager.claim_player_slot(
+        # Reclaim same session (not a reconnect since no disconnect)
+        success, msg, is_reconnect = await game_manager.claim_player_slot(
             game_id, player_id=0, session_id="session1"
         )
         assert success is True
+        assert is_reconnect is False  # Not a reconnect since wasn't marked disconnected
 
     @pytest.mark.asyncio
     async def test_claim_invalid_player_id(self, game_manager: GameManager):
         """Test claiming an invalid player slot."""
         game_id = await game_manager.create_game(num_players=2)
 
-        success, msg = await game_manager.claim_player_slot(
+        success, msg, _ = await game_manager.claim_player_slot(
             game_id, player_id=99, session_id="session1"
         )
         assert success is False
@@ -474,7 +476,7 @@ class TestGameManagerWebSocketIntegration:
     @pytest.mark.asyncio
     async def test_claim_slot_nonexistent_game(self, game_manager: GameManager):
         """Test claiming slot in nonexistent game."""
-        success, msg = await game_manager.claim_player_slot(
+        success, msg, _ = await game_manager.claim_player_slot(
             "nonexistent", player_id=0, session_id="session1"
         )
         assert success is False
@@ -482,15 +484,16 @@ class TestGameManagerWebSocketIntegration:
 
     @pytest.mark.asyncio
     async def test_release_player_slot(self, game_manager: GameManager):
-        """Test releasing a player slot."""
+        """Test releasing a player slot permanently."""
         game_id = await game_manager.create_game(num_players=2)
 
         await game_manager.claim_player_slot(
             game_id, player_id=0, session_id="session1"
         )
 
+        # Permanent release fully clears the slot
         released = await game_manager.release_player_slot(
-            game_id, player_id=0, session_id="session1"
+            game_id, player_id=0, session_id="session1", permanent=True
         )
         assert released is True
 
@@ -646,7 +649,7 @@ class TestDisconnect:
             assert disconnect_msg["data"]["player_id"] == 1
 
     def test_player_slot_released_on_disconnect(self, client: TestClient):
-        """Test that player slot is released on disconnection."""
+        """Test that player slot is marked disconnected (not fully released)."""
         game_id = create_game(client)
 
         with client.websocket_connect(
@@ -654,11 +657,15 @@ class TestDisconnect:
         ) as ws:
             ws.receive_json()  # Skip state
 
-        # After disconnect, slot should be released
+        # After disconnect, slot should be marked as disconnected (for reconnection)
+        # The session_id is kept but disconnected_at is set
         # Check via API
         response = client.get(f"/api/games/{game_id}/players")
         players = response.json()
 
         # Find player 0
         player_0 = next(p for p in players if p["player_id"] == 0)
-        assert player_0["session_id"] is None
+        # Session is still held (for reconnection window)
+        assert player_0["session_id"] == "session1"
+        # But marked as disconnected
+        assert player_0["disconnected_at"] is not None

@@ -20,6 +20,7 @@ from ..models.websocket import WSMessage, WSMessageType
 if TYPE_CHECKING:
     from monopoly_engine.actions import Action
 
+    from .ai_manager import AIManager
     from .broadcast import ConnectionManager
 
 
@@ -57,6 +58,7 @@ class GameManager:
         self._lock = asyncio.Lock()
         self._cleanup_task: asyncio.Task[None] | None = None
         self._connection_manager: "ConnectionManager | None" = None
+        self._ai_manager: "AIManager | None" = None
 
     def set_connection_manager(self, manager: "ConnectionManager") -> None:
         """Set the WebSocket connection manager for broadcasts.
@@ -65,6 +67,14 @@ class GameManager:
             manager: The ConnectionManager instance
         """
         self._connection_manager = manager
+
+    def set_ai_manager(self, manager: "AIManager") -> None:
+        """Set the AI manager for AI opponent turns.
+
+        Args:
+            manager: The AIManager instance
+        """
+        self._ai_manager = manager
 
     async def create_game(
         self,
@@ -204,7 +214,34 @@ class GameManager:
                     exclude_session=exclude_session,
                 )
 
+        # Check if we should trigger AI turns
+        await self._maybe_process_ai_turns(game_id)
+
         return True, ""
+
+    async def _maybe_process_ai_turns(self, game_id: str) -> None:
+        """Process AI turns if the current player is AI.
+
+        This is called after action execution to check if the next player
+        is an AI and should take their turn automatically.
+
+        Args:
+            game_id: The game ID
+        """
+        if self._ai_manager is None:
+            return
+
+        active_game = self.games.get(game_id)
+        if active_game is None or active_game.game.game_over:
+            return
+
+        current_player = active_game.game.current_player
+        if self._ai_manager.is_ai_player(game_id, current_player):
+            # Schedule AI turn processing (don't block the response)
+            import asyncio
+            asyncio.create_task(
+                self._ai_manager.process_ai_turns_for_game(self, game_id)
+            )
 
     async def claim_player_slot(
         self,
@@ -212,8 +249,10 @@ class GameManager:
         player_id: int,
         session_id: str,
         player_name: str | None = None,
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, bool]:
         """Claim a player slot for a session.
+
+        Supports reconnection within the reconnect window.
 
         Args:
             game_id: The game ID
@@ -222,44 +261,72 @@ class GameManager:
             player_name: Optional name override
 
         Returns:
-            Tuple of (success, message)
+            Tuple of (success, message, is_reconnect)
         """
+        settings = get_settings()
         async with self._lock:
             active_game = self.games.get(game_id)
             if active_game is None:
-                return False, "Game not found"
+                return False, "Game not found", False
 
             if player_id not in active_game.player_slots:
-                return False, f"Invalid player ID: {player_id}"
+                return False, f"Invalid player ID: {player_id}", False
 
             slot = active_game.player_slots[player_id]
 
-            # Check if slot is already claimed by someone else
-            if slot.session_id is not None and slot.session_id != session_id:
-                return False, f"Player slot {player_id} is already claimed"
+            # Check if this is a reconnection (same session_id returning)
+            if slot.session_id == session_id:
+                # Clear disconnection status - this is a reconnect
+                is_reconnect = slot.disconnected_at is not None
+                slot.disconnected_at = None
+                if player_name:
+                    slot.name = player_name
+                return True, "", is_reconnect
+
+            # Check if slot is claimed by someone else
+            if slot.session_id is not None:
+                # Check if previous owner is within reconnect window
+                if slot.disconnected_at is not None:
+                    elapsed = datetime.now(UTC) - slot.disconnected_at
+                    if elapsed <= timedelta(seconds=settings.ws_reconnect_window):
+                        return (
+                            False,
+                            f"Player slot {player_id} is reserved for reconnection",
+                            False,
+                        )
+                    # Reconnect window expired - allow claiming
+                else:
+                    # Slot is actively held by another session
+                    return False, f"Player slot {player_id} is already claimed", False
 
             # Claim the slot
             slot.session_id = session_id
+            slot.disconnected_at = None
             if player_name:
                 slot.name = player_name
 
-            return True, ""
+            return True, "", False
 
     async def release_player_slot(
         self,
         game_id: str,
         player_id: int,
         session_id: str,
+        permanent: bool = False,
     ) -> bool:
         """Release a player slot.
+
+        By default, marks the slot as disconnected for reconnection support.
+        Set permanent=True to fully release the slot (e.g., player left game).
 
         Args:
             game_id: The game ID
             player_id: The player slot to release
             session_id: The session releasing the slot (must match)
+            permanent: If True, fully release slot. If False, mark disconnected.
 
         Returns:
-            True if released, False otherwise
+            True if released/marked, False otherwise
         """
         async with self._lock:
             active_game = self.games.get(game_id)
@@ -273,7 +340,13 @@ class GameManager:
 
             # Only release if session matches
             if slot.session_id == session_id:
-                slot.session_id = None
+                if permanent:
+                    # Fully release the slot
+                    slot.session_id = None
+                    slot.disconnected_at = None
+                else:
+                    # Mark as disconnected for potential reconnection
+                    slot.disconnected_at = datetime.now(UTC)
                 return True
 
             return False
