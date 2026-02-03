@@ -17,19 +17,14 @@ from typing import Any
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from monopoly_engine.game import MonopolyGame
 from monopoly_engine.actions import (
-    RollDice,
     BuyProperty,
     EndTurn,
     PayJailFine,
+    RollDice,
     UseJailCard,
-    DeclareBankruptcy,
-    BuildHouse,
-    BuildHotel,
-    SellHouse,
-    MortgageProperty,
 )
+from monopoly_engine.game import MonopolyGame
 from monopoly_engine.types import SpaceType
 
 
@@ -207,9 +202,8 @@ def run_demo_game(
         print_player_status(game)
         if game.state.winner is not None:
             winner = game.state.players[game.state.winner]
-            print(
-                f"{Colors.GREEN}{Colors.BOLD}Winner: {winner.name} with ${winner.money}!{Colors.ENDC}\n"
-            )
+            msg = f"Winner: {winner.name} with ${winner.money}!"
+            print(f"{Colors.GREEN}{Colors.BOLD}{msg}{Colors.ENDC}\n")
         else:
             print(f"{Colors.YELLOW}Game ended after {max_turns} turns (no winner){Colors.ENDC}\n")
 
