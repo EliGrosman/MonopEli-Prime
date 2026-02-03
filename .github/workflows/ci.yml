@@ -60,4 +60,4 @@ jobs:
         run: uv sync --dev
 
       - name: Run benchmarks
-        run: uv run python scripts/benchmark.py --games 1000 --quiet
+        run: uv run python scripts/benchmark.py --quick
