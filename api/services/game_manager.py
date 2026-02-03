@@ -15,9 +15,12 @@ from monopoly_engine import MonopolyGame
 
 from ..config import get_settings
 from ..models.game import GameInfo, GameState, PlayerSlot
+from ..models.websocket import WSMessage, WSMessageType
 
 if TYPE_CHECKING:
     from monopoly_engine.actions import Action
+
+    from .broadcast import ConnectionManager
 
 
 @dataclass
@@ -53,6 +56,15 @@ class GameManager:
         self.games: dict[str, ActiveGame] = {}
         self._lock = asyncio.Lock()
         self._cleanup_task: asyncio.Task[None] | None = None
+        self._connection_manager: "ConnectionManager | None" = None
+
+    def set_connection_manager(self, manager: "ConnectionManager") -> None:
+        """Set the WebSocket connection manager for broadcasts.
+
+        Args:
+            manager: The ConnectionManager instance
+        """
+        self._connection_manager = manager
 
     async def create_game(
         self,
@@ -149,12 +161,16 @@ class GameManager:
         self,
         game_id: str,
         action: "Action",
+        broadcast: bool = True,
+        exclude_session: str | None = None,
     ) -> tuple[bool, str]:
         """Execute a game action.
 
         Args:
             game_id: The game to execute action on
             action: The action to execute
+            broadcast: Whether to broadcast state update (default True)
+            exclude_session: Session to exclude from broadcast (action sender)
 
         Returns:
             Tuple of (success, message)
@@ -175,7 +191,116 @@ class GameManager:
             except Exception as e:
                 return False, f"Action execution failed: {e}"
 
+        # Broadcast state update to other players (outside lock)
+        if broadcast and self._connection_manager:
+            state = await self.get_game_state(game_id)
+            if state:
+                await self._connection_manager.broadcast_to_game(
+                    game_id,
+                    WSMessage(
+                        type=WSMessageType.STATE_UPDATE,
+                        data=state.model_dump(),
+                    ),
+                    exclude_session=exclude_session,
+                )
+
+        return True, ""
+
+    async def claim_player_slot(
+        self,
+        game_id: str,
+        player_id: int,
+        session_id: str,
+        player_name: str | None = None,
+    ) -> tuple[bool, str]:
+        """Claim a player slot for a session.
+
+        Args:
+            game_id: The game ID
+            player_id: The player slot to claim
+            session_id: The session claiming the slot
+            player_name: Optional name override
+
+        Returns:
+            Tuple of (success, message)
+        """
+        async with self._lock:
+            active_game = self.games.get(game_id)
+            if active_game is None:
+                return False, "Game not found"
+
+            if player_id not in active_game.player_slots:
+                return False, f"Invalid player ID: {player_id}"
+
+            slot = active_game.player_slots[player_id]
+
+            # Check if slot is already claimed by someone else
+            if slot.session_id is not None and slot.session_id != session_id:
+                return False, f"Player slot {player_id} is already claimed"
+
+            # Claim the slot
+            slot.session_id = session_id
+            if player_name:
+                slot.name = player_name
+
             return True, ""
+
+    async def release_player_slot(
+        self,
+        game_id: str,
+        player_id: int,
+        session_id: str,
+    ) -> bool:
+        """Release a player slot.
+
+        Args:
+            game_id: The game ID
+            player_id: The player slot to release
+            session_id: The session releasing the slot (must match)
+
+        Returns:
+            True if released, False otherwise
+        """
+        async with self._lock:
+            active_game = self.games.get(game_id)
+            if active_game is None:
+                return False
+
+            if player_id not in active_game.player_slots:
+                return False
+
+            slot = active_game.player_slots[player_id]
+
+            # Only release if session matches
+            if slot.session_id == session_id:
+                slot.session_id = None
+                return True
+
+            return False
+
+    async def get_player_slot_by_session(
+        self,
+        game_id: str,
+        session_id: str,
+    ) -> int | None:
+        """Get player ID for a session in a game.
+
+        Args:
+            game_id: The game ID
+            session_id: The session to look up
+
+        Returns:
+            Player ID if found, None otherwise
+        """
+        active_game = self.games.get(game_id)
+        if active_game is None:
+            return None
+
+        for player_id, slot in active_game.player_slots.items():
+            if slot.session_id == session_id:
+                return player_id
+
+        return None
 
     async def delete_game(self, game_id: str) -> bool:
         """Delete a game session.

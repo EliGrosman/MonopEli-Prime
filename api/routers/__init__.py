@@ -2,6 +2,6 @@
 FastAPI routers for the MonopEli API.
 """
 
-from . import games
+from . import games, websocket
 
-__all__ = ["games"]
+__all__ = ["games", "websocket"]

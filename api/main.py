@@ -16,7 +16,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
-from .routers import games
+from .routers import games, websocket
+from .services.broadcast import ConnectionManager
 from .services.game_manager import GameManager
 
 
@@ -25,6 +26,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for startup/shutdown."""
     # Startup
     app.state.game_manager = GameManager()
+    app.state.connection_manager = ConnectionManager()
+
+    # Link connection manager to game manager for broadcasts
+    app.state.game_manager.set_connection_manager(app.state.connection_manager)
+
     await app.state.game_manager.start_cleanup_task()
 
     yield
@@ -75,14 +81,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def api_info() -> dict[str, str | int]:
         """API information endpoint."""
         game_manager: GameManager = app.state.game_manager
+        conn_manager: ConnectionManager = app.state.connection_manager
         return {
             "name": "MonopEli API",
             "version": "1.0.0",
             "active_games": game_manager.game_count(),
+            "websocket_connections": conn_manager.total_connections(),
         }
 
     # Include routers
     app.include_router(games.router, prefix="/api/games", tags=["games"])
+    app.include_router(websocket.router, tags=["websocket"])
 
     return app
 
