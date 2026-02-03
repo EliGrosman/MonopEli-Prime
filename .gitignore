@@ -9,6 +9,7 @@ wheels/
 .pytest_cache/
 htmlcov/
 .coverage
+.hypothesis/
 
 # Virtual environments
 .venv

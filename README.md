@@ -73,7 +73,7 @@ state_json = game.to_json()
 
 ```
 MonopEli-Prime/
-├── monopoly_engine/           # Core game engine package (1,869 lines)
+├── monopoly_engine/           # Core game engine package (~1,800 lines)
 │   ├── __init__.py           # Package exports
 │   ├── types.py              # Enums, TypedDicts, Protocols (145 lines)
 │   ├── board.py              # Board definition with 40 spaces (100 lines)
@@ -84,9 +84,15 @@ MonopEli-Prime/
 │   ├── rules.py              # Game rules and validation (225 lines)
 │   ├── actions.py            # All 15 action types (407 lines)
 │   ├── state.py              # Game state management (74 lines)
-│   └── game.py               # Main game orchestrator (483 lines)
+│   └── game.py               # Main game orchestrator (482 lines)
 │
-├── tests/                     # Test suite (~5,000 lines, 400 tests)
+├── monopoly_gym/              # PettingZoo RL environment (~530 lines) ✨ NEW
+│   ├── __init__.py           # Package exports
+│   ├── env.py                # PettingZoo AEC environment (210 lines)
+│   ├── action_space.py       # 149-dim action encoding (202 lines)
+│   └── observation.py        # Dict observation space (118 lines)
+│
+├── tests/                     # Test suite (~5,500 lines, 433 tests)
 │   ├── conftest.py           # Shared fixtures
 │   ├── test_types.py         # Type validation tests (27 tests)
 │   ├── test_board.py         # Board structure tests (32 tests)
@@ -420,11 +426,20 @@ uv run python scripts/benchmark.py --profile
 
 **Status**: 10/10 core modules complete, ~1,800 lines of production code, ~5,000 lines of tests, all success criteria met
 
-### Phase 2: Gymnasium Integration (Next)
-- OpenAI Gym/Gymnasium wrapper
-- Observation space definition
-- Action space encoding
-- Reward shaping for RL
+### Phase 2: PettingZoo RL Environment 🚧 IN PROGRESS
+**Week 1 Complete** ✅:
+- PettingZoo AEC environment (`monopoly_gym/env.py`)
+- 149-dimensional action space encoding
+- Dict observation space
+- Multi-agent turn-based gameplay (2-4 players)
+- Action masking with upfront validation
+- 33 new tests, zero mypy errors
+
+**Remaining (Weeks 2-6)**:
+- Agent implementations (Random, Rule-based, RL)
+- Reward function tuning
+- Training infrastructure
+- Self-play training
 
 ### Phase 3: Web Backend
 - FastAPI REST API
@@ -484,29 +499,32 @@ Built as part of the MonopEli project - a multi-phase implementation of Monopoly
 
 ---
 
-**Status**: Phase 1 - 100% Complete
-**Version**: 1.0.0 (Phase 1 Release)
+**Status**: Phase 2 - Week 1 Complete
+**Version**: 2.0.0-dev (Phase 2 In Progress)
 **Last Updated**: 2026-02-02
 
-## Phase 1 Complete
+## Phase 2 Week 1 Complete ✅
 
-All 6 weeks of Phase 1 development are now complete:
+PettingZoo RL environment foundation is now complete:
 
-**Week 6 Achievements**:
-- Fixed all ruff linting issues (28 errors → 0)
-- Created CI/CD pipeline with GitHub Actions
-  - Multi-Python testing (3.11, 3.12, 3.13)
-  - Automatic linting and type checking
-  - Coverage reporting to Codecov
-  - Performance benchmark job
-- Updated pyproject.toml configuration
-- Final documentation polish
+**Week 1 Deliverables**:
+- `monopoly_gym/env.py` - PettingZoo AEC environment (210 lines, 79% coverage)
+- `monopoly_gym/action_space.py` - 149-dim action encoding (202 lines, 59% coverage)
+- `monopoly_gym/observation.py` - Dict observation space (118 lines, 68% coverage)
+- `tests/test_monopoly_gym.py` - 33 new tests passing
 
-**Final Metrics**:
-- 400 tests passing (91% coverage)
-- 1,234 games/second performance
+**Key Features**:
+- Full PettingZoo AEC API compliance
+- 149-dimensional action space (no trades - deferred to Phase 2.5)
+- Action masking with upfront validation
+- Multi-agent turn-based gameplay (2-4 players)
+- Automatic dice rolling at turn start
+- Sparse and dense reward functions
+- Zero mypy errors (strict mode)
+
+**Metrics**:
+- 433 total tests passing (61% coverage)
 - Zero mypy errors (strict mode)
 - Zero ruff linting issues
-- All success criteria met
 
-**Ready for Phase 2**: Gymnasium Integration
+**Next**: Week 2 - Agent implementations, comprehensive tests
