@@ -46,11 +46,13 @@ from .observation import (
     flatten_observation,
     get_flat_observation_size,
 )
+from .single_agent_env import SingleAgentMonopolyEnv
 
 __version__ = "0.1.0"
 __all__ = [
-    # Environment
+    # Environments
     "MonopolyEnv",
+    "SingleAgentMonopolyEnv",
     # Action space
     "ActionEncoder",
     "ACTION_SPACE_SIZE",
