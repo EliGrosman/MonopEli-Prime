@@ -15,3 +15,8 @@ htmlcov/
 .venv
 
 .DS_Store
+
+# Training artifacts
+logs/*
+training_log_*.txt
+models/*

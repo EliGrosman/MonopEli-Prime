@@ -19,8 +19,8 @@ from typing import Any
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from monopoly_engine.actions import BuyProperty, EndTurn, PayJailFine, RollDice
 from monopoly_engine.game import MonopolyGame
-from monopoly_engine.actions import RollDice, BuyProperty, EndTurn, PayJailFine
 from monopoly_engine.types import SpaceType
 
 
@@ -280,7 +280,8 @@ def print_results(results: dict[str, Any]) -> None:
         t = results["throughput"]
         print("\n📊 THROUGHPUT")
         print(f"  Games played: {t['num_games']}")
-        print(f"  Completed: {t['completed_games']} ({t['completed_games']/t['num_games']*100:.1f}%)")
+        pct = t['completed_games'] / t['num_games'] * 100
+        print(f"  Completed: {t['completed_games']} ({pct:.1f}%)")
         print(f"  Total turns: {t['total_turns']}")
         print(f"  Elapsed: {t['elapsed_seconds']:.2f}s")
         print(f"  → Games/second: {t['games_per_second']:.1f}")

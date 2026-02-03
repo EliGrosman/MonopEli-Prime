@@ -86,13 +86,27 @@ MonopEli-Prime/
 │   ├── state.py              # Game state management (74 lines)
 │   └── game.py               # Main game orchestrator (482 lines)
 │
-├── monopoly_gym/              # PettingZoo RL environment (~530 lines) ✨ NEW
+├── monopoly_gym/              # PettingZoo RL environment (~1,000 lines)
 │   ├── __init__.py           # Package exports
 │   ├── env.py                # PettingZoo AEC environment (210 lines)
 │   ├── action_space.py       # 149-dim action encoding (202 lines)
-│   └── observation.py        # Dict observation space (118 lines)
+│   ├── observation.py        # Dict observation space (118 lines)
+│   ├── rewards.py            # Configurable reward functions (210 lines) ✨ NEW
+│   └── single_agent_env.py   # Gymnasium wrapper for SB3 (296 lines) ✨ NEW
 │
-├── tests/                     # Test suite (~5,500 lines, 433 tests)
+├── agents/                    # Agent framework (~300 lines)
+│   ├── __init__.py           # Package exports
+│   ├── base.py               # Agent ABC
+│   ├── random_agent.py       # Random baseline agent
+│   └── rule_based.py         # Heuristic agents (RuleBased, Aggressive, Conservative)
+│
+├── training/                  # Training infrastructure (~1,000 lines) ✨ NEW
+│   ├── __init__.py           # Package exports
+│   ├── train.py              # MaskablePPO training (278 lines)
+│   ├── evaluate.py           # Evaluation harness (305 lines)
+│   └── curriculum.py         # Curriculum learning (354 lines)
+│
+├── tests/                     # Test suite (~9,400 lines, 1120 tests)
 │   ├── conftest.py           # Shared fixtures
 │   ├── test_types.py         # Type validation tests (27 tests)
 │   ├── test_board.py         # Board structure tests (32 tests)
@@ -103,11 +117,20 @@ MonopEli-Prime/
 │   ├── test_actions.py       # Action validation tests (74 tests)
 │   ├── test_state.py         # State management tests (30 tests)
 │   ├── test_game.py          # Game orchestration tests (34 tests)
-│   └── test_integration.py   # Integration tests (24 tests) ✨ NEW
+│   ├── test_integration.py   # Integration tests (24 tests)
+│   ├── test_monopoly_gym.py  # Environment tests (33 tests)
+│   ├── test_action_space.py  # Action encoding tests (265 tests)
+│   ├── test_observation.py   # Observation encoding tests (111 tests)
+│   ├── test_agents.py        # Agent tests (72 tests)
+│   ├── test_rewards.py       # Reward function tests (65 tests)
+│   ├── test_single_agent_env.py # Single-agent env tests (90 tests)
+│   └── test_training.py      # Training infrastructure tests (51 tests) ✨ NEW
 │
-├── scripts/                   # Utility scripts (236 lines) ✨ NEW
+├── scripts/                   # Utility scripts (~550 lines)
 │   ├── cli_runner.py         # Interactive CLI runner (68 lines)
 │   ├── benchmark.py          # Performance benchmarks (135 lines)
+│   ├── train_ppo.py          # Training CLI (174 lines) ✨ NEW
+│   └── evaluate_agent.py     # Evaluation CLI (137 lines) ✨ NEW
 │   └── random_bot.py         # Random action bot (33 lines)
 │
 ├── pyproject.toml            # Project configuration
