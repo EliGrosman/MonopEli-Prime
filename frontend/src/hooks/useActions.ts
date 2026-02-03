@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { useSessionStore } from '@/store/sessionStore';
 import { useUIStore } from '@/store/uiStore';
 import type { ClientActionMessage } from '@/types';
 
@@ -11,11 +12,27 @@ interface UseActionsOptions {
  * Game action dispatchers.
  *
  * Sends actions to server via WebSocket.
+ * Provides computed states for UI enablement.
  */
 export function useActions({ send }: UseActionsOptions) {
-  const { setLoading, setError } = useGameStore();
+  const { setLoading, setError, gameState } = useGameStore();
+  const { playerId } = useSessionStore();
   const { addToast } = useUIStore();
   const [isActionPending, setIsActionPending] = useState(false);
+
+  // Current player state
+  const currentPlayer = useMemo(
+    () => gameState?.players.find((p) => p.id === playerId),
+    [gameState?.players, playerId]
+  );
+
+  // Computed states for UI
+  const isMyTurn = gameState?.currentPlayer === playerId;
+  const isInJail = currentPlayer?.inJail ?? false;
+  const canRollDice = isMyTurn && !gameState?.lastRoll && gameState?.gamePhase === 'pre_roll' && !isInJail;
+  const canEndTurn = isMyTurn && (gameState?.gamePhase === 'post_roll' || gameState?.lastRoll !== null);
+  const canPayJailFine = isMyTurn && isInJail && (currentPlayer?.money ?? 0) >= 50;
+  const canUseJailCard = isMyTurn && isInJail && (currentPlayer?.jailCards ?? 0) > 0;
 
   const sendAction = useCallback(
     (actionType: string, data: Record<string, unknown> = {}) => {
@@ -45,6 +62,15 @@ export function useActions({ send }: UseActionsOptions) {
 
   return {
     isActionPending,
+
+    // Computed states for UI
+    isMyTurn,
+    isInJail,
+    canRollDice,
+    canEndTurn,
+    canPayJailFine,
+    canUseJailCard,
+    currentPlayer,
 
     // Dice
     rollDice: useCallback(() => sendAction('roll_dice'), [sendAction]),
