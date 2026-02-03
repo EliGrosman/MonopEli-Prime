@@ -450,19 +450,25 @@ uv run python scripts/benchmark.py --profile
 **Status**: 10/10 core modules complete, ~1,800 lines of production code, ~5,000 lines of tests, all success criteria met
 
 ### Phase 2: PettingZoo RL Environment 🚧 IN PROGRESS
-**Week 1 Complete** ✅:
+**Weeks 1-5 Complete** ✅:
 - PettingZoo AEC environment (`monopoly_gym/env.py`)
 - 149-dimensional action space encoding
-- Dict observation space
+- Dict observation space with flattening support
 - Multi-agent turn-based gameplay (2-4 players)
 - Action masking with upfront validation
-- 33 new tests, zero mypy errors
+- Agent framework (Random, RuleBased, Aggressive, Conservative)
+- Configurable reward functions (sparse/dense)
+- SingleAgentMonopolyEnv for SB3 training
+- MaskablePPO training with vectorized environments
+- Curriculum learning (4-stage progression)
+- Self-play training infrastructure
+- **94% win rate vs random** achieved
+- 1144 tests, 92% coverage
 
-**Remaining (Weeks 2-6)**:
-- Agent implementations (Random, Rule-based, RL)
-- Reward function tuning
-- Training infrastructure
-- Self-play training
+**Week 6 (Current)**:
+- Self-play training loop ✅
+- Documentation polish
+- Final testing
 
 ### Phase 3: Web Backend
 - FastAPI REST API
@@ -522,32 +528,136 @@ Built as part of the MonopEli project - a multi-phase implementation of Monopoly
 
 ---
 
-**Status**: Phase 2 - Week 1 Complete
-**Version**: 2.0.0-dev (Phase 2 In Progress)
-**Last Updated**: 2026-02-02
+**Status**: Phase 2 - Week 6 (Final Polish)
+**Version**: 2.0.0-dev (Phase 2 Nearly Complete)
+**Last Updated**: 2026-02-03
 
-## Phase 2 Week 1 Complete ✅
+## Phase 2: RL Training Environment
 
-PettingZoo RL environment foundation is now complete:
+### Quick Start - Training an Agent
 
-**Week 1 Deliverables**:
-- `monopoly_gym/env.py` - PettingZoo AEC environment (210 lines, 79% coverage)
-- `monopoly_gym/action_space.py` - 149-dim action encoding (202 lines, 59% coverage)
-- `monopoly_gym/observation.py` - Dict observation space (118 lines, 68% coverage)
-- `tests/test_monopoly_gym.py` - 33 new tests passing
+```bash
+# Install training dependencies
+uv sync --extra training
 
-**Key Features**:
-- Full PettingZoo AEC API compliance
-- 149-dimensional action space (no trades - deferred to Phase 2.5)
-- Action masking with upfront validation
-- Multi-agent turn-based gameplay (2-4 players)
-- Automatic dice rolling at turn start
-- Sparse and dense reward functions
-- Zero mypy errors (strict mode)
+# Train a PPO agent (100k steps)
+uv run python scripts/train_ppo.py --timesteps 100000
 
-**Metrics**:
-- 433 total tests passing (61% coverage)
-- Zero mypy errors (strict mode)
-- Zero ruff linting issues
+# Evaluate trained agent
+uv run python scripts/evaluate_agent.py --model models/ppo_monopoly --games 100
 
-**Next**: Week 2 - Agent implementations, comprehensive tests
+# Self-play training
+uv run python scripts/train_self_play.py --timesteps 500000
+```
+
+### Using the RL Environment
+
+```python
+# Multi-agent environment (PettingZoo)
+from monopoly_gym import MonopolyEnv
+
+env = MonopolyEnv(num_players=4, reward_type="sparse")
+env.reset(seed=42)
+
+for agent in env.agent_iter():
+    obs, reward, term, trunc, info = env.last()
+    if term or trunc:
+        action = None
+    else:
+        action_mask = info["action_mask"]
+        action = select_action(obs, action_mask)
+    env.step(action)
+
+# Single-agent environment (Gymnasium - for SB3)
+from monopoly_gym import SingleAgentMonopolyEnv
+
+env = SingleAgentMonopolyEnv(
+    num_players=2,
+    opponent_type="random",  # or "rule_based", "aggressive", "conservative"
+    reward_type="dense",
+)
+obs, info = env.reset()
+
+while True:
+    action_mask = info["action_mask"]
+    action = model.predict(obs, action_masks=action_mask)
+    obs, reward, term, trunc, info = env.step(action)
+    if term or trunc:
+        break
+```
+
+### Training with MaskablePPO
+
+```python
+from training import train_agent, TrainingConfig, EnvironmentConfig
+
+config = TrainingConfig(
+    total_timesteps=1_000_000,
+    num_envs=8,
+    learning_rate=3e-4,
+)
+env_config = EnvironmentConfig(
+    num_players=2,
+    opponent_type="random",
+    reward_type="dense",
+)
+
+model = train_agent(config, env_config, save_path="models/my_agent")
+```
+
+### Self-Play Training
+
+```python
+from training import SelfPlayConfig, SelfPlayTrainer
+
+config = SelfPlayConfig(
+    total_timesteps=1_000_000,
+    checkpoint_freq=50_000,
+    past_version_prob=0.5,
+)
+trainer = SelfPlayTrainer(config)
+model = trainer.train()
+```
+
+### Curriculum Learning
+
+```python
+from training import CurriculumConfig, CurriculumTrainer
+
+config = CurriculumConfig(
+    stages=[
+        ("random", 100_000, 0.8),      # Train vs random until 80% win rate
+        ("rule_based", 200_000, 0.6),  # Then vs rule_based until 60%
+        ("aggressive", 300_000, 0.5),  # Then vs aggressive until 50%
+    ],
+)
+trainer = CurriculumTrainer(config)
+model = trainer.train()
+```
+
+### Phase 2 Achievements
+
+| Metric | Target | Achieved |
+|--------|--------|----------|
+| Win rate vs random | >90% | **94%** ✅ |
+| Win rate vs rule_based | >70% | 22% (2.8x baseline) |
+| Training throughput | - | ~1,000 steps/sec |
+| Tests | 100+ | **1144** ✅ |
+| Coverage | 80%+ | **92%** ✅ |
+
+### Key Features
+
+- **PettingZoo AEC API**: Full multi-agent support
+- **149-dim Action Space**: All game actions except trades
+- **Action Masking**: Only valid actions can be selected
+- **Configurable Rewards**: Sparse (+1/-1) or dense (net worth changes)
+- **Agent Framework**: Random, RuleBased, Aggressive, Conservative
+- **Training Infrastructure**: MaskablePPO, curriculum learning, self-play
+- **Evaluation Harness**: Automated win rate testing
+
+### Next: Phase 2.5 - Trade Actions
+
+Trade actions are deferred to Phase 2.5 to reduce action space complexity:
+- Property-for-property trades
+- Cash-for-property trades
+- Trade negotiation with opponent agents
