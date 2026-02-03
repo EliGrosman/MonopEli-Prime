@@ -237,7 +237,9 @@ class TestJoinLobby:
             json={"player_name": "Bob"},
         )
         assert join_response.status_code == 400
-        assert "invite code" in join_response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = join_response.json()["error"]
+        assert "invite code" in error["message"].lower()
 
     def test_join_lobby_full(self, client: TestClient) -> None:
         """Cannot join a full lobby."""
@@ -260,7 +262,9 @@ class TestJoinLobby:
             json={"player_name": "Charlie"},
         )
         assert join_response.status_code == 400
-        assert "full" in join_response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = join_response.json()["error"]
+        assert "full" in error["message"].lower()
 
     def test_join_nonexistent_lobby(self, client: TestClient) -> None:
         """Cannot join non-existent lobby."""
@@ -409,7 +413,9 @@ class TestAIPlayers:
             params={"session_id": bob_session},
         )
         assert ai_response.status_code == 400
-        assert "host" in ai_response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = ai_response.json()["error"]
+        assert "host" in error["message"].lower()
 
     def test_remove_ai_player(self, client: TestClient) -> None:
         """Host can remove an AI player."""
@@ -594,7 +600,9 @@ class TestStartGame:
             params={"session_id": host_session},
         )
         assert start_response.status_code == 400
-        assert "player" in start_response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = start_response.json()["error"]
+        assert "player" in error["message"].lower()
 
     def test_start_game_non_host(self, client: TestClient) -> None:
         """Non-host cannot start game."""
@@ -615,7 +623,9 @@ class TestStartGame:
             params={"session_id": bob_session},
         )
         assert start_response.status_code == 400
-        assert "host" in start_response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = start_response.json()["error"]
+        assert "host" in error["message"].lower()
 
 
 # ============================================================================

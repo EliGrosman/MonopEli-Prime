@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://eli-lab:5173"]
 
     # Game settings
     max_concurrent_games: int = 1000
@@ -32,6 +32,10 @@ class Settings(BaseSettings):
 
     # AI (Phase 3 Week 5)
     ai_think_delay_ms: int = 500  # Artificial delay for AI moves
+
+    # Rate limiting (Phase 3 Week 6)
+    rate_limit_per_minute: int = 60  # Requests per minute per IP
+    rate_limit_burst: int = 10  # Maximum burst size
 
     # Future: Redis for scaling
     redis_url: str | None = None

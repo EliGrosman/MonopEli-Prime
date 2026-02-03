@@ -89,7 +89,9 @@ class TestCreateGame:
             json={"num_players": 4, "player_names": ["Alice", "Bob"]},
         )
         assert response.status_code == 400
-        assert "player names" in response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = response.json()["error"]
+        assert "player names" in error["message"].lower()
 
     def test_create_game_websocket_url(self, client: TestClient):
         """Test that websocket URL is correctly formatted."""
@@ -196,7 +198,9 @@ class TestGetGameState:
         """Test getting state for non-existent game."""
         response = client.get("/api/games/nonexistent-game-id")
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        # New error format from ErrorHandlingMiddleware
+        error = response.json()["error"]
+        assert "not found" in error["message"].lower()
 
     def test_get_game_state_initial_values(self, client: TestClient):
         """Test initial game state values."""

@@ -449,28 +449,35 @@ uv run python scripts/benchmark.py --profile
 
 **Status**: 10/10 core modules complete, ~1,800 lines of production code, ~5,000 lines of tests, all success criteria met
 
-### Phase 2: PettingZoo RL Environment 🚧 IN PROGRESS
-**Week 1 Complete** ✅:
-- PettingZoo AEC environment (`monopoly_gym/env.py`)
-- 149-dimensional action space encoding
-- Dict observation space
-- Multi-agent turn-based gameplay (2-4 players)
-- Action masking with upfront validation
-- 33 new tests, zero mypy errors
+### Phase 2: PettingZoo RL Environment ✅ COMPLETE
 
-**Remaining (Weeks 2-6)**:
-- Agent implementations (Random, Rule-based, RL)
-- Reward function tuning
-- Training infrastructure
-- Self-play training
+**All Weeks Complete (1-6)**:
+- ✅ PettingZoo AEC environment (`monopoly_gym/env.py`)
+- ✅ 149-dimensional action space encoding
+- ✅ Dict observation space
+- ✅ Agent framework (Random, RuleBased, Aggressive, Conservative)
+- ✅ Configurable reward functions
+- ✅ Training infrastructure with MaskablePPO
+- ✅ Curriculum learning (4-stage progressive difficulty)
+- ✅ Self-play training infrastructure
+- ✅ 94% win rate vs random baseline (exceeds 90% target)
+- ✅ 1,144 tests, 92% coverage
 
-### Phase 3: Web Backend
-- FastAPI REST API
-- WebSocket for real-time updates
-- Game session management
-- Persistent storage
+### Phase 3: FastAPI Web Backend ✅ COMPLETE
 
-### Phase 4: Frontend
+**All Weeks Complete (1-6)**:
+- ✅ FastAPI REST API with OpenAPI documentation
+- ✅ WebSocket for real-time game updates
+- ✅ Lobby system with matchmaking
+- ✅ AI opponent integration (4 agent types)
+- ✅ Player session management
+- ✅ Request logging with request ID tracking
+- ✅ Global error handling with standard format
+- ✅ Rate limiting (token bucket algorithm)
+- ✅ Locust load testing
+- ✅ 199 API tests, zero mypy errors
+
+### Phase 4: Frontend 🚧 NEXT
 - React/TypeScript UI
 - Real-time game board
 - Player dashboard
@@ -522,32 +529,96 @@ Built as part of the MonopEli project - a multi-phase implementation of Monopoly
 
 ---
 
-**Status**: Phase 2 - Week 1 Complete
-**Version**: 2.0.0-dev (Phase 2 In Progress)
-**Last Updated**: 2026-02-02
+**Status**: Phase 3 - COMPLETE
+**Version**: 3.0.0-dev (Phase 3 Complete)
+**Last Updated**: 2026-02-03
 
-## Phase 2 Week 1 Complete ✅
+## API Server
 
-PettingZoo RL environment foundation is now complete:
+### Running the API Server
 
-**Week 1 Deliverables**:
-- `monopoly_gym/env.py` - PettingZoo AEC environment (210 lines, 79% coverage)
-- `monopoly_gym/action_space.py` - 149-dim action encoding (202 lines, 59% coverage)
-- `monopoly_gym/observation.py` - Dict observation space (118 lines, 68% coverage)
-- `tests/test_monopoly_gym.py` - 33 new tests passing
+```bash
+# Development (with auto-reload)
+uv run uvicorn api.main:app --reload --port 8000
+
+# Production (with multiple workers)
+uv run uvicorn api.main:create_app --factory --workers 4 --port 8000
+
+# View API documentation
+# Open http://localhost:8000/api/docs
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api` | GET | API info and stats |
+| `/api/games` | GET/POST | List/create games |
+| `/api/games/{id}` | GET/DELETE | Get/delete game |
+| `/api/lobbies` | GET/POST | List/create lobbies |
+| `/api/lobbies/{id}/join` | POST | Join a lobby |
+| `/api/lobbies/{id}/start` | POST | Start game from lobby |
+| `/api/players/session` | POST | Create player session |
+| `/ws/games/{id}` | WS | Real-time game connection |
+
+### Environment Variables
+
+```bash
+# Server config
+MONOPELI_HOST=0.0.0.0
+MONOPELI_PORT=8000
+MONOPELI_DEBUG=true
+MONOPELI_LOG_LEVEL=INFO
+
+# Rate limiting
+MONOPELI_RATE_LIMIT_PER_MINUTE=60
+MONOPELI_RATE_LIMIT_BURST=10
+
+# CORS origins
+MONOPELI_CORS_ORIGINS=["http://localhost:3000"]
+```
+
+### Load Testing
+
+```bash
+# Install locust
+uv add --dev locust
+
+# Run load test (web UI)
+uv run locust -f scripts/load_test.py --host http://localhost:8000
+
+# Run headless load test
+uv run locust -f scripts/load_test.py --host http://localhost:8000 \
+  --headless -u 100 -r 10 -t 60s
+```
+
+## Phase 3 Complete ✅
+
+FastAPI Web Backend is now complete:
+
+**Week 6 Deliverables**:
+- `api/middleware/logging.py` - Structured request logging (120 lines)
+- `api/middleware/errors.py` - Global error handling (200 lines)
+- `api/middleware/rate_limit.py` - Token bucket rate limiting (195 lines)
+- `scripts/load_test.py` - Locust load testing (200 lines)
+- `tests/api/test_middleware.py` - 34 middleware tests
 
 **Key Features**:
-- Full PettingZoo AEC API compliance
-- 149-dimensional action space (no trades - deferred to Phase 2.5)
-- Action masking with upfront validation
-- Multi-agent turn-based gameplay (2-4 players)
-- Automatic dice rolling at turn start
-- Sparse and dense reward functions
-- Zero mypy errors (strict mode)
+- Full REST API with OpenAPI documentation
+- WebSocket for real-time game updates
+- Lobby system with matchmaking
+- AI opponents (4 agent types)
+- Player session management
+- Request ID tracking
+- Standardized error responses
+- Token bucket rate limiting
 
 **Metrics**:
-- 433 total tests passing (61% coverage)
+- 199 API tests passing
+- ~3,300 lines of production code
+- ~3,600 lines of test code
 - Zero mypy errors (strict mode)
 - Zero ruff linting issues
 
-**Next**: Week 2 - Agent implementations, comprehensive tests
+**Next**: Phase 4 - React/TypeScript Frontend

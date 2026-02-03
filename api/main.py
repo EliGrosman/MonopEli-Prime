@@ -16,6 +16,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
+from .middleware.errors import ErrorHandlingMiddleware
+from .middleware.logging import RequestLoggingMiddleware, setup_logging
+from .middleware.rate_limit import RateLimitMiddleware
 from .routers import games, lobbies, players, websocket
 from .services.ai_manager import AIManager
 from .services.broadcast import ConnectionManager
@@ -68,14 +71,65 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
         settings = get_settings()
 
+    # Set up logging
+    setup_logging(
+        log_level=settings.log_level,
+        json_format=not settings.debug,  # JSON in production, readable in dev
+    )
+
     app = FastAPI(
         title="MonopEli API",
-        description="Multiplayer Monopoly game backend",
+        description="""
+# MonopEli API
+
+Multiplayer Monopoly game backend with real-time WebSocket support.
+
+## Features
+
+- **REST API** for game management (create, list, delete games)
+- **WebSocket** for real-time gameplay communication
+- **Lobby System** for matchmaking and game setup
+- **AI Opponents** with multiple difficulty levels
+- **Session Management** for player tracking
+
+## Getting Started
+
+1. Create a player session: `POST /api/players/session`
+2. Create or join a lobby: `POST /api/lobbies` or `POST /api/lobbies/{id}/join`
+3. When ready, start the game from the lobby
+4. Connect via WebSocket for real-time gameplay
+
+## WebSocket Protocol
+
+Connect to `/ws/games/{game_id}?session_id={session_id}&player_id={player_id}`
+
+Message types:
+- `action`: Send game actions (roll_dice, buy_property, etc.)
+- `heartbeat`: Keep connection alive
+- `chat`: Send chat messages
+        """,
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/api/docs",
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
+    )
+
+    # Install error handlers (must be before middleware)
+    ErrorHandlingMiddleware.install(app)
+
+    # Rate limiting middleware (applied first, before other processing)
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=settings.rate_limit_per_minute,
+        burst_size=settings.rate_limit_burst,
+        exclude_paths=["/health", "/api/docs", "/api/redoc", "/api/openapi.json"],
+    )
+
+    # Request logging middleware
+    app.add_middleware(
+        RequestLoggingMiddleware,
+        exclude_paths=["/health"],
     )
 
     # CORS middleware
