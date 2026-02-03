@@ -3,10 +3,14 @@ import { Layout } from '@/components/layout/Layout';
 import { HomePage } from '@/components/home/HomePage';
 import { LobbyPage } from '@/components/lobby/LobbyPage';
 import { GamePage } from '@/components/game/GamePage';
+import { ToastContainer, GlobalLoading } from '@/components/common';
+import { useUIStore } from '@/store';
 
-function App() {
+function AppContent() {
+  const { toasts, removeToast, globalLoading, loadingMessage } = useUIStore();
+
   return (
-    <BrowserRouter>
+    <>
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -18,6 +22,16 @@ function App() {
           <Route path="/game" element={<GamePage />} />
         </Routes>
       </Layout>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <GlobalLoading isLoading={globalLoading} message={loadingMessage} />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

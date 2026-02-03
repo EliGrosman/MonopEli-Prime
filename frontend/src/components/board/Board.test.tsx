@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { Board } from './Board';
-import type { PlayerState, PropertyState } from '@/types';
+import type { PlayerState } from '@/types';
 
 // Mock players
 const mockPlayers: PlayerState[] = [
@@ -31,12 +31,12 @@ const mockPlayers: PlayerState[] = [
   },
 ];
 
-// Mock properties
-const mockProperties: Record<number, PropertyState> = {
-  1: { position: 1, owner: 0, houses: 2, mortgaged: false },
-  3: { position: 3, owner: 0, houses: 0, mortgaged: false },
-  5: { position: 5, owner: 1, houses: 0, mortgaged: true },
-};
+// Mock properties - available for future tests
+// const mockProperties: Record<number, PropertyState> = {
+//   1: { position: 1, owner: 0, houses: 2, mortgaged: false },
+//   3: { position: 3, owner: 0, houses: 0, mortgaged: false },
+//   5: { position: 5, owner: 1, houses: 0, mortgaged: true },
+// };
 
 describe('Board', () => {
   it('renders the board component', () => {
