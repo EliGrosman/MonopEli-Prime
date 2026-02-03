@@ -7,8 +7,8 @@ and mortgage status. The immutable property definitions are in board.py.
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .types import PropertyColor, PropertyStateData, PROPERTY_GROUPS, POSITION_TO_COLOR
 from .board import Board, PropertySpace, RailroadSpace, UtilitySpace
+from .types import POSITION_TO_COLOR, PROPERTY_GROUPS, PropertyColor, PropertyStateData
 
 if TYPE_CHECKING:
     pass
@@ -111,29 +111,25 @@ class PropertyManager:
 
     def get_owned_by(self, player_id: int) -> list[int]:
         """Get all property positions owned by a player."""
-        return [
-            pos for pos, prop in self.properties.items()
-            if prop.owner == player_id
-        ]
+        return [pos for pos, prop in self.properties.items() if prop.owner == player_id]
 
     def get_unowned(self) -> list[int]:
         """Get all unowned property positions."""
-        return [
-            pos for pos, prop in self.properties.items()
-            if prop.owner is None
-        ]
+        return [pos for pos, prop in self.properties.items() if prop.owner is None]
 
     def get_mortgaged_by(self, player_id: int) -> list[int]:
         """Get all mortgaged property positions owned by a player."""
         return [
-            pos for pos, prop in self.properties.items()
+            pos
+            for pos, prop in self.properties.items()
             if prop.owner == player_id and prop.mortgaged
         ]
 
     def get_unmortgaged_by(self, player_id: int) -> list[int]:
         """Get all unmortgaged property positions owned by a player."""
         return [
-            pos for pos, prop in self.properties.items()
+            pos
+            for pos, prop in self.properties.items()
             if prop.owner == player_id and not prop.mortgaged
         ]
 
@@ -150,15 +146,13 @@ class PropertyManager:
 
     def get_monopolies(self, player_id: int) -> list[PropertyColor]:
         """Get all color groups where player has a monopoly."""
-        return [
-            color for color in PropertyColor
-            if self.has_monopoly(player_id, color)
-        ]
+        return [color for color in PropertyColor if self.has_monopoly(player_id, color)]
 
     def count_railroads_owned(self, player_id: int) -> int:
         """Count how many railroads a player owns."""
         return sum(
-            1 for pos in PROPERTY_GROUPS[PropertyColor.RAILROAD]
+            1
+            for pos in PROPERTY_GROUPS[PropertyColor.RAILROAD]
             if self.properties.get(pos) is not None
             and self.properties[pos].owner == player_id
         )
@@ -166,7 +160,8 @@ class PropertyManager:
     def count_utilities_owned(self, player_id: int) -> int:
         """Count how many utilities a player owns."""
         return sum(
-            1 for pos in PROPERTY_GROUPS[PropertyColor.UTILITY]
+            1
+            for pos in PROPERTY_GROUPS[PropertyColor.UTILITY]
             if self.properties.get(pos) is not None
             and self.properties[pos].owner == player_id
         )
@@ -213,9 +208,7 @@ class PropertyManager:
         if not group:
             return 0
         return min(
-            self.properties[pos].houses
-            for pos in group
-            if pos in self.properties
+            self.properties[pos].houses for pos in group if pos in self.properties
         )
 
     def get_max_houses_in_group(self, color: PropertyColor) -> int:
@@ -224,9 +217,7 @@ class PropertyManager:
         if not group:
             return 0
         return max(
-            self.properties[pos].houses
-            for pos in group
-            if pos in self.properties
+            self.properties[pos].houses for pos in group if pos in self.properties
         )
 
     def can_build_house_on(self, player_id: int, position: int) -> bool:
@@ -320,10 +311,7 @@ class PropertyManager:
 
     def to_dict(self) -> dict[str, PropertyStateData]:
         """Serialize all properties to JSON-compatible dict."""
-        return {
-            str(pos): prop.to_dict()
-            for pos, prop in self.properties.items()
-        }
+        return {str(pos): prop.to_dict() for pos, prop in self.properties.items()}
 
     @classmethod
     def from_dict(cls, data: dict[str, PropertyStateData]) -> "PropertyManager":

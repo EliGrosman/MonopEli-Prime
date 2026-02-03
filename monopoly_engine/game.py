@@ -8,37 +8,27 @@ this class's methods, not by directly modifying state objects.
 import random
 from typing import Any
 
-from .state import GameState
-from .player import Player
-from .property import PropertyManager, Property
-from .board import Board, PropertySpace, RailroadSpace, UtilitySpace
-from .cards import CardDeck, Card, CHANCE_CARDS, COMMUNITY_CHEST_CARDS
-from .rules import (
-    calculate_rent,
-    can_build_house,
-    can_sell_house,
-    get_building_cost,
-    get_house_sale_value,
-    get_mortgage_value,
-    get_unmortgage_cost,
-)
-from .types import (
-    TradeOfferData,
-    CardType,
-    SpaceType,
-    GO_SALARY,
-    JAIL_POSITION,
-    GO_TO_JAIL_POSITION,
-    JAIL_FINE,
-    MAX_JAIL_TURNS,
-    INCOME_TAX_AMOUNT,
-    LUXURY_TAX_AMOUNT,
-    BOARD_SIZE,
-)
+from .board import Board
+from .cards import CHANCE_CARDS, COMMUNITY_CHEST_CARDS, Card, CardDeck
 from .exceptions import (
     InvalidPlayerError,
     InvalidPropertyError,
-    GameOverError,
+)
+from .player import Player
+from .property import Property, PropertyManager
+from .rules import (
+    calculate_rent,
+)
+from .state import GameState
+from .types import (
+    GO_SALARY,
+    INCOME_TAX_AMOUNT,
+    JAIL_FINE,
+    LUXURY_TAX_AMOUNT,
+    MAX_JAIL_TURNS,
+    CardType,
+    SpaceType,
+    TradeOfferData,
 )
 
 
@@ -232,9 +222,7 @@ class MonopolyGame:
         # Collect GO salary if passed GO
         if passed_go:
             player.add_money(GO_SALARY)
-            self.log_event(
-                f"{player.name} passed GO and collected ${GO_SALARY}"
-            )
+            self.log_event(f"{player.name} passed GO and collected ${GO_SALARY}")
 
         self.log_event(
             f"{player.name} moved from {old_pos} to {new_pos} ({spaces} spaces)"
@@ -265,9 +253,7 @@ class MonopolyGame:
         # Collect GO salary if passed GO
         if passed_go:
             player.add_money(GO_SALARY)
-            self.log_event(
-                f"{player.name} passed GO and collected ${GO_SALARY}"
-            )
+            self.log_event(f"{player.name} passed GO and collected ${GO_SALARY}")
 
         space = Board.get_space(position)
         self.log_event(
@@ -435,9 +421,7 @@ class MonopolyGame:
         owner = self._get_player(prop.owner)  # type: ignore
 
         if success:
-            self.log_event(
-                f"{owner.name} sold hotel on {space.name} for 4 houses"
-            )
+            self.log_event(f"{owner.name} sold hotel on {space.name} for 4 houses")
         else:
             self.log_event(
                 f"{owner.name} sold hotel on {space.name} "
@@ -484,9 +468,7 @@ class MonopolyGame:
         # Transfer ownership
         prop.owner = to_player
 
-        self.log_event(
-            f"{space.name} transferred from {from_name} to {to_name}"
-        )
+        self.log_event(f"{space.name} transferred from {from_name} to {to_name}")
 
     def reset_property(self, property_id: int) -> None:
         """Reset a property to unowned state.
@@ -564,9 +546,7 @@ class MonopolyGame:
 
         self.state.pending_trades[trade_id] = trade_offer
 
-        self.log_event(
-            f"{from_p.name} proposed trade #{trade_id} to {to_p.name}"
-        )
+        self.log_event(f"{from_p.name} proposed trade #{trade_id} to {to_p.name}")
 
         return trade_id
 
@@ -591,13 +571,9 @@ class MonopolyGame:
 
         # Validate funds
         if from_player.money < trade["give_money"]:
-            raise ValueError(
-                f"{from_player.name} doesn't have ${trade['give_money']}"
-            )
+            raise ValueError(f"{from_player.name} doesn't have ${trade['give_money']}")
         if to_player.money < trade["want_money"]:
-            raise ValueError(
-                f"{to_player.name} doesn't have ${trade['want_money']}"
-            )
+            raise ValueError(f"{to_player.name} doesn't have ${trade['want_money']}")
 
         # Transfer money
         if trade["give_money"] > 0:
@@ -635,14 +611,11 @@ class MonopolyGame:
             raise ValueError(f"Trade {trade_id} not found")
 
         trade = self.state.pending_trades[trade_id]
-        from_player = self._get_player(trade["from_player"])
         to_player = self._get_player(trade["to_player"])
 
         del self.state.pending_trades[trade_id]
 
-        self.log_event(
-            f"Trade #{trade_id} rejected by {to_player.name}"
-        )
+        self.log_event(f"Trade #{trade_id} rejected by {to_player.name}")
 
     def get_pending_trade(self, trade_id: int) -> TradeOfferData | None:
         """Get a pending trade offer.
@@ -712,9 +685,7 @@ class MonopolyGame:
                 prop.mortgaged = False
 
                 space = Board.get_space(prop_id)
-                self.log_event(
-                    f"{space.name} transferred to {creditor_name}"
-                )
+                self.log_event(f"{space.name} transferred to {creditor_name}")
             else:
                 # Bank gets property (reset to unowned)
                 self.reset_property(prop_id)
@@ -723,9 +694,7 @@ class MonopolyGame:
         if player.money > 0:
             if creditor is not None:
                 creditor.add_money(player.money)
-                self.log_event(
-                    f"${player.money} transferred to {creditor_name}"
-                )
+                self.log_event(f"${player.money} transferred to {creditor_name}")
 
         # Mark player as bankrupt
         player.declare_bankrupt()
@@ -756,9 +725,7 @@ class MonopolyGame:
         next_player = self.state.next_player()
         self.state.turn_number += 1
 
-        self.log_event(
-            f"{current.name} ended turn. {next_player.name}'s turn begins."
-        )
+        self.log_event(f"{current.name} ended turn. {next_player.name}'s turn begins.")
 
     def next_player(self) -> Player:
         """Advance to the next active player.
@@ -838,9 +805,7 @@ class MonopolyGame:
                         self._handle_landing(player_id)
                     else:
                         # Can't pay fine, bankruptcy
-                        self.log_event(
-                            f"{player.name} cannot afford jail fine"
-                        )
+                        self.log_event(f"{player.name} cannot afford jail fine")
                         self.handle_bankruptcy(player_id)
                 else:
                     self.log_event(
@@ -854,9 +819,7 @@ class MonopolyGame:
 
             if self.state.doubles_count >= 3:
                 # Three doubles in a row = jail
-                self.log_event(
-                    f"{player.name} rolled 3 doubles in a row!"
-                )
+                self.log_event(f"{player.name} rolled 3 doubles in a row!")
                 self.send_to_jail(player_id)
                 return
         else:
@@ -931,15 +894,11 @@ class MonopolyGame:
 
             if not player.remove_money(rent):
                 # Can't afford rent, bankruptcy
-                self.log_event(
-                    f"{player.name} cannot afford ${rent} rent"
-                )
+                self.log_event(f"{player.name} cannot afford ${rent} rent")
                 self.handle_bankruptcy(player_id, prop.owner)
             else:
                 owner.add_money(rent)
-                self.log_event(
-                    f"{player.name} paid ${rent} rent to {owner.name}"
-                )
+                self.log_event(f"{player.name} paid ${rent} rent to {owner.name}")
 
     def _handle_railroad_landing(self, player_id: int) -> None:
         """Handle landing on a railroad."""
@@ -997,9 +956,7 @@ class MonopolyGame:
         elif card.card_type == CardType.PAY:
             if card.amount is not None:
                 if not player.remove_money(card.amount):
-                    self.log_event(
-                        f"{player.name} cannot afford ${card.amount}"
-                    )
+                    self.log_event(f"{player.name} cannot afford ${card.amount}")
                     self.handle_bankruptcy(player_id)
                 else:
                     self.log_event(f"{player.name} paid ${card.amount}")
@@ -1024,9 +981,7 @@ class MonopolyGame:
                             # Other player bankrupt to this player
                             self.handle_bankruptcy(other.id, player_id)
 
-                self.log_event(
-                    f"{player.name} collected ${total} from other players"
-                )
+                self.log_event(f"{player.name} collected ${total} from other players")
 
         elif card.card_type == CardType.PAY_TO_PLAYERS:
             if card.amount is not None:
@@ -1039,9 +994,7 @@ class MonopolyGame:
                         other.add_money(card.amount)
 
                 total = card.amount * (len(self.state.get_active_players()) - 1)
-                self.log_event(
-                    f"{player.name} paid ${total} to other players"
-                )
+                self.log_event(f"{player.name} paid ${total} to other players")
 
         elif card.card_type == CardType.GET_OUT_OF_JAIL:
             player.add_jail_card()

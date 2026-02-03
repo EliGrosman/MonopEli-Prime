@@ -10,13 +10,13 @@ All game logic and state mutations happen through game.py.
 from dataclasses import dataclass, field
 from typing import Any
 
+from .cards import CHANCE_CARDS, COMMUNITY_CHEST_CARDS, CardDeck
 from .player import Player
 from .property import PropertyManager
-from .cards import CardDeck, CHANCE_CARDS, COMMUNITY_CHEST_CARDS
 from .types import (
-    TradeOfferData,
-    TOTAL_HOUSES,
     TOTAL_HOTELS,
+    TOTAL_HOUSES,
+    TradeOfferData,
 )
 
 
@@ -112,9 +112,7 @@ class GameState:
             ValueError: If data is malformed or invalid
         """
         # Reconstruct players
-        players = [
-            Player.from_dict(player_data) for player_data in data["players"]
-        ]
+        players = [Player.from_dict(player_data) for player_data in data["players"]]
 
         # Reconstruct property manager
         property_manager = PropertyManager.from_dict(data["properties"])

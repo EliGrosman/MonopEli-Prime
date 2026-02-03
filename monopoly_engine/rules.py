@@ -6,8 +6,8 @@ rent calculation, building rules, mortgage rules, and bankruptcy handling.
 
 from typing import TYPE_CHECKING
 
-from .types import PropertyColor, PROPERTY_GROUPS, POSITION_TO_COLOR
 from .board import Board, PropertySpace, RailroadSpace, UtilitySpace
+from .types import POSITION_TO_COLOR, PROPERTY_GROUPS, PropertyColor
 
 if TYPE_CHECKING:
     from .player import Player
@@ -285,7 +285,10 @@ def can_mortgage_property(
 
     # Check if any property in the color group has houses
     color = POSITION_TO_COLOR.get(position)
-    if color is not None and color not in (PropertyColor.RAILROAD, PropertyColor.UTILITY):
+    if color is not None and color not in (
+        PropertyColor.RAILROAD,
+        PropertyColor.UTILITY,
+    ):
         for pos in PROPERTY_GROUPS.get(color, ()):
             other_prop = property_manager.get(pos)
             if other_prop and other_prop.houses > 0:

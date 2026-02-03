@@ -4,14 +4,14 @@ This module defines all Chance and Community Chest cards and provides
 a CardDeck class for managing shuffled decks.
 """
 
+import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
-import random
 
-from .types import CardType, CardData
+from .types import CardData, CardType
 
 if TYPE_CHECKING:
-    from .player import Player
+    pass
 
 
 @dataclass(frozen=True)
@@ -89,19 +89,28 @@ CHANCE_CARDS: tuple[Card, ...] = (
     ),
     Card(
         id=4,
-        text="Advance to the nearest Railroad. If unowned, you may buy it from the Bank. If owned, pay owner twice the rental.",
+        text=(
+            "Advance to the nearest Railroad. If unowned, you may buy it from the Bank. "
+            "If owned, pay owner twice the rental."
+        ),
         card_type=CardType.MOVE_NEAREST,
         move_to_nearest="railroad",
     ),
     Card(
         id=5,
-        text="Advance to the nearest Railroad. If unowned, you may buy it from the Bank. If owned, pay owner twice the rental.",
+        text=(
+            "Advance to the nearest Railroad. If unowned, you may buy it from the Bank. "
+            "If owned, pay owner twice the rental."
+        ),
         card_type=CardType.MOVE_NEAREST,
         move_to_nearest="railroad",
     ),
     Card(
         id=6,
-        text="Advance to the nearest Utility. If unowned, you may buy it from the Bank. If owned, throw dice and pay owner 10 times amount thrown.",
+        text=(
+            "Advance to the nearest Utility. If unowned, you may buy it from the Bank. "
+            "If owned, throw dice and pay owner 10 times amount thrown."
+        ),
         card_type=CardType.MOVE_NEAREST,
         move_to_nearest="utility",
     ),
@@ -129,7 +138,10 @@ CHANCE_CARDS: tuple[Card, ...] = (
     ),
     Card(
         id=11,
-        text="Make general repairs on all your property. For each house pay $25. For each hotel pay $100.",
+        text=(
+            "Make general repairs on all your property. "
+            "For each house pay $25. For each hotel pay $100."
+        ),
         card_type=CardType.PAY_PER_BUILDING,
         per_house=25,
         per_hotel=100,

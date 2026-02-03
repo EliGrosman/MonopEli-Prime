@@ -6,7 +6,7 @@ jail status, and bankruptcy.
 
 from dataclasses import dataclass, field
 
-from .types import PlayerStateData, STARTING_MONEY, JAIL_POSITION, BOARD_SIZE
+from .types import BOARD_SIZE, JAIL_POSITION, STARTING_MONEY, PlayerStateData
 
 
 @dataclass
@@ -178,5 +178,7 @@ class Player:
 
     def __str__(self) -> str:
         """Human-readable string representation."""
-        status = "BANKRUPT" if self.bankrupt else ("IN JAIL" if self.in_jail else "active")
+        status = (
+            "BANKRUPT" if self.bankrupt else ("IN JAIL" if self.in_jail else "active")
+        )
         return f"{self.name} (${self.money}, pos {self.position}, {status})"
