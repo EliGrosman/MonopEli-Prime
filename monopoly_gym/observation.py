@@ -8,12 +8,13 @@ The observation space is a Dict containing:
 2. opponent_states: Other players' states (stacked features)
 3. board_state: Property ownership and development (28 properties x 5 features)
 4. game_state: Global game information (turn number, resources, last roll)
-5. action_mask: Valid actions (149-dim binary from action_space module)
+5. action_mask: Valid actions (149-dim for gameplay, 907-dim with trades)
+6. trade_context: (Phase 2.5a) Pending trade information for responding
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from gymnasium import spaces
@@ -32,7 +33,7 @@ MAX_HOUSES: int = 32
 MAX_HOTELS: int = 12
 MAX_DICE_SUM: int = 12
 
-# Property positions (all 28 buyable spaces)
+# Property positions (all 28 buyable spaces) - must match action_space.py
 PROPERTY_POSITIONS: tuple[int, ...] = (
     1, 3,  # Brown
     6, 8, 9,  # Light Blue
@@ -51,6 +52,11 @@ PROPERTY_POS_TO_IDX: dict[int, int] = {
     pos: idx for idx, pos in enumerate(PROPERTY_POSITIONS)
 }
 
+# Inverse map: index to position
+PROPERTY_IDX_TO_POS: dict[int, int] = {
+    idx: pos for idx, pos in enumerate(PROPERTY_POSITIONS)
+}
+
 
 class ObservationEncoder:
     """Encodes Monopoly game state to numpy arrays for RL.
@@ -62,13 +68,15 @@ class ObservationEncoder:
     Attributes:
         num_players: Total number of players in the game.
         max_opponents: Maximum number of opponents (num_players - 1).
+        enable_trades: Whether trade context is included (Phase 2.5a).
     """
 
-    def __init__(self, num_players: int) -> None:
+    def __init__(self, num_players: int, enable_trades: bool = False) -> None:
         """Initialize the observation encoder.
 
         Args:
             num_players: Total number of players (2-8).
+            enable_trades: If True, include trade context in observations.
 
         Raises:
             ValueError: If num_players is not between 2 and 8.
@@ -78,6 +86,7 @@ class ObservationEncoder:
 
         self.num_players = num_players
         self.max_opponents = num_players - 1
+        self.enable_trades = enable_trades
 
         # Features per opponent: money, position, in_jail, jail_turns, jail_cards,
         # bankrupt, plus 28-dim property ownership
@@ -94,9 +103,17 @@ class ObservationEncoder:
             - board_state: Box of shape (28, 5) - owner one-hot + houses normalized
             - game_state: Dict with turn_number, houses_remaining, hotels_remaining,
                          last_roll
-            - action_mask: MultiBinary(149) for valid actions
+            - action_mask: MultiBinary(149 or 907) for valid actions
+            - trade_context: (Phase 2.5a) Dict with pending trade info
         """
-        return spaces.Dict({
+        # Import action space size
+        from .action_space import ACTION_SPACE_SIZE, GAMEPLAY_ACTION_SPACE_SIZE
+
+        action_mask_size = (
+            ACTION_SPACE_SIZE if self.enable_trades else GAMEPLAY_ACTION_SPACE_SIZE
+        )
+
+        obs_space: dict[str, spaces.Space[Any]] = {
             "player_state": spaces.Dict({
                 # Money normalized to [0, 1] by dividing by MAX_MONEY
                 "money": spaces.Box(
@@ -144,19 +161,36 @@ class ObservationEncoder:
                     low=0.0, high=1.0, shape=(1,), dtype=np.float32
                 ),
             }),
-            "action_mask": spaces.MultiBinary(149),
-        })
+            "action_mask": spaces.MultiBinary(action_mask_size),
+        }
+
+        # Add trade context if trades are enabled (Phase 2.5a)
+        if self.enable_trades:
+            obs_space["trade_context"] = spaces.Dict({
+                # Is there a pending trade I need to respond to?
+                "pending_trade": spaces.Discrete(2),  # 0 = no, 1 = yes
+                # Property index being offered to me (0-27, or 28 for none)
+                "offer_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
+                # Property index they want from me (0-27, or 28 for none)
+                "want_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
+                # Who proposed the trade (0-3, or 4 for none)
+                "proposer_id": spaces.Discrete(self.num_players + 1),
+            })
+
+        return spaces.Dict(obs_space)
 
     def encode(
         self,
         game: MonopolyGame,
         player_id: int,
+        pending_trade_response: bool = False,
     ) -> dict[str, np.ndarray | dict[str, np.ndarray]]:
         """Encode the full game state from a player's perspective.
 
         Args:
             game: The MonopolyGame instance to encode.
             player_id: The player ID whose perspective to encode from.
+            pending_trade_response: If True, this player is responding to a trade.
 
         Returns:
             Dictionary matching the observation space structure with encoded
@@ -168,13 +202,19 @@ class ObservationEncoder:
         if player_id < 0 or player_id >= self.num_players:
             raise ValueError(f"Invalid player_id: {player_id}")
 
-        return {
+        obs: dict[str, np.ndarray | dict[str, np.ndarray]] = {
             "player_state": self._encode_player_state(game, player_id),
             "opponent_states": self._encode_opponent_states(game, player_id),
             "board_state": self._encode_board_state(game, player_id),
             "game_state": self._encode_game_state(game),
-            "action_mask": self._encode_action_mask(game, player_id),
+            "action_mask": self._encode_action_mask(game, player_id, pending_trade_response),
         }
+
+        # Add trade context if trades are enabled
+        if self.enable_trades:
+            obs["trade_context"] = self._encode_trade_context(game, player_id)
+
+        return obs
 
     def _encode_player_state(
         self,
@@ -349,24 +389,73 @@ class ObservationEncoder:
         self,
         game: MonopolyGame,
         player_id: int,
+        pending_trade_response: bool = False,
     ) -> np.ndarray:
         """Encode the action mask for valid actions.
 
-        This creates a 149-dimensional binary mask indicating which actions
-        are valid in the current game state.
+        This creates a binary mask indicating which actions are valid in the
+        current game state.
+
+        Args:
+            game: The MonopolyGame instance.
+            player_id: The current player's ID.
+            pending_trade_response: If True, only accept/reject are valid.
+
+        Returns:
+            Binary array of shape (149,) or (907,) with 1 for valid actions.
+        """
+        from .action_space import ActionEncoder
+
+        encoder = ActionEncoder(enable_trades=self.enable_trades)
+        mask = encoder.get_action_mask(game, player_id, pending_trade_response)
+        return mask.astype(np.int8)
+
+    def _encode_trade_context(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+    ) -> dict[str, np.ndarray]:
+        """Encode the trade context for a player.
 
         Args:
             game: The MonopolyGame instance.
             player_id: The current player's ID.
 
         Returns:
-            Binary array of shape (149,) with 1 for valid actions.
+            Dictionary with trade context arrays.
         """
-        from .action_space import ActionEncoder
+        # Check for pending trade directed at this player
+        pending_trade = False
+        offer_property_idx = NUM_PROPERTIES  # 28 = no property
+        want_property_idx = NUM_PROPERTIES
+        proposer_id = self.num_players  # 4 = no proposer (for 4-player game)
 
-        encoder = ActionEncoder()
-        mask = encoder.get_action_mask(game, player_id)
-        return mask.astype(np.int8)
+        for trade_id, trade in game.state.pending_trades.items():
+            if trade["to_player"] == player_id:
+                pending_trade = True
+
+                # For simple 1-for-1 trades
+                if trade["give_properties"] and trade["want_properties"]:
+                    # What they're offering (give_properties from their perspective)
+                    offer_pos = trade["give_properties"][0]
+                    # What they want (want_properties from their perspective)
+                    want_pos = trade["want_properties"][0]
+
+                    # Convert positions to indices
+                    if offer_pos in PROPERTY_POS_TO_IDX:
+                        offer_property_idx = PROPERTY_POS_TO_IDX[offer_pos]
+                    if want_pos in PROPERTY_POS_TO_IDX:
+                        want_property_idx = PROPERTY_POS_TO_IDX[want_pos]
+
+                proposer_id = trade["from_player"]
+                break
+
+        return {
+            "pending_trade": np.array(1 if pending_trade else 0, dtype=np.int64),
+            "offer_property_idx": np.array(offer_property_idx, dtype=np.int64),
+            "want_property_idx": np.array(want_property_idx, dtype=np.int64),
+            "proposer_id": np.array(proposer_id, dtype=np.int64),
+        }
 
 
 def flatten_observation(

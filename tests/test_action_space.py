@@ -32,6 +32,7 @@ from monopoly_gym.action_space import (
     ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
+    GAMEPLAY_ACTION_SPACE_SIZE,
     OFFSET_BUILD_HOTEL,
     OFFSET_BUILD_HOUSE,
     OFFSET_BUY_PROPERTY,
@@ -56,8 +57,9 @@ class TestActionSpaceConstants:
     """Tests for action space constants and mappings."""
 
     def test_action_space_size(self) -> None:
-        """Action space should have exactly 149 dimensions."""
-        assert ACTION_SPACE_SIZE == 149
+        """Gameplay action space should have 149 dimensions, full space 907."""
+        assert GAMEPLAY_ACTION_SPACE_SIZE == 149
+        assert ACTION_SPACE_SIZE == 907  # With Phase 2.5a trades
 
     def test_buyable_positions_count(self) -> None:
         """Should have exactly 28 buyable positions."""
@@ -327,15 +329,22 @@ class TestDecodeAction:
             encoder.decode(-1, player_id=0, game=game)
 
     def test_decode_out_of_range_index_raises(self) -> None:
-        """Action index >= 149 should raise ValueError."""
-        encoder = ActionEncoder()
+        """Out of range action indices should raise ValueError."""
+        # Without trades, action space is 149
+        encoder_no_trades = ActionEncoder(enable_trades=False)
         game = MonopolyGame(num_players=2, seed=42)
 
         with pytest.raises(ValueError, match="out of range"):
-            encoder.decode(149, player_id=0, game=game)
+            encoder_no_trades.decode(149, player_id=0, game=game)
+
+        # With trades, action space is 907
+        encoder_with_trades = ActionEncoder(enable_trades=True)
 
         with pytest.raises(ValueError, match="out of range"):
-            encoder.decode(1000, player_id=0, game=game)
+            encoder_with_trades.decode(907, player_id=0, game=game)
+
+        with pytest.raises(ValueError, match="out of range"):
+            encoder_with_trades.decode(1000, player_id=0, game=game)
 
 
 class TestEncodeDecodeRoundtrip:

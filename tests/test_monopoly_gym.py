@@ -15,6 +15,7 @@ from monopoly_gym import (
     ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
+    GAMEPLAY_ACTION_SPACE_SIZE,
     OFFSET_BUILD_HOTEL,
     OFFSET_BUILD_HOUSE,
     OFFSET_BUY_PROPERTY,
@@ -70,7 +71,7 @@ class TestMonopolyEnv:
         for agent in env.agents:
             assert "action_mask" in env.infos[agent]
             mask = env.infos[agent]["action_mask"]
-            assert len(mask) == ACTION_SPACE_SIZE
+            assert len(mask) == GAMEPLAY_ACTION_SPACE_SIZE  # Default env has no trades
 
     def test_reset_deterministic_with_seed(self) -> None:
         """Test reset with same seed produces same initial state."""
@@ -517,4 +518,4 @@ class TestIntegration:
 
             assert isinstance(obs_space, spaces.Dict)
             assert isinstance(act_space, spaces.Discrete)
-            assert act_space.n == ACTION_SPACE_SIZE
+            assert act_space.n == GAMEPLAY_ACTION_SPACE_SIZE  # Default env has no trades
