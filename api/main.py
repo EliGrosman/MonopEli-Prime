@@ -16,9 +16,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
-from .routers import games, websocket
+from .routers import games, lobbies, websocket
 from .services.broadcast import ConnectionManager
 from .services.game_manager import GameManager
+from .services.lobby_manager import LobbyManager
 
 
 @asynccontextmanager
@@ -27,9 +28,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     app.state.game_manager = GameManager()
     app.state.connection_manager = ConnectionManager()
+    app.state.lobby_manager = LobbyManager()
 
     # Link connection manager to game manager for broadcasts
     app.state.game_manager.set_connection_manager(app.state.connection_manager)
+
+    # Link game manager to lobby manager for game creation
+    app.state.lobby_manager.set_game_manager(app.state.game_manager)
 
     await app.state.game_manager.start_cleanup_task()
 
@@ -91,6 +96,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Include routers
     app.include_router(games.router, prefix="/api/games", tags=["games"])
+    app.include_router(lobbies.router, prefix="/api/lobbies", tags=["lobbies"])
     app.include_router(websocket.router, tags=["websocket"])
 
     return app

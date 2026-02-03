@@ -9,6 +9,7 @@ from fastapi import Request, WebSocket
 
 from .services.broadcast import ConnectionManager
 from .services.game_manager import GameManager
+from .services.lobby_manager import LobbyManager
 
 
 def get_game_manager(request: Request) -> GameManager:
@@ -61,3 +62,29 @@ def get_connection_manager_ws(websocket: WebSocket) -> ConnectionManager:
     """
     conn_manager: ConnectionManager = websocket.app.state.connection_manager
     return conn_manager
+
+
+def get_lobby_manager(request: Request) -> LobbyManager:
+    """Get the lobby manager from application state (for HTTP endpoints).
+
+    Args:
+        request: The FastAPI request object
+
+    Returns:
+        The LobbyManager instance
+    """
+    lobby_manager: LobbyManager = request.app.state.lobby_manager
+    return lobby_manager
+
+
+def get_lobby_manager_ws(websocket: WebSocket) -> LobbyManager:
+    """Get the lobby manager from application state (for WebSocket endpoints).
+
+    Args:
+        websocket: The FastAPI WebSocket object
+
+    Returns:
+        The LobbyManager instance
+    """
+    lobby_manager: LobbyManager = websocket.app.state.lobby_manager
+    return lobby_manager

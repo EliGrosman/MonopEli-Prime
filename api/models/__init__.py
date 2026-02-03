@@ -12,6 +12,20 @@ from .game import (
     PlayerState,
     PropertyState,
 )
+from .lobby import (
+    AddAIRequest,
+    CreateLobbyRequest,
+    CreateLobbyResponse,
+    JoinLobbyRequest,
+    JoinLobbyResponse,
+    LobbyInfo,
+    LobbyMessage,
+    LobbyPlayer,
+    LobbySettings,
+    LobbyState,
+    LobbyStatus,
+    LobbyWSMessageType,
+)
 from .websocket import (
     WSActionRequest,
     WSActionResult,
@@ -35,6 +49,19 @@ __all__ = [
     # Action models
     "ActionRequest",
     "ActionResponse",
+    # Lobby models
+    "AddAIRequest",
+    "CreateLobbyRequest",
+    "CreateLobbyResponse",
+    "JoinLobbyRequest",
+    "JoinLobbyResponse",
+    "LobbyInfo",
+    "LobbyMessage",
+    "LobbyPlayer",
+    "LobbySettings",
+    "LobbyState",
+    "LobbyStatus",
+    "LobbyWSMessageType",
     # WebSocket models
     "WSActionRequest",
     "WSActionResult",
