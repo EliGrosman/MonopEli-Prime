@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@theme {
+  /* Monopoly property colors */
+  --color-property-brown: #8B4513;
+  --color-property-lightblue: #87CEEB;
+  --color-property-magenta: #FF00FF;
+  --color-property-orange: #FFA500;
+  --color-property-red: #FF0000;
+  --color-property-yellow: #FFFF00;
+  --color-property-green: #008000;
+  --color-property-blue: #0000FF;
+  --color-property-railroad: #000000;
+  --color-property-utility: #808080;
+
+  /* UI colors */
+  --color-board-bg: #C8E6C9;
+  --color-board-border: #2E7D32;
+  --color-space-bg: #FAFAFA;
+
+  /* Player colors */
+  --color-player-0: #E53935;
+  --color-player-1: #1E88E5;
+  --color-player-2: #43A047;
+  --color-player-3: #FDD835;
+  --color-player-4: #8E24AA;
+  --color-player-5: #FB8C00;
+  --color-player-6: #00ACC1;
+  --color-player-7: #6D4C41;
+
+  /* Custom animations */
+  --animate-dice-roll: diceRoll 0.5s ease-out;
+  --animate-token-move: tokenMove 0.3s ease-in-out;
+  --animate-pulse-highlight: pulseHighlight 1s infinite;
+}
+
+@keyframes diceRoll {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes tokenMove {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pulseHighlight {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(66, 153, 225, 0.7); }
+  50% { box-shadow: 0 0 0 10px rgba(66, 153, 225, 0); }
+}
+
+:root {
+  /* Board dimensions */
+  --board-size: min(95vw, 95vh, 800px);
+  --space-count-side: 11;
+  --corner-size: calc(var(--board-size) / var(--space-count-side));
+  --space-width: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
+  --space-height: var(--corner-size);
+
+  /* Colors */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+
+  /* Property color bands */
+  --color-band-height: 20px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
+  --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.2);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+
+  /* Z-indexes */
+  --z-board: 1;
+  --z-token: 10;
+  --z-tooltip: 20;
+  --z-sidebar: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-board-bg: #1B5E20;
+    --color-space-bg: #2D2D2D;
+    --color-text-primary: #FAFAFA;
+    --color-text-secondary: #AAAAAA;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-board-bg);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  min-height: 100vh;
+}
