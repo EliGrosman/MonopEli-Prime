@@ -102,18 +102,26 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
             Dictionary mapping agent IDs to agent instances.
         """
         # Import agents lazily to avoid circular imports
-        from agents import RandomAgent
+        from agents import (
+            AggressiveAgent,
+            ConservativeAgent,
+            RandomAgent,
+            RuleBasedAgent,
+        )
 
         opponents: dict[str, Any] = {}
         for i in range(1, self.num_players):
             agent_id = f"player_{i}"
-            # Currently only RandomAgent is fully implemented
-            # Other agent types fall back to RandomAgent
             if self.opponent_type == "random":
                 opponents[agent_id] = RandomAgent(i, seed=self._seed)
+            elif self.opponent_type == "rule_based":
+                opponents[agent_id] = RuleBasedAgent(i)
+            elif self.opponent_type == "aggressive":
+                opponents[agent_id] = AggressiveAgent(i)
+            elif self.opponent_type == "conservative":
+                opponents[agent_id] = ConservativeAgent(i)
             else:
-                # For now, all other types default to random
-                # TODO: Add RuleBasedAgent, AggressiveAgent, ConservativeAgent
+                # Default to random for unknown types
                 opponents[agent_id] = RandomAgent(i, seed=self._seed)
         return opponents
 
@@ -206,7 +214,10 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
         return obs, float(reward), terminated, truncated, info
 
     def _play_until_agent_turn(self) -> None:
-        """Play opponent turns until it's the learning agent's turn."""
+        """Play opponent turns until it's the learning agent's turn.
+
+        Optimized: Skip observation encoding for opponents since most don't use it.
+        """
         max_iterations = 1000  # Prevent infinite loops
         iterations = 0
 
@@ -219,7 +230,9 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
 
             if current_agent in self._opponents:
                 opponent = self._opponents[current_agent]
-                obs, _, term, trunc, info = self._env.last()
+                # Use observe=False to skip expensive observation encoding
+                # Most opponents (RandomAgent) don't use the observation anyway
+                _, _, term, trunc, info = self._env.last(observe=False)
 
                 if term or trunc:
                     self._env.step(None)
@@ -227,7 +240,8 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
                     action_mask = info.get(
                         "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
                     )
-                    action = opponent.choose_action(obs, action_mask, self._env.game)
+                    # Pass None for observation - RandomAgent ignores it
+                    action = opponent.choose_action(None, action_mask, self._env.game)
                     self._env.step(action)
             else:
                 break

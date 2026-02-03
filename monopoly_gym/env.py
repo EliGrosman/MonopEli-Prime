@@ -271,12 +271,16 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         else:
             observation = None
 
+        # Ensure action mask is computed (lazy)
+        mask = self._get_agent_mask(agent)
+        info = {"action_mask": mask}
+
         return (
             observation,
             self._cumulative_rewards[agent],
             self.terminations[agent],
             self.truncations[agent],
-            self.infos[agent],
+            info,
         )
 
     def _clear_rewards(self) -> None:
@@ -361,17 +365,67 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
                 self.terminations[agent] = True
 
     def _update_infos(self) -> None:
-        """Update info dicts with action masks."""
+        """Update info dicts with action masks.
+
+        For performance, only computes action mask for current agent.
+        Other agents get masks computed lazily when accessed via infos property.
+        """
+        import numpy as np
+
         if self.game is None:
             return
 
-        for agent in self.agents:
-            player_id = self.agent_name_mapping[agent]
-            self.infos[agent] = {
-                "action_mask": self.action_encoder.get_action_mask(
-                    self.game, player_id
-                ),
+        # Only compute mask for current agent (main performance optimization)
+        current_agent = self.agent_selection
+        if current_agent in self.agents:
+            player_id = self.agent_name_mapping[current_agent]
+            mask = self.action_encoder.get_action_mask(self.game, player_id)
+            self.infos[current_agent] = {
+                "action_mask": mask,
             }
+
+        # Set placeholder for other agents (computed lazily in _get_agent_mask)
+        # Placeholder mask allows all actions - real mask computed on access
+        placeholder = np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+        for agent in self.agents:
+            if agent != current_agent:
+                self.infos[agent] = {
+                    "action_mask": placeholder,
+                    "_needs_mask_update": True,
+                }
+
+    def _get_agent_mask(self, agent: str) -> Any:
+        """Get action mask for agent, computing if needed.
+
+        Args:
+            agent: Agent ID
+
+        Returns:
+            Action mask array
+        """
+        import numpy as np
+
+        if self.game is None:
+            return np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+
+        info = self.infos.get(agent, {})
+
+        # If mask needs update (not the current agent), compute it
+        if info.get("_needs_mask_update", False):
+            player_id = self.agent_name_mapping[agent]
+            mask = self.action_encoder.get_action_mask(self.game, player_id)
+            self.infos[agent] = {"action_mask": mask}
+            return mask
+
+        # Return cached mask
+        if "action_mask" in info:
+            return info["action_mask"]
+
+        # Fallback: compute mask
+        player_id = self.agent_name_mapping[agent]
+        mask = self.action_encoder.get_action_mask(self.game, player_id)
+        self.infos[agent] = {"action_mask": mask}
+        return mask
 
     def _handle_turn_start(self) -> None:
         """Handle automatic dice roll at the start of a turn.

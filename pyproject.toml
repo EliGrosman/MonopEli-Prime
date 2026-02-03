@@ -8,6 +8,8 @@ dependencies = [
     "gymnasium>=0.29.0",
     "pettingzoo>=1.24.0",
     "numpy>=1.24.0",
+    "tqdm>=4.67.2",
+    "rich>=14.3.2",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +20,13 @@ dev = [
     "mypy>=1.4.0",
     "ruff>=0.0.280",
     "black>=23.7.0",
+]
+training = [
+    "stable-baselines3>=2.0.0",
+    "sb3-contrib>=2.0.0",
+    "tensorboard>=2.14.0",
+    "torch>=2.0.0",
+    "pyyaml>=6.0",
 ]
 
 [build-system]
@@ -36,6 +45,14 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disable_error_code = ["union-attr", "index", "attr-defined", "unused-ignore", "arg-type", "operator"]
+
+[[tool.mypy.overrides]]
+module = "training.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["stable_baselines3.*", "sb3_contrib.*", "torch.*", "tensorboard.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
