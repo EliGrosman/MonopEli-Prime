@@ -9,9 +9,9 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 
-from ..dependencies import get_lobby_manager, get_lobby_manager_ws
+from ..dependencies import get_lobby_manager, get_lobby_manager_ws, get_session_manager, get_connection_manager_ws
 from ..models.lobby import (
     AddAIRequest,
     CreateLobbyRequest,
@@ -22,7 +22,9 @@ from ..models.lobby import (
     LobbySettings,
     LobbyState,
 )
+from ..services.broadcast import Connection, ConnectionManager
 from ..services.lobby_manager import LobbyManager
+from ..services.session_manager import SessionManager
 
 router = APIRouter()
 
@@ -36,25 +38,30 @@ router = APIRouter()
 async def create_lobby(
     request: CreateLobbyRequest,
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
+    session_manager: SessionManager = Depends(get_session_manager),
 ) -> CreateLobbyResponse:
     """Create a new game lobby.
 
     The creator becomes the host and is automatically added as player 0.
+    The backend generates a session for the host and returns it.
     """
-    # Generate a session ID for the host
-    host_session_id = str(uuid.uuid4())
+    # Create a session for the host (so /api/players/me works)
+    session = await session_manager.create_session(display_name=request.host_name)
 
     lobby_id, invite_code = await lobby_manager.create_lobby(
         name=request.name,
         host_name=request.host_name,
-        host_session_id=host_session_id,
+        host_session_id=session.id,
         settings=request.settings,
     )
+
+    # Update session with lobby info
+    session.current_lobby_id = lobby_id
 
     return CreateLobbyResponse(
         id=lobby_id,
         name=request.name,
-        session_id=host_session_id,
+        session_id=session.id,
         invite_code=invite_code,
         websocket_url=f"/ws/lobbies/{lobby_id}",
         created_at=datetime.now(UTC),
@@ -81,41 +88,66 @@ async def get_lobby(
     return state
 
 
-@router.post("/{lobby_id}/join", response_model=JoinLobbyResponse)
+@router.post("/{lobby_id}/join", response_model=LobbyState)
 async def join_lobby(
     lobby_id: str,
     request: JoinLobbyRequest,
+    x_session_id: str = Header(..., description="Session ID from login"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> JoinLobbyResponse:
-    """Join an existing lobby."""
-    session_id = str(uuid.uuid4())
+    session_manager: SessionManager = Depends(get_session_manager),
+) -> LobbyState:
+    """Join an existing lobby.
+
+    The lobby_id parameter can be either:
+    - A full lobby UUID
+    - An invite code (case-insensitive)
+
+    Requires X-Session-Id header from prior login.
+    Returns the full lobby state after joining.
+    """
+    # Verify the session exists
+    session = await session_manager.get_session(x_session_id)
+    if session is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    # Try to find lobby by ID first, then by invite code
+    lobby = await lobby_manager.get_lobby(lobby_id)
+    if lobby is None:
+        lobby = await lobby_manager.get_lobby_by_code(lobby_id)
+
+    if lobby is None:
+        raise HTTPException(status_code=400, detail="Lobby not found")
+
+    actual_lobby_id = lobby.id
 
     success, message, slot_id = await lobby_manager.join_lobby(
-        lobby_id=lobby_id,
+        lobby_id=actual_lobby_id,
         player_name=request.player_name,
-        session_id=session_id,
+        session_id=x_session_id,
         invite_code=request.invite_code,
     )
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return JoinLobbyResponse(
-        lobby_id=lobby_id,
-        session_id=session_id,
-        slot_id=slot_id,
-        websocket_url=f"/ws/lobbies/{lobby_id}",
-    )
+    # Update session with lobby info
+    session.current_lobby_id = actual_lobby_id
+
+    # Return the full lobby state
+    state = await lobby_manager.get_lobby_state(actual_lobby_id)
+    if state is None:
+        raise HTTPException(status_code=500, detail="Failed to get lobby state")
+    return state
 
 
 @router.post("/{lobby_id}/leave")
 async def leave_lobby(
     lobby_id: str,
-    session_id: str = Query(...),
+    x_session_id: str = Header(..., description="Session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
 ) -> dict[str, str]:
     """Leave a lobby."""
-    success, message = await lobby_manager.leave_lobby(lobby_id, session_id)
+    success, message = await lobby_manager.leave_lobby(lobby_id, x_session_id)
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
@@ -126,30 +158,35 @@ async def leave_lobby(
 @router.post("/{lobby_id}/ready")
 async def set_ready(
     lobby_id: str,
-    session_id: str = Query(...),
-    ready: bool = Query(True),
+    request: dict[str, Any],
+    x_session_id: str = Header(..., description="Session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> dict[str, bool]:
+) -> LobbyState:
     """Set player ready status."""
-    success, message = await lobby_manager.set_ready(lobby_id, session_id, ready)
+    is_ready = request.get("is_ready", True)
+    success, message = await lobby_manager.set_ready(lobby_id, x_session_id, is_ready)
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return {"ready": ready}
+    # Return updated lobby state
+    state = await lobby_manager.get_lobby_state(lobby_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
+    return state
 
 
 @router.post("/{lobby_id}/ai", status_code=201)
 async def add_ai_player(
     lobby_id: str,
     request: AddAIRequest,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> dict[str, Any]:
+) -> LobbyState:
     """Add an AI player to the lobby (host only)."""
     success, message, slot_id = await lobby_manager.add_ai_player(
         lobby_id=lobby_id,
-        host_session_id=session_id,
+        host_session_id=x_session_id,
         ai_type=request.ai_type,
         name=request.name,
     )
@@ -157,79 +194,93 @@ async def add_ai_player(
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return {"slot_id": slot_id, "ai_type": request.ai_type}
+    # Return updated lobby state
+    state = await lobby_manager.get_lobby_state(lobby_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
+    return state
 
 
 @router.delete("/{lobby_id}/ai/{slot_id}")
 async def remove_ai_player(
     lobby_id: str,
     slot_id: int,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> dict[str, str]:
+) -> LobbyState:
     """Remove an AI player from the lobby (host only)."""
     success, message = await lobby_manager.remove_ai_player(
         lobby_id=lobby_id,
-        host_session_id=session_id,
+        host_session_id=x_session_id,
         slot_id=slot_id,
     )
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return {"status": "removed"}
+    # Return updated lobby state
+    state = await lobby_manager.get_lobby_state(lobby_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
+    return state
 
 
 @router.post("/{lobby_id}/kick/{slot_id}")
 async def kick_player(
     lobby_id: str,
     slot_id: int,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> dict[str, str]:
+) -> LobbyState:
     """Kick a player from the lobby (host only)."""
     success, message = await lobby_manager.kick_player(
         lobby_id=lobby_id,
-        host_session_id=session_id,
+        host_session_id=x_session_id,
         slot_id=slot_id,
     )
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return {"status": "kicked"}
+    state = await lobby_manager.get_lobby_state(lobby_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
+    return state
 
 
 @router.put("/{lobby_id}/settings")
 async def update_settings(
     lobby_id: str,
     settings: LobbySettings,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
-) -> dict[str, str]:
+) -> LobbyState:
     """Update lobby settings (host only)."""
     success, message = await lobby_manager.update_settings(
         lobby_id=lobby_id,
-        host_session_id=session_id,
+        host_session_id=x_session_id,
         settings=settings,
     )
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
 
-    return {"status": "updated"}
+    state = await lobby_manager.get_lobby_state(lobby_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
+    return state
 
 
 @router.post("/{lobby_id}/start")
 async def start_game(
     lobby_id: str,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
 ) -> dict[str, Any]:
     """Start the game from the lobby (host only)."""
     success, message, game_id = await lobby_manager.start_game(
         lobby_id=lobby_id,
-        host_session_id=session_id,
+        host_session_id=x_session_id,
     )
 
     if not success:
@@ -245,7 +296,7 @@ async def start_game(
 @router.delete("/{lobby_id}")
 async def delete_lobby(
     lobby_id: str,
-    session_id: str = Query(..., description="Host session ID"),
+    x_session_id: str = Header(..., description="Host session ID"),
     lobby_manager: LobbyManager = Depends(get_lobby_manager),
 ) -> dict[str, str]:
     """Delete/close a lobby (host only)."""
@@ -253,7 +304,7 @@ async def delete_lobby(
     if lobby is None:
         raise HTTPException(status_code=404, detail="Lobby not found")
 
-    if lobby.host_session_id != session_id:
+    if lobby.host_session_id != x_session_id:
         raise HTTPException(status_code=403, detail="Only host can delete lobby")
 
     await lobby_manager.delete_lobby(lobby_id)
@@ -288,6 +339,7 @@ async def lobby_websocket(
     lobby_id: str,
     session_id: str = Query(...),
     lobby_manager: LobbyManager = Depends(get_lobby_manager_ws),
+    conn_manager: ConnectionManager = Depends(get_connection_manager_ws),
 ) -> None:
     """WebSocket endpoint for lobby real-time updates.
 
@@ -305,7 +357,7 @@ async def lobby_websocket(
         - start_game: Start the game (host only)
 
     Messages to client:
-        - lobby_state: Full lobby state
+        - lobby_update: Full lobby state
         - player_joined/left: Player events
         - player_ready/unready: Ready status changes
         - game_starting/started: Game lifecycle
@@ -322,10 +374,12 @@ async def lobby_websocket(
 
     # Verify session is in lobby
     player_slot = None
+    player_name = ""
     is_host = False
     for slot_id, player in lobby.players.items():
         if player.session_id == session_id:
             player_slot = slot_id
+            player_name = player.name
             is_host = player.is_host
             break
 
@@ -334,12 +388,27 @@ async def lobby_websocket(
         await websocket.close(code=4003)
         return
 
+    # Register connection with connection manager for broadcasts
+    # Use "lobby:{lobby_id}" as the key to match _broadcast_lobby_event
+    lobby_key = f"lobby:{lobby_id}"
+    connection = Connection(
+        websocket=websocket,
+        session_id=session_id,
+        game_id=lobby_key,
+        player_id=player_slot,
+        player_name=player_name,
+    )
+    async with conn_manager._lock:
+        if lobby_key not in conn_manager._connections:
+            conn_manager._connections[lobby_key] = []
+        conn_manager._connections[lobby_key].append(connection)
+
     # Send initial state
     state = await lobby_manager.get_lobby_state(lobby_id)
     if state:
         await _send_message(
             websocket,
-            {"type": "lobby_state", "data": state.model_dump(mode="json")},
+            {"type": "lobby_update", "data": state.model_dump(mode="json")},
         )
 
     try:
@@ -454,11 +523,26 @@ async def lobby_websocket(
                         },
                     )
 
+            elif msg_type == "heartbeat":
+                # Respond to heartbeat to keep connection alive
+                await _send_message(websocket, {"type": "heartbeat_ack"})
+
             else:
                 await _send_error(websocket, f"Unknown message type: {msg_type}")
 
     except WebSocketDisconnect:
         pass
     finally:
+        # Unregister connection from connection manager
+        async with conn_manager._lock:
+            if lobby_key in conn_manager._connections:
+                conn_manager._connections[lobby_key] = [
+                    c for c in conn_manager._connections[lobby_key]
+                    if c.session_id != session_id
+                ]
+                # Clean up empty list
+                if not conn_manager._connections[lobby_key]:
+                    del conn_manager._connections[lobby_key]
+
         # Leave lobby on disconnect
         await lobby_manager.leave_lobby(lobby_id, session_id)

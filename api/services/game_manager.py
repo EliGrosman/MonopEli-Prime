@@ -307,6 +307,31 @@ class GameManager:
 
             return True, "", False
 
+    async def get_player_id_by_session(
+        self,
+        game_id: str,
+        session_id: str,
+    ) -> int | None:
+        """Get player ID for a session in a game.
+
+        Args:
+            game_id: The game ID
+            session_id: The session ID to look up
+
+        Returns:
+            The player ID if found, None otherwise
+        """
+        async with self._lock:
+            active_game = self.games.get(game_id)
+            if active_game is None:
+                return None
+
+            for player_id, slot in active_game.player_slots.items():
+                if slot.session_id == session_id:
+                    return player_id
+
+            return None
+
     async def release_player_slot(
         self,
         game_id: str,

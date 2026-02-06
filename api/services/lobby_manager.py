@@ -24,7 +24,6 @@ from ..models.lobby import (
     LobbyStatus,
     LobbyWSMessageType,
 )
-from ..models.websocket import WSMessage, WSMessageType
 
 
 @dataclass
@@ -121,7 +120,8 @@ class LobbyManager:
 
         async with self._lock:
             lobby_id = str(uuid.uuid4())
-            invite_code = secrets.token_urlsafe(8) if settings.private else None
+            # Always generate an invite code for easy sharing
+            invite_code = secrets.token_urlsafe(6).upper()
 
             host_player = LobbyPlayer(
                 slot_id=0,
@@ -149,6 +149,14 @@ class LobbyManager:
     async def get_lobby(self, lobby_id: str) -> ActiveLobby | None:
         """Get a lobby by ID."""
         return self.lobbies.get(lobby_id)
+
+    async def get_lobby_by_code(self, code: str) -> ActiveLobby | None:
+        """Get a lobby by invite code (case-insensitive)."""
+        code_upper = code.upper()
+        for lobby in self.lobbies.values():
+            if lobby.invite_code and lobby.invite_code.upper() == code_upper:
+                return lobby
+        return None
 
     async def get_lobby_state(self, lobby_id: str) -> LobbyState | None:
         """Get lobby state."""
@@ -207,11 +215,11 @@ class LobbyManager:
 
             lobby.players[slot_id] = player
 
-        # Broadcast player joined
+        # Broadcast player joined with full player data
         await self._broadcast_lobby_event(
             lobby_id,
             LobbyWSMessageType.PLAYER_JOINED,
-            {"slot_id": slot_id, "name": player_name},
+            player.model_dump(mode="json"),
         )
 
         return True, "", slot_id
@@ -270,7 +278,7 @@ class LobbyManager:
         await self._broadcast_lobby_event(
             lobby_id,
             LobbyWSMessageType.PLAYER_LEFT,
-            {"slot_id": player_slot, "name": player_name},
+            {"sessionId": session_id, "reason": "left"},
         )
 
         return True, ""
@@ -300,16 +308,11 @@ class LobbyManager:
             for player in lobby.players.values():
                 if player.session_id == session_id:
                     player.is_ready = ready
-                    msg_type = (
-                        LobbyWSMessageType.PLAYER_READY
-                        if ready
-                        else LobbyWSMessageType.PLAYER_UNREADY
-                    )
 
                     await self._broadcast_lobby_event(
                         lobby_id,
-                        msg_type,
-                        {"slot_id": player.slot_id, "name": player.name},
+                        LobbyWSMessageType.PLAYER_READY,
+                        {"sessionId": session_id, "isReady": ready},
                     )
                     return True, ""
 
@@ -364,7 +367,7 @@ class LobbyManager:
         await self._broadcast_lobby_event(
             lobby_id,
             LobbyWSMessageType.AI_ADDED,
-            {"slot_id": slot_id, "name": name, "ai_type": ai_type},
+            ai_player.model_dump(mode="json"),
         )
 
         return True, "", slot_id
@@ -695,12 +698,10 @@ class LobbyManager:
 
         # Use the lobby_id as the "game_id" for the connection manager
         # Lobby connections use the same broadcast mechanism
-        await self._connection_manager.broadcast_to_game(
+        # Use broadcast_raw since lobby message types differ from game types
+        await self._connection_manager.broadcast_raw(
             f"lobby:{lobby_id}",
-            WSMessage(
-                type=WSMessageType.STATE_UPDATE,  # Reuse state_update type
-                data={"lobby_event": event_type.value, **data},
-            ),
+            {"type": event_type.value, "data": data},
         )
 
 

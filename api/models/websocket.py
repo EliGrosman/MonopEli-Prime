@@ -34,6 +34,7 @@ class WSMessageType(str, Enum):
     ACTION_RESULT = "action_result"
     ERROR = "error"
     HEARTBEAT_ACK = "heartbeat_ack"
+    IDENTITY = "identity"  # Tells client their player_id
     PLAYER_JOINED = "player_joined"
     PLAYER_LEFT = "player_left"
     PLAYER_DISCONNECTED = "player_disconnected"
@@ -92,3 +93,10 @@ class WSChatMessage(BaseModel):
     player_id: int | None  # None for spectators
     player_name: str
     message: str
+
+
+class WSIdentity(BaseModel):
+    """Identity message telling client their player_id."""
+
+    player_id: int | None  # None for spectators
+    player_name: str
