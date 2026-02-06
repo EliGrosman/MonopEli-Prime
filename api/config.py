@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://eli-lab:5173", "http://192.168.0.30:5173"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://192.168.0.30:3000", "http://localhost:5173", "http://eli-lab:5173", "http://192.168.0.30:5173"]
 
     # Game settings
     max_concurrent_games: int = 1000

@@ -74,7 +74,11 @@ class TestWebSocketConnection:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test-session&player_id=0&player_name=Alice"
         ) as websocket:
-            # Should receive initial state
+            # Should receive identity first
+            identity = websocket.receive_json()
+            assert identity["type"] == "identity"
+
+            # Then initial state
             data = websocket.receive_json()
             assert data["type"] == "state_update"
             assert "players" in data["data"]
@@ -86,7 +90,11 @@ class TestWebSocketConnection:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test-session"
         ) as websocket:
-            # Should receive initial state
+            # Should receive identity first
+            identity = websocket.receive_json()
+            assert identity["type"] == "identity"
+
+            # Then initial state
             data = websocket.receive_json()
             assert data["type"] == "state_update"
 
@@ -119,13 +127,15 @@ class TestWebSocketConnection:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=session1&player_id=0"
         ) as ws1:
+            ws1.receive_json()  # Skip identity
             data1 = ws1.receive_json()
             assert data1["type"] == "state_update"
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=session2&player_id=1"
             ) as ws2:
-                # Second connection receives state
+                # Second connection receives identity + state
+                ws2.receive_json()  # Skip identity
                 data2 = ws2.receive_json()
                 assert data2["type"] == "state_update"
 
@@ -150,8 +160,9 @@ class TestHeartbeat:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test"
         ) as websocket:
-            # Skip initial state
-            websocket.receive_json()
+            # Skip identity and initial state
+            websocket.receive_json()  # identity
+            websocket.receive_json()  # state
 
             # Send heartbeat
             websocket.send_json({"type": "heartbeat"})
@@ -176,8 +187,9 @@ class TestWebSocketActions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test&player_id=0"
         ) as websocket:
-            # Skip initial state
-            websocket.receive_json()
+            # Skip identity and initial state
+            websocket.receive_json()  # identity
+            websocket.receive_json()  # state
 
             # Send roll dice action
             websocket.send_json({
@@ -201,8 +213,9 @@ class TestWebSocketActions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test"  # No player_id = spectator
         ) as websocket:
-            # Skip initial state
-            websocket.receive_json()
+            # Skip identity and initial state
+            websocket.receive_json()  # identity
+            websocket.receive_json()  # state
 
             # Try to send action
             websocket.send_json({
@@ -223,8 +236,9 @@ class TestWebSocketActions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test&player_id=0"
         ) as websocket:
-            # Skip initial state
-            websocket.receive_json()
+            # Skip identity and initial state
+            websocket.receive_json()  # identity
+            websocket.receive_json()  # state
 
             # Send invalid action
             websocket.send_json({
@@ -244,8 +258,9 @@ class TestWebSocketActions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test&player_id=1"  # Player 1, but turn is player 0
         ) as websocket:
-            # Skip initial state
-            websocket.receive_json()
+            # Skip identity and initial state
+            websocket.receive_json()  # identity
+            websocket.receive_json()  # state
 
             # Try to roll dice when it's not our turn (player 0's turn, we're player 1)
             websocket.send_json({
@@ -275,11 +290,13 @@ class TestWebSocketChat:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=session1&player_id=0&player_name=Alice"
         ) as ws1:
+            ws1.receive_json()  # Skip identity
             ws1.receive_json()  # Skip state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=session2&player_id=1&player_name=Bob"
             ) as ws2:
+                ws2.receive_json()  # Skip identity
                 ws2.receive_json()  # Skip state
                 ws1.receive_json()  # Skip player_joined
 
@@ -307,6 +324,7 @@ class TestWebSocketChat:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test&player_id=0&player_name=Test"
         ) as websocket:
+            websocket.receive_json()  # Skip identity
             websocket.receive_json()  # Skip state
 
             # Send very long message
@@ -337,6 +355,7 @@ class TestWebSocketErrors:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test"
         ) as websocket:
+            websocket.receive_json()  # Skip identity
             websocket.receive_json()  # Skip state
 
             # Send invalid JSON
@@ -354,6 +373,7 @@ class TestWebSocketErrors:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=test"
         ) as websocket:
+            websocket.receive_json()  # Skip identity
             websocket.receive_json()  # Skip state
 
             # Send unknown type
@@ -564,11 +584,13 @@ class TestBroadcast:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=session1&player_id=0"
         ) as ws1:
+            ws1.receive_json()  # Skip identity
             ws1.receive_json()  # Skip initial state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=session2&player_id=1"
             ) as ws2:
+                ws2.receive_json()  # Skip identity
                 ws2.receive_json()  # Skip initial state
                 ws1.receive_json()  # Skip player_joined
 
@@ -596,11 +618,13 @@ class TestBroadcast:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=player&player_id=0"
         ) as player_ws:
+            player_ws.receive_json()  # Skip identity
             player_ws.receive_json()  # Skip state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=spectator"
             ) as spectator_ws:
+                spectator_ws.receive_json()  # Skip identity
                 spectator_ws.receive_json()  # Skip state
 
                 # Player performs action
@@ -635,11 +659,13 @@ class TestDisconnect:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=session1&player_id=0"
         ) as ws1:
+            ws1.receive_json()  # Skip identity
             ws1.receive_json()  # Skip state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=session2&player_id=1&player_name=Bob"
             ) as ws2:
+                ws2.receive_json()  # Skip identity
                 ws2.receive_json()  # Skip state
                 ws1.receive_json()  # Skip player_joined
 
@@ -655,6 +681,7 @@ class TestDisconnect:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=session1&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             ws.receive_json()  # Skip state
 
         # After disconnect, slot should be marked as disconnected (for reconnection)

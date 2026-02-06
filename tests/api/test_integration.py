@@ -65,7 +65,8 @@ class TestTurnCycle:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=player0&player_id=0"
         ) as ws:
-            # Get initial state
+            # Skip identity, get initial state
+            ws.receive_json()  # identity
             initial = ws.receive_json()
             assert initial["type"] == "state_update"
             assert initial["data"]["current_player"] == 0
@@ -103,6 +104,7 @@ class TestTurnCycle:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=player0&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             ws.receive_json()  # Initial state
 
             # First roll
@@ -127,6 +129,7 @@ class TestTurnCycle:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws0:
+            ws0.receive_json()  # Skip identity
             ws0.receive_json()  # Initial state
 
             # Player 0's turn
@@ -156,6 +159,7 @@ class TestPropertyTransactions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             initial = ws.receive_json()
             initial_money = initial["data"]["players"][0]["money"]
 
@@ -194,6 +198,7 @@ class TestPropertyTransactions:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             ws.receive_json()  # Initial state
 
             # Roll and try to buy
@@ -236,7 +241,8 @@ class TestAllActionTypes:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
             result = ws.receive_json()
@@ -254,7 +260,8 @@ class TestAllActionTypes:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Roll first
             ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
@@ -276,7 +283,8 @@ class TestAllActionTypes:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Try to pay jail fine when not in jail
             ws.send_json({"type": "action", "data": {"action_type": "pay_jail_fine"}})
@@ -291,7 +299,8 @@ class TestAllActionTypes:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Try to use jail card when don't have one
             ws.send_json({"type": "action", "data": {"action_type": "use_jail_card"}})
@@ -306,7 +315,8 @@ class TestAllActionTypes:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Declare bankruptcy
             ws.send_json({"type": "action", "data": {"action_type": "declare_bankruptcy"}})
@@ -327,7 +337,8 @@ class TestActionValidation:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p1&player_id=1"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Try to roll dice on player 0's turn
             ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
@@ -343,7 +354,8 @@ class TestActionValidation:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Try buy_property without position
             ws.send_json({
@@ -366,11 +378,13 @@ class TestMultiPlayerBroadcast:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws0:
+            ws0.receive_json()  # Skip identity
             ws0.receive_json()  # Initial state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=p1&player_id=1"
             ) as ws1:
+                ws1.receive_json()  # Skip identity
                 ws1.receive_json()  # Initial state
                 ws0.receive_json()  # player_joined for p1
 
@@ -397,12 +411,14 @@ class TestMultiPlayerBroadcast:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws_player:
-            ws_player.receive_json()
+            ws_player.receive_json()  # Skip identity
+            ws_player.receive_json()  # Skip state
 
             # Connect spectator (no player_id)
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=spectator"
             ) as ws_spectator:
+                ws_spectator.receive_json()  # Skip identity
                 ws_spectator.receive_json()  # Initial state
 
                 # Player performs action
@@ -430,7 +446,8 @@ class TestRESTAPIIntegration:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
             ws.receive_json()
@@ -460,6 +477,7 @@ class TestRESTAPIIntegration:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=alice&player_id=0&player_name=Alice"
         ) as ws:
+            ws.receive_json()  # Skip identity
             state = ws.receive_json()
             assert state["data"]["players"][0]["name"] == "Alice"
             assert state["data"]["players"][1]["name"] == "Bob"
@@ -475,12 +493,14 @@ class TestGameProgression:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws0:
-            ws0.receive_json()
+            ws0.receive_json()  # Skip identity
+            ws0.receive_json()  # Skip state
 
             with client.websocket_connect(
                 f"/ws/games/{game_id}?session_id=p1&player_id=1"
             ) as ws1:
-                ws1.receive_json()
+                ws1.receive_json()  # Skip identity
+                ws1.receive_json()  # Skip state
                 ws0.receive_json()  # player_joined
 
                 # Play 4 turns (2 each)
@@ -512,6 +532,7 @@ class TestGameProgression:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             initial = ws.receive_json()
             initial_pos = initial["data"]["players"][0]["position"]
             assert initial_pos == 0  # Players start at GO
@@ -546,7 +567,8 @@ class TestErrorRecovery:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
 
             # Try invalid action
             ws.send_json({"type": "action", "data": {"action_type": "invalid"}})
@@ -566,15 +588,17 @@ class TestErrorRecovery:
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
-            ws.receive_json()
+            ws.receive_json()  # Skip identity
+            ws.receive_json()  # Skip state
             ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
-            ws.receive_json()
-            state1 = ws.receive_json()
+            ws.receive_json()  # result
+            state1 = ws.receive_json()  # state
             position_after_roll = state1["data"]["players"][0]["position"]
 
         # Reconnect - state should be preserved
         with client.websocket_connect(
             f"/ws/games/{game_id}?session_id=p0&player_id=0"
         ) as ws:
+            ws.receive_json()  # Skip identity
             state2 = ws.receive_json()
             assert state2["data"]["players"][0]["position"] == position_after_roll
