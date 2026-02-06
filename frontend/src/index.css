@@ -1,0 +1,213 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Monopoly property colors */
+  --color-property-brown: #8b4513;
+  --color-property-lightblue: #87ceeb;
+  --color-property-magenta: #ff00ff;
+  --color-property-orange: #ffa500;
+  --color-property-red: #ff0000;
+  --color-property-yellow: #ffff00;
+  --color-property-green: #008000;
+  --color-property-blue: #0000ff;
+  --color-property-railroad: #000000;
+  --color-property-utility: #808080;
+
+  /* UI colors */
+  --color-board-bg: #c8e6c9;
+  --color-board-border: #2e7d32;
+  --color-space-bg: #fafafa;
+
+  /* Player colors */
+  --color-player-0: #e53935;
+  --color-player-1: #1e88e5;
+  --color-player-2: #43a047;
+  --color-player-3: #fdd835;
+  --color-player-4: #8e24aa;
+  --color-player-5: #fb8c00;
+  --color-player-6: #00acc1;
+  --color-player-7: #6d4c41;
+
+  /* Custom animations */
+  --animate-dice-roll: diceRoll 0.5s ease-out;
+  --animate-token-move: tokenMove 0.3s ease-in-out;
+  --animate-pulse-highlight: pulseHighlight 1s infinite;
+}
+
+@keyframes diceRoll {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes tokenMove {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseHighlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(66, 153, 225, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(66, 153, 225, 0);
+  }
+}
+
+:root {
+  /* Board dimensions - responsive */
+  --board-size: min(95vw, 95vh, 800px);
+  --space-count-side: 11;
+  --corner-size: calc(var(--board-size) / var(--space-count-side));
+  --space-width: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
+  --space-height: var(--corner-size);
+
+  /* Board text sizes - responsive */
+  --board-title-size: 2.25rem;
+  --board-subtitle-size: 0.875rem;
+  --space-name-size: 0.5rem;
+  --space-price-size: 0.5rem;
+  --token-size: 20px;
+
+  /* Colors */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+
+  /* Property color bands */
+  --color-band-height: 20px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
+  --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.2);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+
+  /* Z-indexes */
+  --z-board: 1;
+  --z-token: 10;
+  --z-tooltip: 20;
+  --z-sidebar: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+/* Mobile: small phones */
+@media (max-width: 479px) {
+  :root {
+    --board-size: 98vw;
+    --board-title-size: 1rem;
+    --board-subtitle-size: 0.5rem;
+    --space-name-size: 0.25rem;
+    --space-price-size: 0.25rem;
+    --color-band-height: 10px;
+    --token-size: 12px;
+  }
+}
+
+/* Mobile: larger phones */
+@media (min-width: 480px) and (max-width: 639px) {
+  :root {
+    --board-size: 95vw;
+    --board-title-size: 1.25rem;
+    --board-subtitle-size: 0.625rem;
+    --space-name-size: 0.375rem;
+    --space-price-size: 0.375rem;
+    --color-band-height: 12px;
+    --token-size: 14px;
+  }
+}
+
+/* Tablet portrait */
+@media (min-width: 640px) and (max-width: 767px) {
+  :root {
+    --board-size: min(90vw, 580px);
+    --board-title-size: 1.5rem;
+    --board-subtitle-size: 0.75rem;
+    --space-name-size: 0.4375rem;
+    --space-price-size: 0.4375rem;
+    --color-band-height: 16px;
+    --token-size: 16px;
+  }
+}
+
+/* Tablet landscape */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --board-size: min(70vh, 600px);
+    --board-title-size: 1.75rem;
+    --board-subtitle-size: 0.75rem;
+    --color-band-height: 18px;
+    --token-size: 18px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  :root {
+    --board-size: min(85vh, 800px);
+    --board-title-size: 2.25rem;
+    --board-subtitle-size: 0.875rem;
+    --color-band-height: 20px;
+    --token-size: 20px;
+  }
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-board-bg: #1b5e20;
+    --color-space-bg: #2d2d2d;
+    --color-text-primary: #fafafa;
+    --color-text-secondary: #aaaaaa;
+  }
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans',
+    'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-board-bg);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Form elements - ensure dark text on light backgrounds */
+input,
+select,
+textarea {
+  color: #1a1a1a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
