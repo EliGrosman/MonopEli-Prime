@@ -1,5 +1,5 @@
 import type { PlayerState, PropertyState } from '@/types';
-import { BOARD_SPACES } from '@/utils/board';
+import { BOARD_SPACES, PROPERTY_INFO } from '@/utils/board';
 
 interface PlayerCardProps {
   player: PlayerState;
@@ -27,8 +27,8 @@ export function PlayerCard({
   // Group properties by color
   const propertyGroups = ownedProperties.reduce(
     (groups, prop) => {
-      const space = BOARD_SPACES[prop.position];
-      const color = space?.color || 'other';
+      const propInfo = PROPERTY_INFO[prop.position];
+      const color = propInfo?.color || 'other';
       if (!groups[color]) {
         groups[color] = [];
       }
@@ -40,16 +40,16 @@ export function PlayerCard({
 
   // Calculate total property value
   const totalPropertyValue = ownedProperties.reduce((sum, prop) => {
-    const space = BOARD_SPACES[prop.position];
-    return sum + (space?.price || 0);
+    const propInfo = PROPERTY_INFO[prop.position];
+    return sum + (propInfo?.price || 0);
   }, 0);
 
   // Calculate net worth (money + property value + houses)
   const houseValue = ownedProperties.reduce((sum, prop) => {
-    const space = BOARD_SPACES[prop.position];
+    const propInfo = PROPERTY_INFO[prop.position];
     const houses = prop.houses < 5 ? prop.houses : 4;
     const hotels = prop.houses === 5 ? 1 : 0;
-    return sum + houses * (space?.buildCost || 0) + hotels * (space?.buildCost || 0);
+    return sum + houses * (propInfo?.buildCost || 0) + hotels * (propInfo?.buildCost || 0);
   }, 0);
 
   const netWorth = player.money + totalPropertyValue + houseValue;
@@ -169,7 +169,7 @@ export function PlayerCard({
         {/* Position */}
         {!player.bankrupt && (
           <div className="mt-2 text-xs text-gray-500">
-            Position: {BOARD_SPACES[player.position]?.name || `Space ${player.position}`}
+            Position: {BOARD_SPACES.find(s => s.position === player.position)?.name || `Space ${player.position}`}
           </div>
         )}
       </div>

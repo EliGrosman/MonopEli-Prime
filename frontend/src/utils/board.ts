@@ -3,16 +3,23 @@ import type { BoardSpace, PropertyInfo, PropertyColor } from '@/types';
 /**
  * Board layout positions for CSS Grid rendering.
  * Each array contains the positions for that side of the board.
+ *
+ * Standard Monopoly orientation:
+ * - GO is bottom-right corner (position 0)
+ * - Players move clockwise
+ * - Jail is bottom-left (position 10)
+ * - Free Parking is top-left (position 20)
+ * - Go To Jail is top-right (position 30)
  */
 export const BOARD_LAYOUT = {
-  // Bottom row: GO (0) to Jail (10) - right to left
+  // Bottom row: Jail (10) on left to GO (0) on right - columns 1-11
   bottom: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
-  // Left column: Connecticut (9) up to St. Charles (11) - bottom to top
-  left: [11, 12, 13, 14, 15, 16, 17, 18, 19],
-  // Top row: Free Parking (20) to Go To Jail (30) - left to right
-  top: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
-  // Right column: Pacific (31) down to Park Place (39) - top to bottom
-  right: [31, 32, 33, 34, 35, 36, 37, 38, 39],
+  // Right column: Boardwalk (39) at bottom to Pacific (31) at top - rows 10-2
+  right: [39, 38, 37, 36, 35, 34, 33, 32, 31],
+  // Top row: Go To Jail (30) on right to Free Parking (20) on left - columns 11-1
+  top: [30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20],
+  // Left column: New York (19) at top to St. Charles (11) at bottom - rows 2-10
+  left: [19, 18, 17, 16, 15, 14, 13, 12, 11],
 };
 
 /**

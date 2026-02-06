@@ -103,8 +103,11 @@ export function BoardSpace({
       {/* Color band for properties */}
       {color && (
         <div
-          className="absolute top-0 left-0 right-0 h-5"
-          style={{ backgroundColor: getColorHex(color) }}
+          className="absolute top-0 left-0 right-0"
+          style={{
+            backgroundColor: getColorHex(color),
+            height: 'var(--color-band-height)',
+          }}
         >
           {/* House indicators */}
           {property && property.houses > 0 && (

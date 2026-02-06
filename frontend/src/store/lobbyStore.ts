@@ -20,6 +20,7 @@ interface LobbyStore {
   // Player actions
   addPlayer: (player: LobbyState['players'][0]) => void;
   removePlayer: (sessionId: string) => void;
+  removePlayerBySlot: (slotId: number) => void;
   updatePlayerReady: (sessionId: string, isReady: boolean) => void;
 
   // Settings
@@ -79,7 +80,20 @@ export const useLobbyStore = create<LobbyStore>()(
             currentLobby: {
               ...state.currentLobby,
               players: state.currentLobby.players.filter(
-                (p) => p.sessionId !== sessionId
+                (p) => p.session_id !== sessionId
+              ),
+            },
+          };
+        }),
+
+      removePlayerBySlot: (slotId) =>
+        set((state) => {
+          if (!state.currentLobby) return state;
+          return {
+            currentLobby: {
+              ...state.currentLobby,
+              players: state.currentLobby.players.filter(
+                (p) => p.slot_id !== slotId
               ),
             },
           };
@@ -92,7 +106,7 @@ export const useLobbyStore = create<LobbyStore>()(
             currentLobby: {
               ...state.currentLobby,
               players: state.currentLobby.players.map((p) =>
-                p.sessionId === sessionId ? { ...p, isReady } : p
+                p.session_id === sessionId ? { ...p, is_ready: isReady } : p
               ),
             },
           };
@@ -113,20 +127,20 @@ export const useLobbyStore = create<LobbyStore>()(
       // Computed
       isHost: (sessionId) => {
         const { currentLobby } = get();
-        return currentLobby?.hostSessionId === sessionId;
+        return currentLobby?.host_session_id === sessionId;
       },
 
       canStartGame: () => {
         const { currentLobby } = get();
-        if (!currentLobby) return false;
+        if (!currentLobby?.players) return false;
         if (currentLobby.players.length < 2) return false;
-        return currentLobby.players.every((p) => p.isReady || p.isAi);
+        return currentLobby.players.every((p) => p.is_ready || p.is_ai);
       },
 
       getMySlot: (sessionId) => {
         const { currentLobby } = get();
-        if (!currentLobby) return null;
-        return currentLobby.players.find((p) => p.sessionId === sessionId) ?? null;
+        if (!currentLobby?.players) return null;
+        return currentLobby.players.find((p) => p.session_id === sessionId) ?? null;
       },
     }),
     { name: 'lobby-store' }

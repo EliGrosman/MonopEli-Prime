@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useActions } from '@/hooks/useActions';
-import { BOARD_SPACES, getColorGroupPositions } from '@/utils/board';
+import { BOARD_SPACES, PROPERTY_INFO, getColorGroupPositions } from '@/utils/board';
 import type { ClientActionMessage, PropertyColor } from '@/types';
 
 interface BuildingControlsProps {
@@ -51,7 +51,7 @@ export function BuildingControls({ send }: BuildingControlsProps) {
         const positions = getColorGroupPositions(color);
         const props = positions.map((pos) => {
           const state = gameState.properties[pos];
-          const space = BOARD_SPACES[pos];
+          const propInfo = PROPERTY_INFO[pos];
           const houses = state?.houses ?? 0;
 
           // Check even building rule
@@ -61,10 +61,10 @@ export function BuildingControls({ send }: BuildingControlsProps) {
 
           return {
             position: pos,
-            name: space?.name || `Property ${pos}`,
+            name: propInfo?.name || `Property ${pos}`,
             houses,
             mortgaged: state?.mortgaged ?? false,
-            buildCost: space?.buildCost || 0,
+            buildCost: propInfo?.buildCost || 0,
             canBuild:
               houses < 5 &&
               !state?.mortgaged &&
@@ -91,15 +91,18 @@ export function BuildingControls({ send }: BuildingControlsProps) {
     const ownedProps = getPlayerProperties(playerId);
     return ownedProps
       .filter((p) => {
-        const space = BOARD_SPACES[p.position];
+        const propInfo = PROPERTY_INFO[p.position];
         // Can mortgage if no houses and not already mortgaged
-        return p.houses === 0 && !p.mortgaged && space;
+        return p.houses === 0 && !p.mortgaged && propInfo;
       })
-      .map((p) => ({
-        position: p.position,
-        name: BOARD_SPACES[p.position]?.name || `Property ${p.position}`,
-        mortgageValue: BOARD_SPACES[p.position]?.mortgageValue || 0,
-      }));
+      .map((p) => {
+        const propInfo = PROPERTY_INFO[p.position];
+        return {
+          position: p.position,
+          name: propInfo?.name || `Property ${p.position}`,
+          mortgageValue: propInfo?.mortgageValue || 0,
+        };
+      });
   }, [gameState, playerId, getPlayerProperties]);
 
   // Get unmortgageable properties
@@ -111,16 +114,19 @@ export function BuildingControls({ send }: BuildingControlsProps) {
 
     return ownedProps
       .filter((p) => {
-        const space = BOARD_SPACES[p.position];
-        const unmortgageCost = Math.floor((space?.mortgageValue || 0) * 1.1);
+        const propInfo = PROPERTY_INFO[p.position];
+        const unmortgageCost = Math.floor((propInfo?.mortgageValue || 0) * 1.1);
         // Can unmortgage if mortgaged and have enough money
         return p.mortgaged && (player?.money ?? 0) >= unmortgageCost;
       })
-      .map((p) => ({
-        position: p.position,
-        name: BOARD_SPACES[p.position]?.name || `Property ${p.position}`,
-        unmortgageCost: Math.floor((BOARD_SPACES[p.position]?.mortgageValue || 0) * 1.1),
-      }));
+      .map((p) => {
+        const propInfo = PROPERTY_INFO[p.position];
+        return {
+          position: p.position,
+          name: propInfo?.name || `Property ${p.position}`,
+          unmortgageCost: Math.floor((propInfo?.mortgageValue || 0) * 1.1),
+        };
+      });
   }, [gameState, playerId, getPlayerProperties]);
 
   if (buildableGroups.length === 0 && mortgageableProperties.length === 0 && unmortgageableProperties.length === 0) {
@@ -149,7 +155,7 @@ export function BuildingControls({ send }: BuildingControlsProps) {
                       className="flex items-center justify-between text-xs"
                     >
                       <div className="flex items-center gap-2">
-                        <span className={prop.mortgaged ? 'text-gray-400 line-through' : ''}>
+                        <span className={prop.mortgaged ? 'text-gray-400 line-through' : 'text-gray-900'}>
                           {prop.name}
                         </span>
                         {prop.houses > 0 && (
@@ -210,7 +216,7 @@ export function BuildingControls({ send }: BuildingControlsProps) {
           <div className="space-y-1">
             {mortgageableProperties.map((prop) => (
               <div key={prop.position} className="flex items-center justify-between text-xs p-1 bg-gray-50 rounded">
-                <span>{prop.name}</span>
+                <span className="text-gray-900">{prop.name}</span>
                 <button
                   onClick={() => mortgageProperty(prop.position)}
                   disabled={isActionPending}

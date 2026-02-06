@@ -29,8 +29,21 @@ export function useActions({ send }: UseActionsOptions) {
   // Computed states for UI
   const isMyTurn = gameState?.currentPlayer === playerId;
   const isInJail = currentPlayer?.inJail ?? false;
-  const canRollDice = isMyTurn && !gameState?.lastRoll && gameState?.gamePhase === 'pre_roll' && !isInJail;
-  const canEndTurn = isMyTurn && (gameState?.gamePhase === 'post_roll' || gameState?.lastRoll !== null);
+  const doublesCount = gameState?.doublesCount ?? 0;
+
+  // Can roll if: it's my turn, not in jail, AND either:
+  // - In pre_roll phase (haven't rolled yet), OR
+  // - In post_roll phase but rolled doubles (doublesCount > 0), so must roll again
+  const canRollDice =
+    isMyTurn &&
+    !isInJail &&
+    (gameState?.gamePhase === 'pre_roll' || (gameState?.gamePhase === 'post_roll' && doublesCount > 0));
+
+  // Can roll in jail: try for doubles to escape
+  const canRollInJail = isMyTurn && isInJail && gameState?.gamePhase === 'pre_roll';
+
+  // Can end turn if: it's my turn, we've rolled (post_roll), and we didn't roll doubles
+  const canEndTurn = isMyTurn && gameState?.gamePhase === 'post_roll' && doublesCount === 0;
   const canPayJailFine = isMyTurn && isInJail && (currentPlayer?.money ?? 0) >= 50;
   const canUseJailCard = isMyTurn && isInJail && (currentPlayer?.jailCards ?? 0) > 0;
 
@@ -67,51 +80,54 @@ export function useActions({ send }: UseActionsOptions) {
     isMyTurn,
     isInJail,
     canRollDice,
+    canRollInJail,
     canEndTurn,
     canPayJailFine,
     canUseJailCard,
     currentPlayer,
+    doublesCount,
 
     // Dice
     rollDice: useCallback(() => sendAction('roll_dice'), [sendAction]),
 
     // Property
     buyProperty: useCallback(
-      (propertyId: number) => sendAction('buy_property', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('buy_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 
-    passBuy: useCallback(() => sendAction('pass_buy'), [sendAction]),
+    // Pass on buying just ends the turn (no specific action needed)
+    passBuy: useCallback(() => sendAction('end_turn'), [sendAction]),
 
     // Building
     buildHouse: useCallback(
-      (propertyId: number) => sendAction('build_house', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('build_house', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     buildHotel: useCallback(
-      (propertyId: number) => sendAction('build_hotel', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('build_hotel', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     sellHouse: useCallback(
-      (propertyId: number) => sendAction('sell_house', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('sell_house', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     sellHotel: useCallback(
-      (propertyId: number) => sendAction('sell_hotel', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('sell_hotel', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     // Mortgage
     mortgageProperty: useCallback(
-      (propertyId: number) => sendAction('mortgage_property', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('mortgage_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     unmortgageProperty: useCallback(
-      (propertyId: number) => sendAction('unmortgage_property', { property_id: propertyId }),
+      (propertyPosition: number) => sendAction('unmortgage_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 

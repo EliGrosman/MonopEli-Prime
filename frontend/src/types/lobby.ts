@@ -1,38 +1,43 @@
 /**
- * Lobby player slot.
+ * Lobby player slot (matches backend snake_case).
  */
 export interface LobbyPlayer {
-  sessionId: string;
-  displayName: string;
-  isReady: boolean;
-  isAi: boolean;
-  aiType?: string;
-  slot: number;
+  session_id: string;
+  name: string;
+  is_host: boolean;
+  is_ready: boolean;
+  is_ai: boolean;
+  ai_type?: string;
+  slot_id: number;
+  joined_at: string;
 }
 
 /**
- * Lobby settings.
+ * Lobby settings (matches backend snake_case).
  */
 export interface LobbySettings {
-  maxPlayers: number;
-  startingMoney: number;
-  turnTimeLimit: number | null;
-  allowSpectators: boolean;
+  max_players: number;
+  min_players: number;
+  starting_money: number;
+  go_salary: number;
+  allow_spectators: boolean;
+  private: boolean;
 }
 
 /**
- * Lobby state.
+ * Lobby state (matches backend snake_case).
  */
 export interface LobbyState {
   id: string;
   name: string;
-  code: string;
-  hostSessionId: string;
-  players: LobbyPlayer[];
+  host_session_id: string;
+  status: string;
   settings: LobbySettings;
-  isPrivate: boolean;
-  gameId: string | null;
-  createdAt: number;
+  players: LobbyPlayer[];
+  spectator_count: number;
+  created_at: string;
+  game_id: string | null;
+  invite_code: string | null;
 }
 
 /**
@@ -41,9 +46,9 @@ export interface LobbyState {
 export interface LobbyListItem {
   id: string;
   name: string;
-  code: string;
-  playerCount: number;
-  maxPlayers: number;
-  hostName: string;
-  isPrivate: boolean;
+  host_name: string;
+  status: string;
+  current_players: number;
+  max_players: number;
+  created_at: string;
 }

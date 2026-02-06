@@ -18,11 +18,23 @@ export enum WSMessageType {
   ACTION_ERROR = 'action_error',
 
   // Connection
+  IDENTITY = 'identity',
   HEARTBEAT_ACK = 'heartbeat_ack',
   ERROR = 'error',
 
   // Chat
   CHAT_MESSAGE = 'chat_message',
+
+  // Lobby events
+  LOBBY_UPDATE = 'lobby_update',
+  LOBBY_PLAYER_JOINED = 'lobby_player_joined',
+  LOBBY_PLAYER_LEFT = 'lobby_player_left',
+  LOBBY_PLAYER_READY = 'lobby_player_ready',
+  LOBBY_AI_ADDED = 'lobby_ai_added',
+  LOBBY_AI_REMOVED = 'lobby_ai_removed',
+  LOBBY_SETTINGS_CHANGED = 'lobby_settings_changed',
+  LOBBY_GAME_STARTING = 'lobby_game_starting',
+  LOBBY_GAME_STARTED = 'lobby_game_started',
 }
 
 /**
@@ -113,6 +125,17 @@ export interface ChatMessage extends WSMessage {
 }
 
 /**
+ * Identity message - tells client their player_id.
+ */
+export interface IdentityMessage extends WSMessage {
+  type: WSMessageType.IDENTITY;
+  data: {
+    player_id: number | null;
+    player_name: string;
+  };
+}
+
+/**
  * Client action message to send to server.
  */
 export interface ClientActionMessage {
@@ -149,3 +172,63 @@ export type ClientMessage = ClientActionMessage | ClientHeartbeatMessage | Clien
  * WebSocket connection state.
  */
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+
+// Lobby WebSocket messages
+import type { LobbyState, LobbyPlayer, LobbySettings } from './lobby';
+
+/**
+ * Lobby update message (full state sync).
+ */
+export interface LobbyUpdateMessage extends WSMessage {
+  type: WSMessageType.LOBBY_UPDATE;
+  data: LobbyState;
+}
+
+/**
+ * Player joined lobby message.
+ */
+export interface LobbyPlayerJoinedMessage extends WSMessage {
+  type: WSMessageType.LOBBY_PLAYER_JOINED;
+  data: LobbyPlayer;
+}
+
+/**
+ * Player left lobby message.
+ */
+export interface LobbyPlayerLeftMessage extends WSMessage {
+  type: WSMessageType.LOBBY_PLAYER_LEFT;
+  data: {
+    sessionId: string;
+    reason: 'left' | 'kicked' | 'disconnected';
+  };
+}
+
+/**
+ * Player ready status changed message.
+ */
+export interface LobbyPlayerReadyMessage extends WSMessage {
+  type: WSMessageType.LOBBY_PLAYER_READY;
+  data: {
+    sessionId: string;
+    isReady: boolean;
+  };
+}
+
+/**
+ * Lobby settings changed message.
+ */
+export interface LobbySettingsChangedMessage extends WSMessage {
+  type: WSMessageType.LOBBY_SETTINGS_CHANGED;
+  data: Partial<LobbySettings>;
+}
+
+/**
+ * Game starting from lobby message.
+ */
+export interface LobbyGameStartingMessage extends WSMessage {
+  type: WSMessageType.LOBBY_GAME_STARTING;
+  data: {
+    gameId: string;
+    countdown: number;
+  };
+}

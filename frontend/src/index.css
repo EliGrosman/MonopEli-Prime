@@ -52,12 +52,19 @@
 }
 
 :root {
-  /* Board dimensions */
+  /* Board dimensions - responsive */
   --board-size: min(95vw, 95vh, 800px);
   --space-count-side: 11;
   --corner-size: calc(var(--board-size) / var(--space-count-side));
   --space-width: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
   --space-height: var(--corner-size);
+
+  /* Board text sizes - responsive */
+  --board-title-size: 2.25rem;
+  --board-subtitle-size: 0.875rem;
+  --space-name-size: 0.5rem;
+  --space-price-size: 0.5rem;
+  --token-size: 20px;
 
   /* Colors */
   --color-text-primary: #1a1a1a;
@@ -83,6 +90,67 @@
   --z-modal-backdrop: 40;
   --z-modal: 50;
   --z-toast: 60;
+}
+
+/* Mobile: small phones */
+@media (max-width: 479px) {
+  :root {
+    --board-size: 98vw;
+    --board-title-size: 1rem;
+    --board-subtitle-size: 0.5rem;
+    --space-name-size: 0.25rem;
+    --space-price-size: 0.25rem;
+    --color-band-height: 10px;
+    --token-size: 12px;
+  }
+}
+
+/* Mobile: larger phones */
+@media (min-width: 480px) and (max-width: 639px) {
+  :root {
+    --board-size: 95vw;
+    --board-title-size: 1.25rem;
+    --board-subtitle-size: 0.625rem;
+    --space-name-size: 0.375rem;
+    --space-price-size: 0.375rem;
+    --color-band-height: 12px;
+    --token-size: 14px;
+  }
+}
+
+/* Tablet portrait */
+@media (min-width: 640px) and (max-width: 767px) {
+  :root {
+    --board-size: min(90vw, 580px);
+    --board-title-size: 1.5rem;
+    --board-subtitle-size: 0.75rem;
+    --space-name-size: 0.4375rem;
+    --space-price-size: 0.4375rem;
+    --color-band-height: 16px;
+    --token-size: 16px;
+  }
+}
+
+/* Tablet landscape */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --board-size: min(70vh, 600px);
+    --board-title-size: 1.75rem;
+    --board-subtitle-size: 0.75rem;
+    --color-band-height: 18px;
+    --token-size: 18px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  :root {
+    --board-size: min(85vh, 800px);
+    --board-title-size: 2.25rem;
+    --board-subtitle-size: 0.875rem;
+    --color-band-height: 20px;
+    --token-size: 20px;
+  }
 }
 
 /* Dark mode */
@@ -112,4 +180,16 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* Form elements - ensure dark text on light backgrounds */
+input,
+select,
+textarea {
+  color: #1a1a1a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
 }

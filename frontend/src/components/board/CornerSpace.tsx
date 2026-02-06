@@ -22,7 +22,7 @@ export function CornerSpace({ position, name }: CornerSpaceProps) {
       return (
         <div className="flex flex-col items-center justify-center h-full p-1 relative">
           {/* Just Visiting section */}
-          <div className="absolute top-1 left-1 text-[7px] font-semibold">
+          <div className="absolute top-1 left-1 text-[7px] font-semibold text-gray-800">
             JUST
             <br />
             VISITING
@@ -30,7 +30,7 @@ export function CornerSpace({ position, name }: CornerSpaceProps) {
 
           {/* Jail section */}
           <div className="border-2 border-gray-800 bg-gray-200 p-1 rounded">
-            <div className="text-xs font-bold">JAIL</div>
+            <div className="text-xs font-bold text-gray-900">JAIL</div>
             <div className="text-lg">🔒</div>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function CornerSpace({ position, name }: CornerSpaceProps) {
     default:
       return (
         <div className="flex items-center justify-center h-full">
-          <div className="text-xs font-semibold">{name}</div>
+          <div className="text-xs font-semibold text-gray-900">{name}</div>
         </div>
       );
   }

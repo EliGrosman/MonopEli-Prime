@@ -89,7 +89,7 @@ export function GamePage() {
       {/* Connection Status Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold text-gray-900">
             {gameId ? `Game: ${gameId.slice(0, 8)}...` : 'Monopoly'}
           </h1>
           <ConnectionStatus state={connectionState} onReconnect={reconnect} />
@@ -121,7 +121,7 @@ export function GamePage() {
 
           {/* Event Log placeholder */}
           <div className="bg-white rounded-lg shadow-md p-4">
-            <h2 className="text-lg font-semibold mb-4">Event Log</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900">Event Log</h2>
             <p className="text-gray-500">Game events will appear here...</p>
           </div>
         </div>

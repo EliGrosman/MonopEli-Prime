@@ -27,13 +27,23 @@ export function PropertySpace({ position, name, type }: PropertySpaceProps) {
     case 'utility':
       return (
         <div className="text-center leading-tight">
-          <div className="font-semibold text-[8px] leading-tight mb-1">{displayName}</div>
+          <div
+            className="font-semibold leading-tight mb-0.5"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
+            {displayName}
+          </div>
           {propertyInfo && (
-            <div className="text-[7px] text-gray-600">{formatMoney(propertyInfo.price)}</div>
+            <div
+              className="text-gray-600"
+              style={{ fontSize: 'var(--space-price-size)' }}
+            >
+              {formatMoney(propertyInfo.price)}
+            </div>
           )}
-          {type === 'railroad' && <div className="text-lg mt-0.5">🚂</div>}
+          {type === 'railroad' && <div className="text-sm sm:text-lg mt-0.5">🚂</div>}
           {type === 'utility' && (
-            <div className="text-lg mt-0.5">{position === 12 ? '💡' : '🚰'}</div>
+            <div className="text-sm sm:text-lg mt-0.5">{position === 12 ? '💡' : '🚰'}</div>
           )}
         </div>
       );
@@ -41,35 +51,63 @@ export function PropertySpace({ position, name, type }: PropertySpaceProps) {
     case 'tax':
       return (
         <div className="text-center leading-tight">
-          <div className="font-semibold text-[8px] leading-tight">{displayName}</div>
-          <div className="text-lg mt-1">💰</div>
-          <div className="text-[7px] text-gray-600">{position === 4 ? '$200' : '$100'}</div>
+          <div
+            className="font-semibold leading-tight"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
+            {displayName}
+          </div>
+          <div className="text-sm sm:text-lg mt-0.5">💰</div>
+          <div
+            className="text-gray-600"
+            style={{ fontSize: 'var(--space-price-size)' }}
+          >
+            {position === 4 ? '$200' : '$100'}
+          </div>
         </div>
       );
 
     case 'chance':
       return (
         <div className="text-center leading-tight">
-          <div className="font-semibold text-[8px] leading-tight">CHANCE</div>
-          <div className="text-2xl mt-1">❓</div>
+          <div
+            className="font-semibold leading-tight"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
+            CHANCE
+          </div>
+          <div className="text-lg sm:text-2xl mt-0.5">❓</div>
         </div>
       );
 
     case 'community_chest':
       return (
         <div className="text-center leading-tight">
-          <div className="font-semibold text-[8px] leading-tight whitespace-nowrap">
+          <div
+            className="font-semibold leading-tight whitespace-nowrap"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
             COMMUNITY
           </div>
-          <div className="font-semibold text-[8px] leading-tight">CHEST</div>
-          <div className="text-xl mt-1">📦</div>
+          <div
+            className="font-semibold leading-tight"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
+            CHEST
+          </div>
+          <div className="text-base sm:text-xl mt-0.5">📦</div>
         </div>
       );
 
     default:
       return (
         <div className="text-center leading-tight">
-          <div className="font-semibold text-[8px] leading-tight">{displayName}</div>
+          <div
+            className="font-semibold leading-tight"
+            style={{ fontSize: 'var(--space-name-size)' }}
+          >
+            {displayName}
+          </div>
         </div>
       );
   }

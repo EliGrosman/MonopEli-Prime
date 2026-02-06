@@ -21,9 +21,11 @@ export function PlayerToken({ playerId, color, offset = 0 }: PlayerTokenProps) {
 
   return (
     <div
-      className="player-token w-4 h-4 rounded-full border-2 border-white shadow-sm animate-token-move"
+      className="player-token rounded-full border border-white sm:border-2 shadow-sm animate-token-move"
       style={{
         backgroundColor: tokenColor,
+        width: 'var(--token-size)',
+        height: 'var(--token-size)',
         ...offsetStyle,
       }}
       data-testid={`token-player-${playerId}`}

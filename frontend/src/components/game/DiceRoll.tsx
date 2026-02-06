@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { DiceRoll as DiceRollType } from '@/types';
 
 interface DiceRollProps {
@@ -14,10 +14,25 @@ interface DiceRollProps {
 export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: DiceRollProps) {
   const [animating, setAnimating] = useState(false);
   const [displayDice, setDisplayDice] = useState<[number, number]>([1, 1]);
+  // Track the last roll values to prevent re-animating on state updates
+  const lastRollRef = useRef<string | null>(null);
 
-  // Animate dice when a new roll comes in
+  // Animate dice when a NEW roll comes in (not just state refresh)
   useEffect(() => {
     if (roll && !isRolling) {
+      // Create a key from the roll values to compare
+      const rollKey = `${roll.die1}-${roll.die2}`;
+
+      // Only animate if this is actually a new roll
+      if (lastRollRef.current === rollKey) {
+        // Same roll values, just update display without animation
+        setDisplayDice([roll.die1, roll.die2]);
+        return;
+      }
+
+      // New roll - update ref and animate
+      lastRollRef.current = rollKey;
+
       // Defer state update to avoid cascading renders
       const startTimeout = setTimeout(() => {
         setAnimating(true);
@@ -43,6 +58,9 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
         clearInterval(interval);
         clearTimeout(timeout);
       };
+    } else if (!roll) {
+      // Reset when roll is cleared (new turn)
+      lastRollRef.current = null;
     }
   }, [roll, isRolling]);
 
@@ -185,15 +203,15 @@ export function DiceDisplay({ roll }: { roll: DiceRollType | null }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1">
-        <span className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-sm font-bold">
+        <span className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-sm font-bold text-gray-900">
           {roll.die1}
         </span>
-        <span className="text-gray-400">+</span>
-        <span className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-sm font-bold">
+        <span className="text-gray-500">+</span>
+        <span className="w-6 h-6 bg-white rounded border border-gray-300 flex items-center justify-center text-sm font-bold text-gray-900">
           {roll.die2}
         </span>
-        <span className="text-gray-400">=</span>
-        <span className="font-bold text-lg">{total}</span>
+        <span className="text-gray-500">=</span>
+        <span className="font-bold text-lg text-gray-900">{total}</span>
       </div>
       {roll.isDoubles && (
         <span className="px-1.5 py-0.5 text-xs bg-yellow-400 text-yellow-900 rounded">

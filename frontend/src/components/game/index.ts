@@ -5,3 +5,5 @@ export { PlayerCard } from './PlayerCard';
 export { ActionPanel } from './ActionPanel';
 export { DiceRoll, DiceDisplay } from './DiceRoll';
 export { BuildingControls } from './BuildingControls';
+export { EventLog, CompactEventLog } from './EventLog';
+export { default as MobileControls } from './MobileControls';

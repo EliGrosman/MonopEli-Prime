@@ -53,8 +53,8 @@ export const apiClient = createClient();
  */
 export function setSessionId(sessionId: string | null): void {
   if (sessionId) {
-    apiClient.defaults.headers.common['X-Session-ID'] = sessionId;
+    apiClient.defaults.headers.common['X-Session-Id'] = sessionId;
   } else {
-    delete apiClient.defaults.headers.common['X-Session-ID'];
+    delete apiClient.defaults.headers.common['X-Session-Id'];
   }
 }

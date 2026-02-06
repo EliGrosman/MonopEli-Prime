@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
 import { useGameStore } from '@/store/gameStore';
-import type { WSMessage, WSMessageType, ConnectionState, ClientMessage } from '@/types';
+import type { WSMessage, WSMessageType, ConnectionState, ClientMessage, IdentityMessage } from '@/types';
 
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const HEARTBEAT_INTERVAL = 30000;
@@ -124,6 +124,13 @@ export function useWebSocket({
 
         // Handle specific message types
         switch (message.type as WSMessageType) {
+          case 'identity':
+            // Server tells us our player_id
+            if (message.data && typeof message.data === 'object') {
+              const identityData = message.data as IdentityMessage['data'];
+              useSessionStore.getState().setCurrentGame(gameId, identityData.player_id);
+            }
+            break;
           case 'state_update':
             if (message.data) {
               updateGameState(message.data as Parameters<typeof updateGameState>[0]);

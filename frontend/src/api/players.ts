@@ -23,9 +23,12 @@ export async function createSession(displayName: string): Promise<SessionRespons
 
 /**
  * Get current session info.
+ * Note: sessionId param is for setting the header before the call.
  */
 export async function getSession(sessionId: string): Promise<SessionResponse> {
-  const response = await apiClient.get<SessionResponse>(`/players/session/${sessionId}`);
+  // Ensure session ID header is set
+  setSessionId(sessionId);
+  const response = await apiClient.get<SessionResponse>('/players/me');
   return response.data;
 }
 
@@ -36,7 +39,9 @@ export async function updateDisplayName(
   sessionId: string,
   displayName: string
 ): Promise<SessionResponse> {
-  const response = await apiClient.patch<SessionResponse>(`/players/session/${sessionId}`, {
+  // Ensure session ID header is set
+  setSessionId(sessionId);
+  const response = await apiClient.put<SessionResponse>('/players/me', {
     display_name: displayName,
   });
   return response.data;

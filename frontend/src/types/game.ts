@@ -8,17 +8,30 @@ export interface DiceRoll {
 }
 
 export interface GameState {
-  gameId: string;
+  // Note: Backend sends snake_case, so we use snake_case here
+  game_id?: string;
   players: PlayerState[];
-  properties: Record<number, PropertyState>;
-  currentPlayer: number;
-  turnNumber: number;
-  lastRoll: DiceRoll | null;
-  housesRemaining: number;
-  hotelsRemaining: number;
-  gamePhase: GamePhase;
-  gameOver: boolean;
+  properties: Record<string, PropertyState>;  // Backend sends string keys
+  current_player: number;
+  turn_number: number;
+  last_roll: [number, number] | null;  // Backend sends tuple
+  doubles_count: number;
+  houses_remaining: number;
+  hotels_remaining: number;
+  game_over: boolean;
   winner: number | null;
+  event_log: string[];
+
+  // Aliased for easier access (optional)
+  currentPlayer?: number;
+  turnNumber?: number;
+  gamePhase?: GamePhase;
+  lastRoll?: DiceRoll | null;
+  housesRemaining?: number;
+  hotelsRemaining?: number;
+  gameOver?: boolean;
+  rolledDoubles?: boolean;
+  doublesCount?: number;
 }
 
 export type GamePhase =
