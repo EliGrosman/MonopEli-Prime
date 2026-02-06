@@ -5,19 +5,22 @@ Provides endpoints for creating, joining, and managing game lobbies.
 """
 
 import json
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 
-from ..dependencies import get_lobby_manager, get_lobby_manager_ws, get_session_manager, get_connection_manager_ws
+from ..dependencies import (
+    get_connection_manager_ws,
+    get_lobby_manager,
+    get_lobby_manager_ws,
+    get_session_manager,
+)
 from ..models.lobby import (
     AddAIRequest,
     CreateLobbyRequest,
     CreateLobbyResponse,
     JoinLobbyRequest,
-    JoinLobbyResponse,
     LobbyInfo,
     LobbySettings,
     LobbyState,

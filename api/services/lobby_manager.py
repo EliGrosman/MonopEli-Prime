@@ -245,11 +245,9 @@ class LobbyManager:
 
             # Find player
             player_slot = None
-            player_name = ""
             for slot_id, player in lobby.players.items():
                 if player.session_id == session_id:
                     player_slot = slot_id
-                    player_name = player.name
                     break
 
             if player_slot is None:

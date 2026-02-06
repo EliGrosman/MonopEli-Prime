@@ -38,7 +38,7 @@ test-frontend:
 	cd frontend && npm test -- --run
 
 test-e2e:
-	cd frontend && npx playwright test
+	cd frontend && PLAYWRIGHT_BASE_URL=http://localhost:8080 npx playwright test --project=chromium
 
 lint:
 	uv run python -m ruff check monopoly_engine api
