@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { act } from '@testing-library/react';
 import { useGameStore } from './gameStore';
-import type { GameState } from '@/types';
 
 // Reset store between tests
 beforeEach(() => {
@@ -10,24 +9,23 @@ beforeEach(() => {
   });
 });
 
-// Create a mock game state for testing
-function createMockGameState(): GameState {
+// Create a mock raw backend state (snake_case) for updateGameState
+function createMockRawState() {
   return {
-    currentPlayer: 0,
-    turnPhase: 'pre_roll',
-    diceRoll: null,
-    doublesCount: 0,
+    current_player: 0,
+    doubles_count: 0,
+    last_roll: null as [number, number] | null,
     players: [
       {
         id: 0,
         name: 'Alice',
         money: 1500,
         position: 0,
-        inJail: false,
-        jailTurns: 0,
-        jailCards: 0,
+        in_jail: false,
+        jail_turns: 0,
+        jail_cards: 0,
         bankrupt: false,
-        isAi: false,
+        is_ai: false,
         color: '#E53935',
       },
       {
@@ -35,11 +33,11 @@ function createMockGameState(): GameState {
         name: 'Bob',
         money: 1200,
         position: 5,
-        inJail: false,
-        jailTurns: 0,
-        jailCards: 0,
+        in_jail: false,
+        jail_turns: 0,
+        jail_cards: 0,
         bankrupt: false,
-        isAi: false,
+        is_ai: false,
         color: '#1E88E5',
       },
     ],
@@ -48,9 +46,9 @@ function createMockGameState(): GameState {
       3: { position: 3, owner: 0, houses: 0, mortgaged: false },
       5: { position: 5, owner: 1, houses: 0, mortgaged: true },
     },
-    housesRemaining: 30,
-    hotelsRemaining: 12,
-    gameOver: false,
+    houses_remaining: 30,
+    hotels_remaining: 12,
+    game_over: false,
     winner: null,
   };
 }
@@ -84,14 +82,24 @@ describe('gameStore', () => {
     });
 
     it('updateGameState sets game state and clears error', () => {
-      const mockState = createMockGameState();
+      const rawState = createMockRawState();
 
       act(() => {
         useGameStore.getState().setError('Some error');
-        useGameStore.getState().updateGameState(mockState);
+        useGameStore.getState().updateGameState(rawState);
       });
 
-      expect(useGameStore.getState().gameState).toEqual(mockState);
+      const gameState = useGameStore.getState().gameState;
+      expect(gameState).not.toBeNull();
+      expect(gameState!.currentPlayer).toBe(0);
+      expect(gameState!.players).toHaveLength(2);
+      expect(gameState!.players[0].name).toBe('Alice');
+      expect(gameState!.players[1].name).toBe('Bob');
+      expect(gameState!.housesRemaining).toBe(30);
+      expect(gameState!.hotelsRemaining).toBe(12);
+      expect(gameState!.gameOver).toBe(false);
+      expect(gameState!.gamePhase).toBe('pre_roll');
+      expect(gameState!.lastRoll).toBeNull();
       expect(useGameStore.getState().error).toBeNull();
     });
 
@@ -124,7 +132,7 @@ describe('gameStore', () => {
     it('reset restores initial state', () => {
       act(() => {
         useGameStore.getState().setGameId('game-123');
-        useGameStore.getState().updateGameState(createMockGameState());
+        useGameStore.getState().updateGameState(createMockRawState());
         useGameStore.getState().setConnected(true);
         useGameStore.getState().setLoading(true);
         useGameStore.getState().setError('error');
@@ -143,7 +151,7 @@ describe('gameStore', () => {
   describe('selectors', () => {
     beforeEach(() => {
       act(() => {
-        useGameStore.getState().updateGameState(createMockGameState());
+        useGameStore.getState().updateGameState(createMockRawState());
       });
     });
 

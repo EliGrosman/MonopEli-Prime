@@ -3,39 +3,41 @@ import type { GameState } from './game';
 /**
  * WebSocket message types from server.
  */
-export enum WSMessageType {
+export const WSMessageType = {
   // Game state
-  STATE_UPDATE = 'state_update',
-  GAME_OVER = 'game_over',
+  STATE_UPDATE: 'state_update',
+  GAME_OVER: 'game_over',
 
   // Player events
-  PLAYER_JOINED = 'player_joined',
-  PLAYER_LEFT = 'player_left',
-  PLAYER_RECONNECTED = 'player_reconnected',
+  PLAYER_JOINED: 'player_joined',
+  PLAYER_LEFT: 'player_left',
+  PLAYER_RECONNECTED: 'player_reconnected',
 
   // Action responses
-  ACTION_RESULT = 'action_result',
-  ACTION_ERROR = 'action_error',
+  ACTION_RESULT: 'action_result',
+  ACTION_ERROR: 'action_error',
 
   // Connection
-  IDENTITY = 'identity',
-  HEARTBEAT_ACK = 'heartbeat_ack',
-  ERROR = 'error',
+  IDENTITY: 'identity',
+  HEARTBEAT_ACK: 'heartbeat_ack',
+  ERROR: 'error',
 
   // Chat
-  CHAT_MESSAGE = 'chat_message',
+  CHAT_MESSAGE: 'chat_message',
 
   // Lobby events
-  LOBBY_UPDATE = 'lobby_update',
-  LOBBY_PLAYER_JOINED = 'lobby_player_joined',
-  LOBBY_PLAYER_LEFT = 'lobby_player_left',
-  LOBBY_PLAYER_READY = 'lobby_player_ready',
-  LOBBY_AI_ADDED = 'lobby_ai_added',
-  LOBBY_AI_REMOVED = 'lobby_ai_removed',
-  LOBBY_SETTINGS_CHANGED = 'lobby_settings_changed',
-  LOBBY_GAME_STARTING = 'lobby_game_starting',
-  LOBBY_GAME_STARTED = 'lobby_game_started',
-}
+  LOBBY_UPDATE: 'lobby_update',
+  LOBBY_PLAYER_JOINED: 'lobby_player_joined',
+  LOBBY_PLAYER_LEFT: 'lobby_player_left',
+  LOBBY_PLAYER_READY: 'lobby_player_ready',
+  LOBBY_AI_ADDED: 'lobby_ai_added',
+  LOBBY_AI_REMOVED: 'lobby_ai_removed',
+  LOBBY_SETTINGS_CHANGED: 'lobby_settings_changed',
+  LOBBY_GAME_STARTING: 'lobby_game_starting',
+  LOBBY_GAME_STARTED: 'lobby_game_started',
+} as const;
+
+export type WSMessageType = (typeof WSMessageType)[keyof typeof WSMessageType];
 
 /**
  * Base WebSocket message structure.
@@ -50,7 +52,7 @@ export interface WSMessage {
  * State update message from server.
  */
 export interface StateUpdateMessage extends WSMessage {
-  type: WSMessageType.STATE_UPDATE;
+  type: typeof WSMessageType.STATE_UPDATE;
   data: GameState;
 }
 
@@ -58,7 +60,7 @@ export interface StateUpdateMessage extends WSMessage {
  * Game over message from server.
  */
 export interface GameOverMessage extends WSMessage {
-  type: WSMessageType.GAME_OVER;
+  type: typeof WSMessageType.GAME_OVER;
   data: {
     winner: number;
     reason: string;
@@ -70,7 +72,7 @@ export interface GameOverMessage extends WSMessage {
  * Player joined message.
  */
 export interface PlayerJoinedMessage extends WSMessage {
-  type: WSMessageType.PLAYER_JOINED;
+  type: typeof WSMessageType.PLAYER_JOINED;
   data: {
     playerId: number;
     playerName: string;
@@ -81,7 +83,7 @@ export interface PlayerJoinedMessage extends WSMessage {
  * Player left message.
  */
 export interface PlayerLeftMessage extends WSMessage {
-  type: WSMessageType.PLAYER_LEFT;
+  type: typeof WSMessageType.PLAYER_LEFT;
   data: {
     playerId: number;
     reason: string;
@@ -92,7 +94,7 @@ export interface PlayerLeftMessage extends WSMessage {
  * Action result message.
  */
 export interface ActionResultMessage extends WSMessage {
-  type: WSMessageType.ACTION_RESULT;
+  type: typeof WSMessageType.ACTION_RESULT;
   data: {
     success: boolean;
     actionType: string;
@@ -104,7 +106,7 @@ export interface ActionResultMessage extends WSMessage {
  * Error message from server.
  */
 export interface ErrorMessage extends WSMessage {
-  type: WSMessageType.ERROR;
+  type: typeof WSMessageType.ERROR;
   data: {
     code: string;
     message: string;
@@ -115,7 +117,7 @@ export interface ErrorMessage extends WSMessage {
  * Chat message.
  */
 export interface ChatMessage extends WSMessage {
-  type: WSMessageType.CHAT_MESSAGE;
+  type: typeof WSMessageType.CHAT_MESSAGE;
   data: {
     playerId: number;
     playerName: string;
@@ -128,7 +130,7 @@ export interface ChatMessage extends WSMessage {
  * Identity message - tells client their player_id.
  */
 export interface IdentityMessage extends WSMessage {
-  type: WSMessageType.IDENTITY;
+  type: typeof WSMessageType.IDENTITY;
   data: {
     player_id: number | null;
     player_name: string;
@@ -180,7 +182,7 @@ import type { LobbyState, LobbyPlayer, LobbySettings } from './lobby';
  * Lobby update message (full state sync).
  */
 export interface LobbyUpdateMessage extends WSMessage {
-  type: WSMessageType.LOBBY_UPDATE;
+  type: typeof WSMessageType.LOBBY_UPDATE;
   data: LobbyState;
 }
 
@@ -188,7 +190,7 @@ export interface LobbyUpdateMessage extends WSMessage {
  * Player joined lobby message.
  */
 export interface LobbyPlayerJoinedMessage extends WSMessage {
-  type: WSMessageType.LOBBY_PLAYER_JOINED;
+  type: typeof WSMessageType.LOBBY_PLAYER_JOINED;
   data: LobbyPlayer;
 }
 
@@ -196,7 +198,7 @@ export interface LobbyPlayerJoinedMessage extends WSMessage {
  * Player left lobby message.
  */
 export interface LobbyPlayerLeftMessage extends WSMessage {
-  type: WSMessageType.LOBBY_PLAYER_LEFT;
+  type: typeof WSMessageType.LOBBY_PLAYER_LEFT;
   data: {
     sessionId: string;
     reason: 'left' | 'kicked' | 'disconnected';
@@ -207,7 +209,7 @@ export interface LobbyPlayerLeftMessage extends WSMessage {
  * Player ready status changed message.
  */
 export interface LobbyPlayerReadyMessage extends WSMessage {
-  type: WSMessageType.LOBBY_PLAYER_READY;
+  type: typeof WSMessageType.LOBBY_PLAYER_READY;
   data: {
     sessionId: string;
     isReady: boolean;
@@ -218,7 +220,7 @@ export interface LobbyPlayerReadyMessage extends WSMessage {
  * Lobby settings changed message.
  */
 export interface LobbySettingsChangedMessage extends WSMessage {
-  type: WSMessageType.LOBBY_SETTINGS_CHANGED;
+  type: typeof WSMessageType.LOBBY_SETTINGS_CHANGED;
   data: Partial<LobbySettings>;
 }
 
@@ -226,7 +228,7 @@ export interface LobbySettingsChangedMessage extends WSMessage {
  * Game starting from lobby message.
  */
 export interface LobbyGameStartingMessage extends WSMessage {
-  type: WSMessageType.LOBBY_GAME_STARTING;
+  type: typeof WSMessageType.LOBBY_GAME_STARTING;
   data: {
     gameId: string;
     countdown: number;

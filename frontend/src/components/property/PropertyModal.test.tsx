@@ -27,8 +27,8 @@ describe('PropertyModal', () => {
   const mockSend = vi.fn();
 
   const mockPlayers: PlayerState[] = [
-    { id: 0, name: 'Player 1', color: '#FF0000', position: 0, money: 1500, jailTurns: 0, bankrupt: false, getOutOfJailCards: 0 },
-    { id: 1, name: 'Player 2', color: '#0000FF', position: 10, money: 1500, jailTurns: 0, bankrupt: false, getOutOfJailCards: 0 },
+    { id: 0, name: 'Player 1', color: '#FF0000', position: 0, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
+    { id: 1, name: 'Player 2', color: '#0000FF', position: 10, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
   ];
 
   const mockProperties: Record<number, PropertyState> = {
@@ -41,14 +41,15 @@ describe('PropertyModal', () => {
     players: mockPlayers,
     properties: mockProperties,
     currentPlayer: 0,
-    phase: 'playing',
-    dice: [1, 2],
+    turnNumber: 1,
+    gamePhase: 'pre_roll' as const,
+    lastRoll: null,
     doublesCount: 0,
     housesRemaining: 32,
     hotelsRemaining: 12,
     gameOver: false,
     winner: null,
-    turnCount: 1,
+    rolledDoubles: false,
   };
 
   const mockActions = {
@@ -76,7 +77,7 @@ describe('PropertyModal', () => {
       playerId: 0,
     } as ReturnType<typeof useSessionStore>);
 
-    mockUseActions.mockReturnValue(mockActions as ReturnType<typeof useActions>);
+    mockUseActions.mockReturnValue(mockActions as unknown as ReturnType<typeof useActions>);
   });
 
   it('returns null when position is null', () => {
@@ -277,7 +278,7 @@ describe('PropertyModal', () => {
       mockUseActions.mockReturnValue({
         ...mockActions,
         isActionPending: true,
-      } as ReturnType<typeof useActions>);
+      } as unknown as ReturnType<typeof useActions>);
 
       render(
         <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />

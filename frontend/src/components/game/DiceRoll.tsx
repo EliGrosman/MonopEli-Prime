@@ -25,9 +25,9 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
 
       // Only animate if this is actually a new roll
       if (lastRollRef.current === rollKey) {
-        // Same roll values, just update display without animation
-        setDisplayDice([roll.die1, roll.die2]);
-        return;
+        // Same roll values, defer update to avoid cascading renders
+        const t = setTimeout(() => setDisplayDice([roll.die1, roll.die2]), 0);
+        return () => clearTimeout(t);
       }
 
       // New roll - update ref and animate

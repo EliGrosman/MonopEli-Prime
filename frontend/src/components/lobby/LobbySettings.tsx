@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { LobbySettings as LobbySettingsType } from '@/types';
 
 interface LobbySettingsProps {
@@ -13,13 +13,6 @@ interface LobbySettingsProps {
 export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
-
-  // Sync localSettings when settings prop changes (e.g., from WebSocket updates)
-  useEffect(() => {
-    if (!isEditing) {
-      setLocalSettings(settings);
-    }
-  }, [settings, isEditing]);
 
   const handleChange = useCallback(
     (key: keyof LobbySettingsType, value: number | boolean) => {

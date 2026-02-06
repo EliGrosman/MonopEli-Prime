@@ -3,22 +3,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useActions } from './useActions';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
-import type { GameState } from '@/types';
-
-// Mock game state
-const mockGameState: GameState = {
-  gameId: 'test-game',
+// Mock raw backend state (snake_case) - gets transformed by updateGameState
+const mockRawState = {
+  game_id: 'test-game',
   players: [
     {
       id: 0,
       name: 'Alice',
       money: 1500,
       position: 5,
-      inJail: false,
-      jailTurns: 0,
-      jailCards: 1,
+      in_jail: false,
+      jail_turns: 0,
+      jail_cards: 1,
       bankrupt: false,
-      isAi: false,
+      is_ai: false,
       color: '#E53935',
     },
     {
@@ -26,22 +24,22 @@ const mockGameState: GameState = {
       name: 'Bob',
       money: 1200,
       position: 10,
-      inJail: true,
-      jailTurns: 1,
-      jailCards: 0,
+      in_jail: true,
+      jail_turns: 1,
+      jail_cards: 0,
       bankrupt: false,
-      isAi: false,
+      is_ai: false,
       color: '#1E88E5',
     },
   ],
   properties: {},
-  currentPlayer: 0,
-  turnNumber: 1,
-  lastRoll: null,
-  housesRemaining: 32,
-  hotelsRemaining: 12,
-  gamePhase: 'pre_roll',
-  gameOver: false,
+  current_player: 0,
+  turn_number: 1,
+  last_roll: null as [number, number] | null,
+  houses_remaining: 32,
+  hotels_remaining: 12,
+  game_phase: 'pre_roll',
+  game_over: false,
   winner: null,
 };
 
@@ -69,7 +67,7 @@ describe('useActions', () => {
 
   it('isMyTurn is false when not player turn', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 1); // Player 1, but current is 0
     });
 
@@ -79,7 +77,7 @@ describe('useActions', () => {
 
   it('isMyTurn is true when it is player turn', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0); // Player 0 is current
     });
 
@@ -89,7 +87,7 @@ describe('useActions', () => {
 
   it('canRollDice is true in pre_roll phase', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 
@@ -99,8 +97,9 @@ describe('useActions', () => {
 
   it('canRollDice is false after rolling', () => {
     const stateWithRoll = {
-      ...mockGameState,
-      lastRoll: { die1: 3, die2: 4, isDoubles: false },
+      ...mockRawState,
+      last_roll: [3, 4] as [number, number],
+      game_phase: 'post_roll',
     };
 
     act(() => {
@@ -114,9 +113,9 @@ describe('useActions', () => {
 
   it('canEndTurn is true after rolling', () => {
     const stateWithRoll = {
-      ...mockGameState,
-      lastRoll: { die1: 3, die2: 4, isDoubles: false },
-      gamePhase: 'post_roll' as const,
+      ...mockRawState,
+      last_roll: [3, 4] as [number, number],
+      game_phase: 'post_roll',
     };
 
     act(() => {
@@ -131,8 +130,8 @@ describe('useActions', () => {
   it('isInJail is true when player is in jail', () => {
     act(() => {
       useGameStore.getState().updateGameState({
-        ...mockGameState,
-        currentPlayer: 1,
+        ...mockRawState,
+        current_player: 1,
       });
       useSessionStore.getState().setCurrentGame('test-game', 1);
     });
@@ -144,8 +143,8 @@ describe('useActions', () => {
   it('canPayJailFine is true when in jail with enough money', () => {
     act(() => {
       useGameStore.getState().updateGameState({
-        ...mockGameState,
-        currentPlayer: 1,
+        ...mockRawState,
+        current_player: 1,
       });
       useSessionStore.getState().setCurrentGame('test-game', 1);
     });
@@ -158,10 +157,10 @@ describe('useActions', () => {
     // Player 0 has jail cards
     act(() => {
       useGameStore.getState().updateGameState({
-        ...mockGameState,
+        ...mockRawState,
         players: [
-          { ...mockGameState.players[0], inJail: true },
-          mockGameState.players[1],
+          { ...mockRawState.players[0], in_jail: true },
+          mockRawState.players[1],
         ],
       });
       useSessionStore.getState().setCurrentGame('test-game', 0);
@@ -173,7 +172,7 @@ describe('useActions', () => {
 
   it('rollDice sends correct action', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 
@@ -191,7 +190,7 @@ describe('useActions', () => {
 
   it('buyProperty sends correct action with property id', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 
@@ -203,13 +202,13 @@ describe('useActions', () => {
 
     expect(mockSend).toHaveBeenCalledWith({
       type: 'action',
-      data: { action_type: 'buy_property', property_id: 5 },
+      data: { action_type: 'buy_property', property_position: 5 },
     });
   });
 
   it('buildHouse sends correct action', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 
@@ -221,13 +220,13 @@ describe('useActions', () => {
 
     expect(mockSend).toHaveBeenCalledWith({
       type: 'action',
-      data: { action_type: 'build_house', property_id: 1 },
+      data: { action_type: 'build_house', property_position: 1 },
     });
   });
 
   it('mortgageProperty sends correct action', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 
@@ -239,13 +238,13 @@ describe('useActions', () => {
 
     expect(mockSend).toHaveBeenCalledWith({
       type: 'action',
-      data: { action_type: 'mortgage_property', property_id: 3 },
+      data: { action_type: 'mortgage_property', property_position: 3 },
     });
   });
 
   it('endTurn sends correct action', () => {
     act(() => {
-      useGameStore.getState().updateGameState(mockGameState);
+      useGameStore.getState().updateGameState(mockRawState);
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });
 

@@ -30,7 +30,7 @@ interface GameStore {
 
   // Actions
   setGameId: (id: string | null) => void;
-  updateGameState: (state: GameState) => void;
+  updateGameState: (state: Record<string, unknown>) => void;
   addEvent: (event: GameEvent) => void;
   clearEvents: () => void;
   setConnected: (connected: boolean) => void;
@@ -161,7 +161,7 @@ export const useGameStore = create<GameStore>()(
       // Selectors
       getCurrentPlayer: () => {
         const { gameState } = get();
-        if (!gameState) return null;
+        if (!gameState || gameState.currentPlayer == null) return null;
         return gameState.players[gameState.currentPlayer] ?? null;
       },
 

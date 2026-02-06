@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useActions } from '@/hooks/useActions';
-import { BOARD_SPACES, PROPERTY_INFO, getColorGroupPositions } from '@/utils/board';
+import { PROPERTY_INFO, getColorGroupPositions } from '@/utils/board';
 import type { ClientActionMessage, PropertyColor } from '@/types';
 
 interface BuildingControlsProps {

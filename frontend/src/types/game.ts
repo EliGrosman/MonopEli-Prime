@@ -8,30 +8,33 @@ export interface DiceRoll {
 }
 
 export interface GameState {
-  // Note: Backend sends snake_case, so we use snake_case here
-  game_id?: string;
+  // Core fields (always present after store transformation)
   players: PlayerState[];
-  properties: Record<string, PropertyState>;  // Backend sends string keys
-  current_player: number;
-  turn_number: number;
-  last_roll: [number, number] | null;  // Backend sends tuple
-  doubles_count: number;
-  houses_remaining: number;
-  hotels_remaining: number;
-  game_over: boolean;
+  properties: Record<number, PropertyState>;
+  currentPlayer: number;
+  turnNumber: number;
+  gamePhase: GamePhase;
+  lastRoll: DiceRoll | null;
+  doublesCount: number;
+  housesRemaining: number;
+  hotelsRemaining: number;
+  gameOver: boolean;
   winner: number | null;
-  event_log: string[];
+  rolledDoubles: boolean;
 
-  // Aliased for easier access (optional)
-  currentPlayer?: number;
-  turnNumber?: number;
-  gamePhase?: GamePhase;
-  lastRoll?: DiceRoll | null;
-  housesRemaining?: number;
-  hotelsRemaining?: number;
-  gameOver?: boolean;
-  rolledDoubles?: boolean;
-  doublesCount?: number;
+  // Backend snake_case fields (present from raw spread)
+  game_id?: string;
+  current_player?: number;
+  turn_number?: number;
+  last_roll?: [number, number] | null;
+  doubles_count?: number;
+  houses_remaining?: number;
+  hotels_remaining?: number;
+  game_over?: boolean;
+  event_log?: string[];
+
+  // Allow additional backend fields
+  [key: string]: unknown;
 }
 
 export type GamePhase =

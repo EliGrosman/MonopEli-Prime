@@ -97,10 +97,10 @@ export const useUIStore = create<UIStore>()(
 
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-      setGlobalLoading: (loading, message = null) =>
+      setGlobalLoading: (loading, message) =>
         set({
           globalLoading: loading,
-          loadingMessage: message,
+          loadingMessage: message ?? null,
         }),
     }),
     { name: 'ui-store' }
