@@ -46,17 +46,23 @@ class SelfPlayConfig:
     total_timesteps: int = 1_000_000
     num_envs: int = 8
     learning_rate: float = 3e-4
-    n_steps: int = 512
-    batch_size: int = 128
-    n_epochs: int = 4
+    lr_schedule: str = "linear"  # "linear" or "constant"
+    n_steps: int = 2048
+    batch_size: int = 64
+    n_epochs: int = 10
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     ent_coef: float = 0.01
+    vf_coef: float = 0.5
+    max_grad_norm: float = 0.5
 
     # Environment
     num_players: int = 4
     max_turns: int = 500
+    reward_type: str = "sparse"  # "sparse" or "dense"
+    terminal_win_reward: float = 5.0  # Dense mode terminal win reward
+    terminal_loss_reward: float = -5.0  # Dense mode terminal loss reward
 
     # Self-play
     opponent_type: str = "self"  # "self", "random", "rule_based", "mixed"
@@ -69,6 +75,9 @@ class SelfPlayConfig:
     # Checkpointing
     save_freq: int = 50_000
     save_dir: str = "models/selfplay"
+    checkpoint_min_win_rate: float = 0.0  # Min win rate vs random to save (0=disabled)
+    collapse_detection: bool = True  # Stop training if win rate collapses to 0%
+    load_model: str | None = None  # Path to pre-trained model to load
 
     # Misc
     seed: int = 42
@@ -116,6 +125,9 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         num_players: int = 4,
         max_turns: int = 500,
         opponent_type: str = "random",
+        reward_type: str = "sparse",
+        terminal_win_reward: float = 5.0,
+        terminal_loss_reward: float = -5.0,
         render_mode: str | None = None,
     ):
         super().__init__()
@@ -123,7 +135,14 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         self.num_players = num_players
         self.max_turns = max_turns
         self.opponent_type = opponent_type
+        self.reward_type = reward_type
+        self.terminal_win_reward = terminal_win_reward
+        self.terminal_loss_reward = terminal_loss_reward
         self.render_mode = render_mode
+
+        # Dense reward tracking
+        self._prev_net_worth: int = 1500
+        self._prev_num_properties: int = 0
 
         # Create underlying PettingZoo env (no trades for now)
         self._env = MonopolyEnv(
@@ -201,6 +220,8 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
 
         self.episode_length = 0
         self.episode_reward = 0.0
+        self._prev_net_worth = 1500
+        self._prev_num_properties = 0
 
         # Play until it's the learning agent's turn
         self._play_opponent_turns()
@@ -342,39 +363,62 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         )
 
     def _calculate_reward(self, game_over: bool) -> float:
-        """Calculate reward for the learning agent."""
-        if not game_over:
-            return 0.0
+        """Calculate reward for the learning agent.
 
+        Supports sparse (win/loss only) and dense (per-step shaping) modes.
+        Dense rewards give the agent per-step signal about net worth and
+        property acquisition, which is critical when training against strong
+        opponents where wins are rare.
+        """
         if self._env.game is None:
             return 0.0
 
-        winner = self._env.game.winner
-        if winner == self._learning_agent_id:
-            return 1.0  # Win
-        elif winner is not None:
-            return -1.0  # Loss
-        else:
-            # Truncation - reward based on relative net worth
-            from monopoly_engine import calculate_net_worth
-            my_worth = calculate_net_worth(
-                self._env.game.players[self._learning_agent_id],
-                self._env.game.property_manager,
-            )
-            # Compare to average opponent worth
-            opp_worths = []
-            for i in range(self.num_players):
-                if i != self._learning_agent_id and not self._env.game.players[i].bankrupt:
-                    opp_worths.append(calculate_net_worth(
-                        self._env.game.players[i],
-                        self._env.game.property_manager,
-                    ))
-            if opp_worths:
-                avg_opp = sum(opp_worths) / len(opp_worths)
-                # Normalize: positive if ahead, negative if behind
-                if avg_opp > 0:
-                    return 0.5 * (my_worth - avg_opp) / avg_opp
+        from monopoly_engine import calculate_net_worth
+
+        player = self._env.game.players[self._learning_agent_id]
+        pm = self._env.game.property_manager
+
+        if game_over:
+            winner = self._env.game.winner
+            if winner == self._learning_agent_id:
+                return self.terminal_win_reward if self.reward_type == "dense" else 1.0
+            elif winner is not None:
+                return self.terminal_loss_reward if self.reward_type == "dense" else -1.0
+            else:
+                # Truncation - reward based on relative net worth
+                my_worth = calculate_net_worth(player, pm)
+                opp_worths = []
+                for i in range(self.num_players):
+                    if i != self._learning_agent_id and not self._env.game.players[i].bankrupt:
+                        opp_worths.append(calculate_net_worth(
+                            self._env.game.players[i], pm,
+                        ))
+                if opp_worths:
+                    avg_opp = sum(opp_worths) / len(opp_worths)
+                    if avg_opp > 0:
+                        return 0.5 * (my_worth - avg_opp) / avg_opp
+                return 0.0
+
+        # For sparse reward, no intermediate signal
+        if self.reward_type == "sparse":
             return 0.0
+
+        # Dense reward: per-step shaping
+        reward = 0.0
+
+        # Net worth progress (scaled to ~0.01 per step)
+        current_worth = calculate_net_worth(player, pm)
+        worth_delta = current_worth - self._prev_net_worth
+        reward += worth_delta / 500.0
+        self._prev_net_worth = current_worth
+
+        # Property acquisition bonus
+        current_props = len(pm.get_owned_by(self._learning_agent_id))
+        if current_props > self._prev_num_properties:
+            reward += 0.05 * (current_props - self._prev_num_properties)
+        self._prev_num_properties = current_props
+
+        return reward
 
     def _get_observation(self) -> NDArray[np.float32]:
         """Get flattened observation for learning agent."""
@@ -445,6 +489,14 @@ class SelfPlayTrainer:
         if config.verbose:
             print(f"Creating {config.num_envs} parallel environments...")
             print(f"Opponent type: {config.opponent_type}")
+            print(f"Reward type: {config.reward_type}")
+            print(f"Players: {config.num_players}, Max turns: {config.max_turns}")
+            print(f"n_steps: {config.n_steps}, batch_size: {config.batch_size}, "
+                  f"n_epochs: {config.n_epochs}")
+            print(f"ent_coef: {config.ent_coef}, lr: {config.learning_rate}, "
+                  f"lr_schedule: {config.lr_schedule}")
+            if config.checkpoint_min_win_rate > 0:
+                print(f"Checkpoint min win rate: {config.checkpoint_min_win_rate:.0%}")
 
         # Create vectorized environment
         def make_env(rank: int) -> Callable[[], SelfPlayEnv]:
@@ -453,6 +505,9 @@ class SelfPlayTrainer:
                     num_players=config.num_players,
                     max_turns=config.max_turns,
                     opponent_type=config.opponent_type,
+                    reward_type=config.reward_type,
+                    terminal_win_reward=config.terminal_win_reward,
+                    terminal_loss_reward=config.terminal_loss_reward,
                 )
                 env.reset(seed=config.seed + rank)
                 return env
@@ -460,13 +515,22 @@ class SelfPlayTrainer:
 
         self._vec_env = DummyVecEnv([make_env(i) for i in range(config.num_envs)])
 
+        # Resolve learning rate schedule
+        if config.lr_schedule == "linear":
+            _base_lr = config.learning_rate
+            def lr_schedule_fn(progress_remaining: float) -> float:
+                return progress_remaining * _base_lr
+            lr_value: float | Callable[[float], float] = lr_schedule_fn
+        else:
+            lr_value = config.learning_rate
+
         if config.verbose:
             print("Creating MaskablePPO model...")
 
         self._model = MaskablePPO(
             "MlpPolicy",
             self._vec_env,
-            learning_rate=config.learning_rate,
+            learning_rate=lr_value,
             n_steps=config.n_steps,
             batch_size=config.batch_size,
             n_epochs=config.n_epochs,
@@ -474,10 +538,16 @@ class SelfPlayTrainer:
             gae_lambda=config.gae_lambda,
             clip_range=config.clip_range,
             ent_coef=config.ent_coef,
+            vf_coef=config.vf_coef,
+            max_grad_norm=config.max_grad_norm,
             verbose=0,
             tensorboard_log=str(save_path / "tensorboard"),
             seed=config.seed,
         )
+
+        # Load pre-trained model if specified
+        if config.load_model:
+            self._load_pretrained(Path(config.load_model))
 
         # Create callback for evaluation and self-play updates
         callback = SelfPlayCallback(
@@ -540,6 +610,112 @@ class SelfPlayTrainer:
         for env in self._vec_env.envs:
             env.set_opponent_policy(policy_fn)
 
+    def _load_pretrained(self, path: Path) -> None:
+        """Load a pre-trained model, with weight surgery for cross-player-count transfer.
+
+        First attempts direct load (same observation dimensions). If that fails
+        due to dimension mismatch (e.g., 2P model loaded into 4P env), performs
+        weight surgery on the first linear layers to map observation features.
+
+        Observation layout (from observation.py):
+        - [0:33] = player_state (33 dims, fixed)
+        - [33:33+N*34] = opponent_states (N = num_players-1, 34 features each)
+        - [33+N*34:] = board(140) + game(4) + action_mask(149) = 293 dims (fixed)
+        """
+        from sb3_contrib import MaskablePPO
+
+        if self._model is None or self._vec_env is None:
+            return
+
+        # Resolve path (handle both with and without .zip extension)
+        model_path = path
+        if not model_path.exists() and not model_path.with_suffix(".zip").exists():
+            print(f"Warning: Model not found at {path}, skipping load")
+            return
+        # MaskablePPO.load handles .zip extension automatically
+        load_str = str(model_path)
+
+        if self.config.verbose:
+            print(f"Loading pre-trained model from {path}...")
+
+        try:
+            # Try direct load (same observation dimensions)
+            self._model = MaskablePPO.load(load_str, env=self._vec_env)
+            if self.config.verbose:
+                print("Direct model load successful (matching dimensions)")
+            return
+        except Exception as direct_err:
+            if self.config.verbose:
+                print(f"Direct load failed ({direct_err}), attempting weight surgery...")
+
+        # Weight surgery for cross-player-count transfer
+        try:
+            import torch
+
+            source_model = MaskablePPO.load(load_str)
+            source_params = source_model.policy.state_dict()
+            target_params = self._model.policy.state_dict()
+
+            # Get observation sizes
+            source_obs = source_model.observation_space.shape[0]
+            target_obs = self._model.observation_space.shape[0]
+
+            if self.config.verbose:
+                print(f"Source obs size: {source_obs}, Target obs size: {target_obs}")
+
+            # Observation layout constants
+            player_state_size = 33  # Fixed
+            tail_size = 293  # board(140) + game(4) + action_mask(149), fixed
+            source_opp_size = source_obs - player_state_size - tail_size
+            target_opp_size = target_obs - player_state_size - tail_size
+
+            if self.config.verbose:
+                print(f"Source opponent dims: {source_opp_size}, "
+                      f"Target opponent dims: {target_opp_size}")
+
+            # Process first linear layers that take observations as input
+            for layer_name in list(source_params.keys()):
+                source_tensor = source_params[layer_name]
+                if layer_name not in target_params:
+                    continue
+                target_tensor = target_params[layer_name]
+
+                # First linear layer weights have shape (out_features, in_features)
+                # where in_features == observation size
+                if (source_tensor.dim() == 2
+                        and source_tensor.shape[1] == source_obs
+                        and target_tensor.shape[1] == target_obs):
+                    # Build new weight matrix
+                    new_weight = torch.zeros_like(target_tensor)
+
+                    # Copy player_state cols (0:33)
+                    new_weight[:, :player_state_size] = \
+                        source_tensor[:, :player_state_size]
+
+                    # Copy opponent cols (as many as fit)
+                    copy_opp = min(source_opp_size, target_opp_size)
+                    new_weight[:, player_state_size:player_state_size + copy_opp] = \
+                        source_tensor[:, player_state_size:player_state_size + copy_opp]
+                    # New opponent cols (if target has more) are already zero-initialized
+
+                    # Copy tail cols (board + game + action_mask)
+                    new_weight[:, -tail_size:] = source_tensor[:, -tail_size:]
+
+                    target_params[layer_name] = new_weight
+                    if self.config.verbose:
+                        print(f"Weight surgery on {layer_name}: "
+                              f"{source_tensor.shape} -> {target_tensor.shape}")
+                elif source_tensor.shape == target_tensor.shape:
+                    # Same shape: copy directly (hidden layers, biases, output heads)
+                    target_params[layer_name] = source_tensor
+
+            self._model.policy.load_state_dict(target_params)
+            if self.config.verbose:
+                print("Weight surgery complete, model loaded successfully")
+
+        except Exception as e:
+            print(f"Warning: Model loading failed ({e}), starting from scratch")
+
     def evaluate(
         self,
         opponent_type: str,
@@ -554,6 +730,8 @@ class SelfPlayTrainer:
             num_players=self.config.num_players,
             max_turns=min(self.config.max_turns, 300),  # Cap at 300 for eval speed
             opponent_type=opponent_type,
+            terminal_win_reward=self.config.terminal_win_reward,
+            terminal_loss_reward=self.config.terminal_loss_reward,
         )
 
         wins = 0
@@ -608,6 +786,7 @@ class SelfPlayCallback:
         self.last_save = 0
         self.last_opponent_update = 0
         self.start_time = time.time()
+        self.consecutive_zero_evals: int = 0
 
     def __call__(self, locals_dict: dict, globals_dict: dict) -> bool:
         """Called at each training step."""
@@ -633,6 +812,32 @@ class SelfPlayCallback:
             self._evaluate()
             self.last_eval = self.num_timesteps
 
+            # Collapse detection: check if win rate has dropped to 0%
+            if self.trainer.metrics.eval_results:
+                last_eval = self.trainer.metrics.eval_results[-1]
+                vs_random = last_eval.get("vs_random", 0.0)
+                if vs_random == 0.0 and self.num_timesteps >= 100_000:
+                    self.consecutive_zero_evals += 1
+                else:
+                    self.consecutive_zero_evals = 0
+
+                if (self.consecutive_zero_evals >= 3
+                        and self.trainer.config.collapse_detection):
+                    print(f"\n{'!'*60}")
+                    print(f"COLLAPSE DETECTED at step {self.num_timesteps:,}")
+                    print(f"Win rate vs random has been 0% for "
+                          f"{self.consecutive_zero_evals} consecutive evals")
+                    best_path = self.save_path / "best_model.zip"
+                    if best_path.exists():
+                        print(f"Loading best model from {best_path}")
+                        self.trainer._model = type(self.trainer._model).load(
+                            str(self.save_path / "best_model"),
+                            env=self.trainer._vec_env,
+                        )
+                    print(f"Stopping training early.")
+                    print(f"{'!'*60}\n")
+                    return False
+
         # Save checkpoint
         if self.num_timesteps - self.last_save >= self.save_freq:
             self._save_checkpoint()
@@ -644,8 +849,7 @@ class SelfPlayCallback:
         """Run evaluation against different opponent types."""
         results = {}
 
-        # Use fewer episodes for faster eval during training
-        eval_eps = min(self.eval_episodes, 20)
+        eval_eps = self.eval_episodes
 
         for opp_type in ["random", "rule_based"]:
             win_rate = self.trainer.evaluate(opp_type, eval_eps)
@@ -671,12 +875,36 @@ class SelfPlayCallback:
             self.trainer._model.logger.dump(self.num_timesteps)
 
     def _save_checkpoint(self) -> None:
-        """Save a checkpoint."""
+        """Save a checkpoint, gated on minimum win rate if configured."""
         if self.trainer._model is None:
             return
 
+        min_wr = self.trainer.config.checkpoint_min_win_rate
+        if min_wr > 0 and self.trainer.metrics.eval_results:
+            last_eval = self.trainer.metrics.eval_results[-1]
+            vs_random = last_eval.get("vs_random", 0.0)
+            if vs_random < min_wr:
+                if self.verbose:
+                    print(f"[{self.num_timesteps:,}] Checkpoint skipped "
+                          f"(win rate {vs_random:.0%} < {min_wr:.0%})")
+                return
+
         checkpoint_path = self.save_path / f"checkpoint_{self.num_timesteps}"
         self.trainer._model.save(str(checkpoint_path))
+
+        # Track best model
+        if self.trainer.metrics.eval_results:
+            last_eval = self.trainer.metrics.eval_results[-1]
+            vs_random = last_eval.get("vs_random", 0.0)
+            if not hasattr(self, "_best_win_rate"):
+                self._best_win_rate = 0.0
+            if vs_random > self._best_win_rate:
+                self._best_win_rate = vs_random
+                best_path = self.save_path / "best_model"
+                self.trainer._model.save(str(best_path))
+                if self.verbose:
+                    print(f"[{self.num_timesteps:,}] New best model! "
+                          f"({vs_random:.0%} vs random)")
 
         if self.verbose:
             print(f"[{self.num_timesteps:,}] Saved checkpoint: {checkpoint_path}")
@@ -686,6 +914,9 @@ def make_selfplay_env(
     num_players: int = 4,
     max_turns: int = 500,
     opponent_type: str = "random",
+    reward_type: str = "sparse",
+    terminal_win_reward: float = 5.0,
+    terminal_loss_reward: float = -5.0,
     seed: int | None = None,
 ) -> SelfPlayEnv:
     """Factory function to create a self-play environment."""
@@ -693,6 +924,9 @@ def make_selfplay_env(
         num_players=num_players,
         max_turns=max_turns,
         opponent_type=opponent_type,
+        reward_type=reward_type,
+        terminal_win_reward=terminal_win_reward,
+        terminal_loss_reward=terminal_loss_reward,
     )
     if seed is not None:
         env.reset(seed=seed)

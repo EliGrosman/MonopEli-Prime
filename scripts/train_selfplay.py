@@ -110,6 +110,68 @@ Examples:
         help="Learning rate (default: 3e-4)",
     )
     parser.add_argument(
+        "--n-steps",
+        type=int,
+        default=2048,
+        help="Steps per PPO update per env (default: 2048)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=64,
+        help="Minibatch size (default: 64)",
+    )
+    parser.add_argument(
+        "--n-epochs",
+        type=int,
+        default=10,
+        help="PPO epochs per update (default: 10)",
+    )
+    parser.add_argument(
+        "--ent-coef",
+        type=float,
+        default=0.01,
+        help="Entropy coefficient (default: 0.01)",
+    )
+    parser.add_argument(
+        "--lr-schedule",
+        type=str,
+        choices=["linear", "constant"],
+        default="linear",
+        help="Learning rate schedule (default: linear)",
+    )
+    parser.add_argument(
+        "--clip-range",
+        type=float,
+        default=0.2,
+        help="PPO clip range (default: 0.2, try 0.1 for stability)",
+    )
+    parser.add_argument(
+        "--terminal-scale",
+        type=float,
+        default=5.0,
+        help="Terminal reward magnitude for dense mode (+val win, -val loss) (default: 5.0)",
+    )
+    parser.add_argument(
+        "--load-model",
+        type=str,
+        default=None,
+        help="Path to pre-trained model to load (for transfer learning)",
+    )
+    parser.add_argument(
+        "--reward-type",
+        type=str,
+        choices=["sparse", "dense"],
+        default="dense",
+        help="Reward type: sparse (win/loss only) or dense (per-step shaping) (default: dense)",
+    )
+    parser.add_argument(
+        "--min-win-rate",
+        type=float,
+        default=0.0,
+        help="Min win rate vs random to save checkpoint, 0=disabled (default: 0)",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -147,11 +209,22 @@ Examples:
             num_players=args.num_players,
             max_turns=args.max_turns,
             opponent_type=args.opponent,
+            reward_type=args.reward_type,
             eval_freq=args.eval_freq,
             eval_episodes=args.eval_episodes,
             save_freq=args.save_freq,
             save_dir=args.save_dir,
             learning_rate=args.learning_rate,
+            lr_schedule=args.lr_schedule,
+            clip_range=args.clip_range,
+            terminal_win_reward=args.terminal_scale,
+            terminal_loss_reward=-args.terminal_scale,
+            load_model=args.load_model,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            ent_coef=args.ent_coef,
+            checkpoint_min_win_rate=args.min_win_rate,
             seed=args.seed,
             verbose=not args.quiet,
         )
@@ -187,17 +260,30 @@ def run_curriculum(args: argparse.Namespace) -> None:
         print(f"STAGE: {stage_name.upper()} ({stage_steps:,} steps)")
         print(f"{'='*60}\n")
 
+        # Only load external model for first stage when no prior model exists
+        stage_load_model = args.load_model if model is None else None
+
         config = SelfPlayConfig(
             total_timesteps=stage_steps,
             num_envs=args.num_envs,
             num_players=args.num_players,
             max_turns=args.max_turns,
             opponent_type=stage_name,
+            reward_type=args.reward_type,
             eval_freq=args.eval_freq,
             eval_episodes=args.eval_episodes,
             save_freq=args.save_freq,
             save_dir=str(save_dir / stage_name),
             learning_rate=args.learning_rate,
+            lr_schedule=args.lr_schedule,
+            clip_range=args.clip_range,
+            terminal_win_reward=args.terminal_scale,
+            terminal_loss_reward=-args.terminal_scale,
+            load_model=stage_load_model,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            ent_coef=args.ent_coef,
             seed=args.seed,
             verbose=not args.quiet,
         )
@@ -217,6 +303,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
                         num_players=config.num_players,
                         max_turns=config.max_turns,
                         opponent_type=config.opponent_type,
+                        reward_type=config.reward_type,
                     )
                     env.reset(seed=config.seed + rank)
                     return env
