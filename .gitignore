@@ -16,6 +16,9 @@ htmlcov/
 
 .DS_Store
 
+# Environment files
+.env
+
 # Training artifacts
 logs/*
 training_log_*.txt

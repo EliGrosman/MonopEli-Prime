@@ -16,7 +16,10 @@ class TestHealthCheck:
         """Test GET /health returns healthy status."""
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "healthy"}
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert data["version"] == "1.0.0"
+        assert "uptime_seconds" in data
 
     def test_api_info(self, client: TestClient):
         """Test GET /api returns API info."""

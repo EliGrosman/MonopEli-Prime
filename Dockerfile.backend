@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+FROM python:3.13-slim AS base
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user
+RUN groupadd --gid 1000 app && \
+    useradd --uid 1000 --gid app --shell /bin/bash --create-home app
+
+# Copy dependency files first for layer caching
+COPY pyproject.toml uv.lock README.md ./
+
+# Install production dependencies only (no dev/training extras)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+# Copy application code
+COPY monopoly_engine/ monopoly_engine/
+COPY monopoly_gym/ monopoly_gym/
+COPY agents/ agents/
+COPY api/ api/
+
+# Install the project itself
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# Switch to non-root user
+USER app
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+# Run the application
+CMD ["uv", "run", "--no-sync", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

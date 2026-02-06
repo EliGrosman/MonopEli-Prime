@@ -9,15 +9,20 @@ Usage:
     uvicorn api.main:create_app --factory --workers 4 --port 8000
 """
 
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 from .config import Settings, get_settings
 from .middleware.errors import ErrorHandlingMiddleware
 from .middleware.logging import RequestLoggingMiddleware, setup_logging
+from .middleware.metrics import MetricsMiddleware, metrics_endpoint
 from .middleware.rate_limit import RateLimitMiddleware
 from .routers import games, lobbies, players, websocket
 from .services.ai_manager import AIManager
@@ -31,6 +36,7 @@ from .services.session_manager import SessionManager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for startup/shutdown."""
     # Startup
+    app.state.start_time = time.time()
     app.state.game_manager = GameManager()
     app.state.connection_manager = ConnectionManager()
     app.state.lobby_manager = LobbyManager()
@@ -121,18 +127,24 @@ Message types:
     # Install error handlers (must be before middleware)
     ErrorHandlingMiddleware.install(app)
 
+    # Metrics middleware (outermost - records all requests)
+    app.add_middleware(
+        MetricsMiddleware,
+        exclude_paths=["/metrics", "/health"],
+    )
+
     # Rate limiting middleware (applied first, before other processing)
     app.add_middleware(
         RateLimitMiddleware,
         requests_per_minute=settings.rate_limit_per_minute,
         burst_size=settings.rate_limit_burst,
-        exclude_paths=["/health", "/api/docs", "/api/redoc", "/api/openapi.json"],
+        exclude_paths=["/health", "/metrics", "/api/docs", "/api/redoc", "/api/openapi.json"],
     )
 
     # Request logging middleware
     app.add_middleware(
         RequestLoggingMiddleware,
-        exclude_paths=["/health"],
+        exclude_paths=["/health", "/metrics"],
     )
 
     # CORS middleware
@@ -146,9 +158,20 @@ Message types:
 
     # Health check endpoint
     @app.get("/health", tags=["health"])
-    async def health_check() -> dict[str, str]:
+    async def health_check() -> dict[str, str | float]:
         """Health check endpoint."""
-        return {"status": "healthy"}
+        uptime = time.time() - app.state.start_time if hasattr(app.state, "start_time") else 0.0
+        return {
+            "status": "healthy",
+            "version": "1.0.0",
+            "uptime_seconds": round(uptime, 1),
+        }
+
+    # Prometheus metrics endpoint
+    @app.get("/metrics", tags=["monitoring"], include_in_schema=False)
+    async def metrics() -> Response:
+        """Prometheus metrics endpoint."""
+        return metrics_endpoint(app)
 
     # API info endpoint
     @app.get("/api", tags=["info"])
@@ -172,6 +195,11 @@ Message types:
     app.include_router(lobbies.router, prefix="/api/lobbies", tags=["lobbies"])
     app.include_router(players.router, prefix="/api/players", tags=["players"])
     app.include_router(websocket.router, tags=["websocket"])
+
+    # Serve static frontend files if available (for combined single-container deploy)
+    static_dir = Path(__file__).parent.parent / "static"
+    if static_dir.is_dir():
+        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
     return app
 

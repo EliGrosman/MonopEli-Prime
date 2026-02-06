@@ -9,7 +9,15 @@ import type {
   IdentityMessage,
 } from '@/types';
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+function getWsBaseUrl(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+  if (typeof window !== 'undefined' && window.location.host) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}`;
+  }
+  return 'ws://localhost:8000';
+}
+const WS_BASE_URL = getWsBaseUrl();
 const HEARTBEAT_INTERVAL = 30000;
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;

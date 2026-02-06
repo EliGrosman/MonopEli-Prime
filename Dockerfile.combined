@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+# Combined single-container build: backend + static frontend via FastAPI StaticFiles.
+# Simpler deployment - no Nginx needed.
+
+# Stage 1: Build frontend
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ .
+
+# Empty URLs = relative (same origin)
+ARG VITE_API_URL=
+ARG VITE_WS_URL=
+
+RUN npm run build
+
+# Stage 2: Python backend + static files
+FROM python:3.13-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+RUN groupadd --gid 1000 app && \
+    useradd --uid 1000 --gid app --shell /bin/bash --create-home app
+
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+COPY monopoly_engine/ monopoly_engine/
+COPY monopoly_gym/ monopoly_gym/
+COPY agents/ agents/
+COPY api/ api/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# Copy built frontend to static/ directory
+COPY --from=frontend-build /app/dist static/
+
+USER app
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+
+CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,118 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total[1m])",
+          "legendFormat": "{{method}} {{path}} {{status_code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      }
+    },
+    {
+      "title": "Request Duration (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "title": "Active Games",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "monopeli_active_games",
+          "legendFormat": "Games"
+        }
+      ]
+    },
+    {
+      "title": "WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "expr": "monopeli_active_ws_connections",
+          "legendFormat": "Connections"
+        }
+      ]
+    },
+    {
+      "title": "Active Sessions",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "monopeli_active_sessions",
+          "legendFormat": "Sessions"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status_code=~\"5..\"}[5m])",
+          "legendFormat": "5xx errors/s"
+        },
+        {
+          "expr": "rate(http_requests_total{status_code=~\"4..\"}[5m])",
+          "legendFormat": "4xx errors/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      }
+    },
+    {
+      "title": "Request Rate by Endpoint",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (path) (rate(http_requests_total[5m]))",
+          "legendFormat": "{{path}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["monopeli"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "MonopEli Dashboard",
+  "uid": "monopeli-main",
+  "version": 1
+}

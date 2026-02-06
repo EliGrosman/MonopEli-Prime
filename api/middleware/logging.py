@@ -94,8 +94,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if request.url.path in self.exclude_paths:
             return await call_next(request)
 
-        # Generate request ID
-        request_id = str(uuid.uuid4())[:8]
+        # Use upstream request ID if provided (e.g., from Nginx), otherwise generate
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
         request.state.request_id = request_id
 
         # Record start time

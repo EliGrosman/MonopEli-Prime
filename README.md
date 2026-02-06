@@ -23,7 +23,28 @@ A pure Python implementation of the Monopoly board game engine, designed for AI/
 - **Rule Validation**: Test house rules and variants
 - **Educational**: Learn game theory and probability
 
-## Quick Start
+## Quick Start (Docker)
+
+The fastest way to run MonopEli:
+
+```bash
+cp .env.example .env
+docker compose up -d
+
+# Backend: http://localhost:8000
+# Frontend: http://localhost:3000
+```
+
+For production (single port, Nginx reverse proxy):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+# Everything served on http://localhost
+```
+
+See `docs/05_DEPLOYMENT_GUIDE.md` for full deployment instructions.
+
+## Quick Start (Development)
 
 ### Installation
 
