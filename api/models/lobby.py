@@ -136,18 +136,18 @@ class LobbyWSMessageType(str, Enum):
     UPDATE_SETTINGS = "update_settings"  # Host only
     START_GAME = "start_game"  # Host only
 
-    # Server → Client
-    LOBBY_STATE = "lobby_state"
-    PLAYER_JOINED = "player_joined"
-    PLAYER_LEFT = "player_left"
-    PLAYER_READY = "player_ready"
-    PLAYER_UNREADY = "player_unready"
-    PLAYER_KICKED = "player_kicked"
-    AI_ADDED = "ai_added"
-    AI_REMOVED = "ai_removed"
-    SETTINGS_UPDATED = "settings_updated"
+    # Server → Client (must match frontend WSMessageType)
+    LOBBY_STATE = "lobby_update"
+    PLAYER_JOINED = "lobby_player_joined"
+    PLAYER_LEFT = "lobby_player_left"
+    PLAYER_READY = "lobby_player_ready"
+    PLAYER_UNREADY = "lobby_player_unready"
+    PLAYER_KICKED = "lobby_player_kicked"
+    AI_ADDED = "lobby_ai_added"
+    AI_REMOVED = "lobby_ai_removed"
+    SETTINGS_UPDATED = "lobby_settings_changed"
     CHAT_MESSAGE = "chat_message"
-    GAME_STARTING = "game_starting"
-    GAME_STARTED = "game_started"
+    GAME_STARTING = "lobby_game_starting"
+    GAME_STARTED = "lobby_game_started"
     ERROR = "error"
     LOBBY_CLOSED = "lobby_closed"

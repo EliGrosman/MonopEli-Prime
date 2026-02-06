@@ -26,6 +26,7 @@ from ..models.websocket import (
     WSActionResult,
     WSChatMessage,
     WSError,
+    WSIdentity,
     WSMessage,
     WSMessageType,
     WSPlayerEvent,
@@ -247,6 +248,15 @@ async def websocket_endpoint(
     # Track if this is a reconnection
     is_reconnect = False
 
+    # If player_id is not provided, look it up by session_id
+    # (the lobby manager pre-claims slots for players)
+    if player_id is None:
+        player_id = await game_manager.get_player_id_by_session(game_id, session_id)
+        # If still None, this session isn't a player - connect as spectator
+        if player_id is not None:
+            # Found the player - mark as reconnect since slot is already claimed
+            is_reconnect = True
+
     # Validate player_id if provided
     if player_id is not None:
         if player_id < 0 or player_id >= len(game.player_slots):
@@ -254,7 +264,7 @@ async def websocket_endpoint(
             await websocket.close(code=4001, reason="Invalid player ID")
             return
 
-        # Try to claim the slot
+        # Try to claim the slot (or reconnect to it)
         success, error, is_reconnect = await game_manager.claim_player_slot(
             game_id, player_id, session_id, player_name
         )
@@ -277,6 +287,18 @@ async def websocket_endpoint(
         if game_id not in conn_manager._connections:
             conn_manager._connections[game_id] = []
         conn_manager._connections[game_id].append(connection)
+
+    # Send identity message first (tells client their player_id)
+    await _send_message(
+        websocket,
+        WSMessage(
+            type=WSMessageType.IDENTITY,
+            data=WSIdentity(
+                player_id=player_id,
+                player_name=player_name,
+            ).model_dump(),
+        ),
+    )
 
     # Send initial state
     state = await game_manager.get_game_state(game_id)

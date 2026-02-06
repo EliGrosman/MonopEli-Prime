@@ -31,6 +31,12 @@ def client(app):
         yield client
 
 
+def create_session(client: TestClient, name: str = "Player") -> str:
+    """Create a player session and return the session_id."""
+    response = client.post("/api/players/session", json={"display_name": name})
+    return response.json()["session_id"]
+
+
 # ============================================================================
 # Lobby Creation Tests
 # ============================================================================
@@ -191,15 +197,19 @@ class TestJoinLobby:
         )
         lobby_id = create_response.json()["id"]
 
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
         assert join_response.status_code == 200
         data = join_response.json()
-        assert data["lobby_id"] == lobby_id
-        assert "session_id" in data
-        assert data["slot_id"] == 1  # Second player
+        # Response is now LobbyState
+        assert data["id"] == lobby_id
+        assert len(data["players"]) == 2
+        player_names = {p["name"] for p in data["players"]}
+        assert "Bob" in player_names
 
     def test_join_private_lobby_with_code(self, client: TestClient) -> None:
         """Join private lobby with invite code."""
@@ -214,9 +224,11 @@ class TestJoinLobby:
         lobby_id = create_response.json()["id"]
         invite_code = create_response.json()["invite_code"]
 
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob", "invite_code": invite_code},
+            headers={"X-Session-Id": bob_session},
         )
         assert join_response.status_code == 200
 
@@ -232,12 +244,13 @@ class TestJoinLobby:
         )
         lobby_id = create_response.json()["id"]
 
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
         assert join_response.status_code == 400
-        # New error format from ErrorHandlingMiddleware
         error = join_response.json()["error"]
         assert "invite code" in error["message"].lower()
 
@@ -254,23 +267,31 @@ class TestJoinLobby:
         lobby_id = create_response.json()["id"]
 
         # Second player joins
-        client.post(f"/api/lobbies/{lobby_id}/join", json={"player_name": "Bob"})
+        bob_session = create_session(client, "Bob")
+        client.post(
+            f"/api/lobbies/{lobby_id}/join",
+            json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
+        )
 
         # Third player cannot join
+        charlie_session = create_session(client, "Charlie")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Charlie"},
+            headers={"X-Session-Id": charlie_session},
         )
         assert join_response.status_code == 400
-        # New error format from ErrorHandlingMiddleware
         error = join_response.json()["error"]
         assert "full" in error["message"].lower()
 
     def test_join_nonexistent_lobby(self, client: TestClient) -> None:
         """Cannot join non-existent lobby."""
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             "/api/lobbies/nonexistent/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
         assert join_response.status_code == 400
 
@@ -291,15 +312,16 @@ class TestLeaveLobby:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         leave_response = client.post(
             f"/api/lobbies/{lobby_id}/leave",
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert leave_response.status_code == 200
         assert leave_response.json()["status"] == "left"
@@ -314,7 +336,7 @@ class TestLeaveLobby:
 
         leave_response = client.post(
             f"/api/lobbies/{lobby_id}/leave",
-            params={"session_id": "not-a-member"},
+            headers={"X-Session-Id": "not-a-member"},
         )
         assert leave_response.status_code == 400
 
@@ -338,10 +360,14 @@ class TestReadyStatus:
 
         ready_response = client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": session_id, "ready": True},
+            json={"is_ready": True},
+            headers={"X-Session-Id": session_id},
         )
         assert ready_response.status_code == 200
-        assert ready_response.json()["ready"] is True
+        # Response is LobbyState - verify player is ready
+        data = ready_response.json()
+        host_player = next(p for p in data["players"] if p["is_host"])
+        assert host_player["is_ready"] is True
 
     def test_set_unready(self, client: TestClient) -> None:
         """Set player as not ready."""
@@ -355,16 +381,20 @@ class TestReadyStatus:
         # First set ready
         client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": session_id, "ready": True},
+            json={"is_ready": True},
+            headers={"X-Session-Id": session_id},
         )
 
         # Then unready
         ready_response = client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": session_id, "ready": False},
+            json={"is_ready": False},
+            headers={"X-Session-Id": session_id},
         )
         assert ready_response.status_code == 200
-        assert ready_response.json()["ready"] is False
+        data = ready_response.json()
+        host_player = next(p for p in data["players"] if p["is_host"])
+        assert host_player["is_ready"] is False
 
 
 # ============================================================================
@@ -387,11 +417,13 @@ class TestAIPlayers:
         ai_response = client.post(
             f"/api/lobbies/{lobby_id}/ai",
             json={"ai_type": "rule_based", "name": "Bot"},
-            params={"session_id": session_id},
+            headers={"X-Session-Id": session_id},
         )
         assert ai_response.status_code == 201
-        assert ai_response.json()["ai_type"] == "rule_based"
-        assert "slot_id" in ai_response.json()
+        # Response is LobbyState - verify AI player exists
+        data = ai_response.json()
+        ai_player = next(p for p in data["players"] if p["is_ai"])
+        assert ai_player["ai_type"] == "rule_based"
 
     def test_add_ai_player_non_host(self, client: TestClient) -> None:
         """Non-host cannot add AI players."""
@@ -401,19 +433,19 @@ class TestAIPlayers:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         ai_response = client.post(
             f"/api/lobbies/{lobby_id}/ai",
             json={"ai_type": "rule_based"},
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert ai_response.status_code == 400
-        # New error format from ErrorHandlingMiddleware
         error = ai_response.json()["error"]
         assert "host" in error["message"].lower()
 
@@ -430,17 +462,22 @@ class TestAIPlayers:
         ai_response = client.post(
             f"/api/lobbies/{lobby_id}/ai",
             json={"ai_type": "rule_based"},
-            params={"session_id": session_id},
+            headers={"X-Session-Id": session_id},
         )
-        slot_id = ai_response.json()["slot_id"]
+        # Find AI slot_id from LobbyState response
+        ai_player = next(p for p in ai_response.json()["players"] if p["is_ai"])
+        slot_id = ai_player["slot_id"]
 
         # Remove AI
         remove_response = client.delete(
             f"/api/lobbies/{lobby_id}/ai/{slot_id}",
-            params={"session_id": session_id},
+            headers={"X-Session-Id": session_id},
         )
         assert remove_response.status_code == 200
-        assert remove_response.json()["status"] == "removed"
+        # Response is LobbyState - verify AI is gone
+        data = remove_response.json()
+        ai_players = [p for p in data["players"] if p["is_ai"]]
+        assert len(ai_players) == 0
 
 
 # ============================================================================
@@ -460,18 +497,25 @@ class TestKickPlayer:
         lobby_id = create_response.json()["id"]
         host_session = create_response.json()["session_id"]
 
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_slot = join_response.json()["slot_id"]
+        # Find Bob's slot from LobbyState
+        bob_player = next(p for p in join_response.json()["players"] if p["name"] == "Bob")
+        bob_slot = bob_player["slot_id"]
 
         kick_response = client.post(
             f"/api/lobbies/{lobby_id}/kick/{bob_slot}",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
         assert kick_response.status_code == 200
-        assert kick_response.json()["status"] == "kicked"
+        # Response is LobbyState - verify Bob is gone
+        data = kick_response.json()
+        player_names = {p["name"] for p in data["players"]}
+        assert "Bob" not in player_names
 
     def test_kick_player_non_host(self, client: TestClient) -> None:
         """Non-host cannot kick players."""
@@ -481,15 +525,16 @@ class TestKickPlayer:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         kick_response = client.post(
             f"/api/lobbies/{lobby_id}/kick/0",  # Try to kick host
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert kick_response.status_code == 400
 
@@ -514,7 +559,7 @@ class TestUpdateSettings:
         update_response = client.put(
             f"/api/lobbies/{lobby_id}/settings",
             json={"max_players": 6, "starting_money": 2000},
-            params={"session_id": session_id},
+            headers={"X-Session-Id": session_id},
         )
         assert update_response.status_code == 200
 
@@ -531,16 +576,17 @@ class TestUpdateSettings:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         update_response = client.put(
             f"/api/lobbies/{lobby_id}/settings",
             json={"max_players": 6},
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert update_response.status_code == 400
 
@@ -566,19 +612,20 @@ class TestStartGame:
         client.post(
             f"/api/lobbies/{lobby_id}/ai",
             json={"ai_type": "rule_based"},
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
 
         # Host sets ready
         client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": host_session, "ready": True},
+            json={"is_ready": True},
+            headers={"X-Session-Id": host_session},
         )
 
         # Start game
         start_response = client.post(
             f"/api/lobbies/{lobby_id}/start",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
         assert start_response.status_code == 200
         data = start_response.json()
@@ -597,10 +644,9 @@ class TestStartGame:
 
         start_response = client.post(
             f"/api/lobbies/{lobby_id}/start",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
         assert start_response.status_code == 400
-        # New error format from ErrorHandlingMiddleware
         error = start_response.json()["error"]
         assert "player" in error["message"].lower()
 
@@ -612,18 +658,18 @@ class TestStartGame:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         start_response = client.post(
             f"/api/lobbies/{lobby_id}/start",
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert start_response.status_code == 400
-        # New error format from ErrorHandlingMiddleware
         error = start_response.json()["error"]
         assert "host" in error["message"].lower()
 
@@ -647,7 +693,7 @@ class TestDeleteLobby:
 
         delete_response = client.delete(
             f"/api/lobbies/{lobby_id}",
-            params={"session_id": session_id},
+            headers={"X-Session-Id": session_id},
         )
         assert delete_response.status_code == 200
         assert delete_response.json()["status"] == "deleted"
@@ -664,15 +710,16 @@ class TestDeleteLobby:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         delete_response = client.delete(
             f"/api/lobbies/{lobby_id}",
-            params={"session_id": bob_session},
+            headers={"X-Session-Id": bob_session},
         )
         assert delete_response.status_code == 403
 
@@ -698,7 +745,7 @@ class TestLobbyWebSocket:
             f"/api/lobbies/ws/{lobby_id}?session_id={session_id}"
         ) as ws:
             msg = ws.receive_json()
-            assert msg["type"] == "lobby_state"
+            assert msg["type"] == "lobby_update"
             assert msg["data"]["id"] == lobby_id
             assert msg["data"]["name"] == "Test Lobby"
 
@@ -755,11 +802,12 @@ class TestLobbyWebSocket:
         )
         lobby_id = create_response.json()["id"]
 
-        join_response = client.post(
+        bob_session = create_session(client, "Bob")
+        client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
-        bob_session = join_response.json()["session_id"]
 
         with client.websocket_connect(
             f"/api/lobbies/ws/{lobby_id}?session_id={bob_session}"
@@ -796,12 +844,13 @@ class TestLobbyIntegration:
         host_session = create_response.json()["session_id"]
 
         # 2. Another player joins
+        bob_session = create_session(client, "Bob")
         join_response = client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
         assert join_response.status_code == 200
-        bob_session = join_response.json()["session_id"]
 
         # 3. Verify lobby state
         state = client.get(f"/api/lobbies/{lobby_id}").json()
@@ -810,17 +859,19 @@ class TestLobbyIntegration:
         # 4. Both players ready up
         client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": host_session, "ready": True},
+            json={"is_ready": True},
+            headers={"X-Session-Id": host_session},
         )
         client.post(
             f"/api/lobbies/{lobby_id}/ready",
-            params={"session_id": bob_session, "ready": True},
+            json={"is_ready": True},
+            headers={"X-Session-Id": bob_session},
         )
 
         # 5. Host starts game
         start_response = client.post(
             f"/api/lobbies/{lobby_id}/start",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
         assert start_response.status_code == 200
         game_id = start_response.json()["game_id"]
@@ -845,15 +896,17 @@ class TestLobbyIntegration:
         host_session = create_response.json()["session_id"]
 
         # Another player joins
+        bob_session = create_session(client, "Bob")
         client.post(
             f"/api/lobbies/{lobby_id}/join",
             json={"player_name": "Bob"},
+            headers={"X-Session-Id": bob_session},
         )
 
         # Host leaves
         leave_response = client.post(
             f"/api/lobbies/{lobby_id}/leave",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
         assert leave_response.status_code == 200
         assert "closed" in leave_response.json()["message"].lower()
@@ -874,7 +927,7 @@ class TestLobbyIntegration:
         # Host leaves
         client.post(
             f"/api/lobbies/{lobby_id}/leave",
-            params={"session_id": host_session},
+            headers={"X-Session-Id": host_session},
         )
 
         # Lobby should be closed/deleted

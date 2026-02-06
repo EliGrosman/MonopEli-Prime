@@ -8,8 +8,10 @@ Handles:
 """
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -129,6 +131,45 @@ class ConnectionManager:
             if exclude_session is not None and conn.session_id == exclude_session:
                 continue
             if exclude_player is not None and conn.player_id == exclude_player:
+                continue
+
+            try:
+                await conn.websocket.send_text(data)
+                sent_count += 1
+            except Exception:
+                # Connection may be closed - will be cleaned up
+                pass
+
+        return sent_count
+
+    async def broadcast_raw(
+        self,
+        game_id: str,
+        message: dict[str, Any],
+        exclude_session: str | None = None,
+    ) -> int:
+        """Broadcast a raw dict message to all connections in a game.
+
+        This is useful for lobby events that use different message types
+        than the game WebSocket protocol.
+
+        Args:
+            game_id: Target game/lobby key
+            message: Dict message to send (will be JSON serialized)
+            exclude_session: Optional session ID to exclude
+
+        Returns:
+            Number of connections message was sent to
+        """
+        async with self._lock:
+            connections = list(self._connections.get(game_id, []))
+
+        # Send to all connections (outside lock to avoid blocking)
+        data = json.dumps(message)
+        sent_count = 0
+
+        for conn in connections:
+            if exclude_session is not None and conn.session_id == exclude_session:
                 continue
 
             try:

@@ -40,6 +40,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Link connection manager to game manager for broadcasts
     app.state.game_manager.set_connection_manager(app.state.connection_manager)
 
+    # Link connection manager to lobby manager for broadcasts
+    app.state.lobby_manager.set_connection_manager(app.state.connection_manager)
+
     # Link game manager to lobby manager for game creation
     app.state.lobby_manager.set_game_manager(app.state.game_manager)
 
