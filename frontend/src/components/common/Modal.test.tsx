@@ -162,9 +162,7 @@ describe('ConfirmModal', () => {
   });
 
   it('renders custom button text', () => {
-    render(
-      <ConfirmModal {...defaultProps} confirmText="Delete" cancelText="Keep" />
-    );
+    render(<ConfirmModal {...defaultProps} confirmText="Delete" cancelText="Keep" />);
     expect(screen.getByRole('button', { name: 'Keep' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });

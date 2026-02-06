@@ -19,8 +19,15 @@ interface PropertyModalProps {
 export function PropertyModal({ position, isOpen, onClose, send }: PropertyModalProps) {
   const { gameState, hasMonopoly } = useGameStore();
   const { playerId } = useSessionStore();
-  const { buildHouse, buildHotel, sellHouse, sellHotel, mortgageProperty, unmortgageProperty, isActionPending } =
-    useActions({ send });
+  const {
+    buildHouse,
+    buildHotel,
+    sellHouse,
+    sellHotel,
+    mortgageProperty,
+    unmortgageProperty,
+    isActionPending,
+  } = useActions({ send });
 
   if (position === null || !gameState) {
     return null;
@@ -100,10 +107,7 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
             <h4 className="font-medium text-gray-700 mb-2">Ownership</h4>
             {isOwned && owner ? (
               <div className="flex items-center gap-2">
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: owner.color }}
-                />
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: owner.color }} />
                 <span className="font-medium">
                   {owner.name}
                   {owner.id === playerId && ' (You)'}
@@ -122,9 +126,10 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
               </h4>
               <div className="space-y-1">
                 {colorGroupProperties.map((p) => {
-                  const propOwner = p.property?.owner !== null
-                    ? gameState.players.find((pl) => pl.id === p.property?.owner)
-                    : null;
+                  const propOwner =
+                    p.property?.owner !== null
+                      ? gameState.players.find((pl) => pl.id === p.property?.owner)
+                      : null;
                   return (
                     <div
                       key={p.position}
@@ -166,22 +171,14 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
                 {houses > 0 && houses < 5 && (
                   <div className="flex gap-1">
                     {Array.from({ length: houses }).map((_, i) => (
-                      <span
-                        key={i}
-                        className="w-4 h-4 bg-green-500 rounded-sm"
-                        title="House"
-                      />
+                      <span key={i} className="w-4 h-4 bg-green-500 rounded-sm" title="House" />
                     ))}
                   </div>
                 )}
-                {houses === 5 && (
-                  <span className="w-5 h-5 bg-red-500 rounded-sm" title="Hotel" />
-                )}
+                {houses === 5 && <span className="w-5 h-5 bg-red-500 rounded-sm" title="Hotel" />}
               </div>
               {property?.mortgaged && (
-                <div className="text-red-500 text-sm font-medium">
-                  This property is mortgaged
-                </div>
+                <div className="text-red-500 text-sm font-medium">This property is mortgaged</div>
               )}
             </div>
           )}
@@ -195,7 +192,9 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
                   disabled={isActionPending}
                   className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors"
                 >
-                  {houses === 4 ? `Build Hotel ($${info.buildCost})` : `Build House ($${info.buildCost})`}
+                  {houses === 4
+                    ? `Build Hotel ($${info.buildCost})`
+                    : `Build House ($${info.buildCost})`}
                 </button>
               )}
               {canSell && (
@@ -204,7 +203,9 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
                   disabled={isActionPending}
                   className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 transition-colors"
                 >
-                  {houses === 5 ? `Sell Hotel (+$${info.buildCost / 2})` : `Sell House (+$${info.buildCost / 2})`}
+                  {houses === 5
+                    ? `Sell Hotel (+$${info.buildCost / 2})`
+                    : `Sell House (+$${info.buildCost / 2})`}
                 </button>
               )}
               {canMortgage && (

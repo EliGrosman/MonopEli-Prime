@@ -158,10 +158,7 @@ describe('useActions', () => {
     act(() => {
       useGameStore.getState().updateGameState({
         ...mockRawState,
-        players: [
-          { ...mockRawState.players[0], in_jail: true },
-          mockRawState.players[1],
-        ],
+        players: [{ ...mockRawState.players[0], in_jail: true }, mockRawState.players[1]],
       });
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });

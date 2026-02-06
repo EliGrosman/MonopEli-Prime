@@ -37,7 +37,8 @@ export function useActions({ send }: UseActionsOptions) {
   const canRollDice =
     isMyTurn &&
     !isInJail &&
-    (gameState?.gamePhase === 'pre_roll' || (gameState?.gamePhase === 'post_roll' && doublesCount > 0));
+    (gameState?.gamePhase === 'pre_roll' ||
+      (gameState?.gamePhase === 'post_roll' && doublesCount > 0));
 
   // Can roll in jail: try for doubles to escape
   const canRollInJail = isMyTurn && isInJail && gameState?.gamePhase === 'pre_roll';
@@ -92,7 +93,8 @@ export function useActions({ send }: UseActionsOptions) {
 
     // Property
     buyProperty: useCallback(
-      (propertyPosition: number) => sendAction('buy_property', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('buy_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 
@@ -101,33 +103,39 @@ export function useActions({ send }: UseActionsOptions) {
 
     // Building
     buildHouse: useCallback(
-      (propertyPosition: number) => sendAction('build_house', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('build_house', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     buildHotel: useCallback(
-      (propertyPosition: number) => sendAction('build_hotel', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('build_hotel', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     sellHouse: useCallback(
-      (propertyPosition: number) => sendAction('sell_house', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('sell_house', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     sellHotel: useCallback(
-      (propertyPosition: number) => sendAction('sell_hotel', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('sell_hotel', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     // Mortgage
     mortgageProperty: useCallback(
-      (propertyPosition: number) => sendAction('mortgage_property', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('mortgage_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 
     unmortgageProperty: useCallback(
-      (propertyPosition: number) => sendAction('unmortgage_property', { property_position: propertyPosition }),
+      (propertyPosition: number) =>
+        sendAction('unmortgage_property', { property_position: propertyPosition }),
       [sendAction]
     ),
 

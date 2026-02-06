@@ -130,9 +130,7 @@ describe('MobileControls', () => {
     });
 
     it('disables all buttons when disabled prop is true', () => {
-      render(
-        <MobileControls isMyTurn={true} canRoll={true} canEndTurn={true} disabled={true} />
-      );
+      render(<MobileControls isMyTurn={true} canRoll={true} canEndTurn={true} disabled={true} />);
 
       expect(screen.getByRole('button', { name: /roll dice/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /end turn/i })).toBeDisabled();

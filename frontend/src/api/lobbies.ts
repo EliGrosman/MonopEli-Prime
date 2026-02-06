@@ -128,25 +128,18 @@ export async function updateLobbySettings(
   sessionId: string,
   settings: LobbySettings
 ): Promise<LobbyState> {
-  const response = await apiClient.put<LobbyState>(
-    `/lobbies/${lobbyId}/settings`,
-    settings,
-    { headers: { 'X-Session-Id': sessionId } }
-  );
+  const response = await apiClient.put<LobbyState>(`/lobbies/${lobbyId}/settings`, settings, {
+    headers: { 'X-Session-Id': sessionId },
+  });
   return response.data;
 }
 
 /**
  * Start game from lobby.
  */
-export async function startGame(
-  lobbyId: string,
-  sessionId: string
-): Promise<{ game_id: string }> {
-  const response = await apiClient.post<{ game_id: string }>(
-    `/lobbies/${lobbyId}/start`,
-    null,
-    { headers: { 'X-Session-Id': sessionId } }
-  );
+export async function startGame(lobbyId: string, sessionId: string): Promise<{ game_id: string }> {
+  const response = await apiClient.post<{ game_id: string }>(`/lobbies/${lobbyId}/start`, null, {
+    headers: { 'X-Session-Id': sessionId },
+  });
   return response.data;
 }

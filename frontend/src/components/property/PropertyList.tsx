@@ -28,7 +28,10 @@ export function PropertyList({
     const properties = getPlayerProperties(playerId);
 
     // Group by color
-    const groups: Map<string, { color: string; properties: PropertyState[]; hasMonopoly: boolean }> = new Map();
+    const groups: Map<
+      string,
+      { color: string; properties: PropertyState[]; hasMonopoly: boolean }
+    > = new Map();
 
     // Define color order
     const colorOrder: string[] = [
@@ -60,17 +63,11 @@ export function PropertyList({
     }
 
     // Sort by color order
-    return colorOrder
-      .filter((color) => groups.has(color))
-      .map((color) => groups.get(color)!);
+    return colorOrder.filter((color) => groups.has(color)).map((color) => groups.get(color)!);
   }, [gameState, playerId, getPlayerProperties, hasMonopoly]);
 
   if (!gameState || groupedProperties.length === 0) {
-    return (
-      <div className="text-gray-500 text-sm text-center py-4">
-        No properties owned
-      </div>
-    );
+    return <div className="text-gray-500 text-sm text-center py-4">No properties owned</div>;
   }
 
   return (
@@ -79,10 +76,7 @@ export function PropertyList({
         <div key={color}>
           {/* Color group header */}
           <div className="flex items-center gap-2 mb-2">
-            <div
-              className="w-4 h-4 rounded"
-              style={{ backgroundColor: getColorValue(color) }}
-            />
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: getColorValue(color) }} />
             <span className="text-sm font-medium capitalize">{color}</span>
             {showMonopolyIndicator && monopoly && (
               <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
@@ -113,7 +107,9 @@ export function PropertyList({
       <div className="pt-3 border-t border-gray-200 text-sm text-gray-600">
         <div className="flex justify-between">
           <span>Total Properties</span>
-          <span className="font-medium">{groupedProperties.reduce((sum, g) => sum + g.properties.length, 0)}</span>
+          <span className="font-medium">
+            {groupedProperties.reduce((sum, g) => sum + g.properties.length, 0)}
+          </span>
         </div>
         <div className="flex justify-between">
           <span>Monopolies</span>
@@ -163,7 +159,16 @@ export function PropertySummary({ playerId }: PropertySummaryProps) {
     if (!gameState) return { total: 0, monopolies: 0, houses: 0, hotels: 0 };
 
     const properties = getPlayerProperties(playerId);
-    const colors: PropertyColor[] = ['brown', 'lightblue', 'magenta', 'orange', 'red', 'yellow', 'green', 'blue'];
+    const colors: PropertyColor[] = [
+      'brown',
+      'lightblue',
+      'magenta',
+      'orange',
+      'red',
+      'yellow',
+      'green',
+      'blue',
+    ];
 
     return {
       total: properties.length,

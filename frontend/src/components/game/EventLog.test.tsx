@@ -33,9 +33,7 @@ describe('EventLog', () => {
 
   it('renders events when events exist', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ message: 'Player rolled dice' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ message: 'Player rolled dice' }));
     });
 
     render(<EventLog />);
@@ -45,15 +43,9 @@ describe('EventLog', () => {
 
   it('renders multiple events', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ id: '1', message: 'Event 1' })
-      );
-      useGameStore.getState().addEvent(
-        createMockEvent({ id: '2', message: 'Event 2' })
-      );
-      useGameStore.getState().addEvent(
-        createMockEvent({ id: '3', message: 'Event 3' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ id: '1', message: 'Event 1' }));
+      useGameStore.getState().addEvent(createMockEvent({ id: '2', message: 'Event 2' }));
+      useGameStore.getState().addEvent(createMockEvent({ id: '3', message: 'Event 3' }));
     });
 
     render(<EventLog />);
@@ -65,9 +57,7 @@ describe('EventLog', () => {
 
   it('shows correct icon for roll event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'roll', message: 'Rolled dice' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ type: 'roll', message: 'Rolled dice' }));
     });
 
     render(<EventLog />);
@@ -77,9 +67,9 @@ describe('EventLog', () => {
 
   it('shows correct icon for buy event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'buy', message: 'Bought property' })
-      );
+      useGameStore
+        .getState()
+        .addEvent(createMockEvent({ type: 'buy', message: 'Bought property' }));
     });
 
     render(<EventLog />);
@@ -89,9 +79,7 @@ describe('EventLog', () => {
 
   it('shows correct icon for rent event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'rent', message: 'Paid rent' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ type: 'rent', message: 'Paid rent' }));
     });
 
     render(<EventLog />);
@@ -101,9 +89,7 @@ describe('EventLog', () => {
 
   it('shows correct icon for jail event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'jail', message: 'Went to jail' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ type: 'jail', message: 'Went to jail' }));
     });
 
     render(<EventLog />);
@@ -113,9 +99,9 @@ describe('EventLog', () => {
 
   it('shows correct icon for bankrupt event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'bankrupt', message: 'Went bankrupt' })
-      );
+      useGameStore
+        .getState()
+        .addEvent(createMockEvent({ type: 'bankrupt', message: 'Went bankrupt' }));
     });
 
     render(<EventLog />);
@@ -125,9 +111,7 @@ describe('EventLog', () => {
 
   it('shows correct icon for win event', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ type: 'win', message: 'Won the game!' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ type: 'win', message: 'Won the game!' }));
     });
 
     render(<EventLog />);
@@ -138,9 +122,9 @@ describe('EventLog', () => {
   it('limits displayed events by maxEvents prop', () => {
     act(() => {
       for (let i = 0; i < 10; i++) {
-        useGameStore.getState().addEvent(
-          createMockEvent({ id: `event-${i}`, message: `Event ${i}` })
-        );
+        useGameStore
+          .getState()
+          .addEvent(createMockEvent({ id: `event-${i}`, message: `Event ${i}` }));
       }
     });
 
@@ -189,9 +173,7 @@ describe('CompactEventLog', () => {
 
   it('renders events when events exist', () => {
     act(() => {
-      useGameStore.getState().addEvent(
-        createMockEvent({ message: 'Compact event' })
-      );
+      useGameStore.getState().addEvent(createMockEvent({ message: 'Compact event' }));
     });
 
     render(<CompactEventLog />);
@@ -202,9 +184,9 @@ describe('CompactEventLog', () => {
   it('limits events by maxEvents prop', () => {
     act(() => {
       for (let i = 0; i < 10; i++) {
-        useGameStore.getState().addEvent(
-          createMockEvent({ id: `event-${i}`, message: `Event ${i}` })
-        );
+        useGameStore
+          .getState()
+          .addEvent(createMockEvent({ id: `event-${i}`, message: `Event ${i}` }));
       }
     });
 

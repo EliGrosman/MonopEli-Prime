@@ -123,11 +123,7 @@ export function CompactEventLog({ maxEvents = 5 }: { maxEvents?: number }) {
   return (
     <div className="space-y-1">
       {events.map((event) => (
-        <div
-          key={event.id}
-          className="text-xs text-gray-600 truncate"
-          title={event.message}
-        >
+        <div key={event.id} className="text-xs text-gray-600 truncate" title={event.message}>
           {getEventIcon(event.type)} {event.message}
         </div>
       ))}

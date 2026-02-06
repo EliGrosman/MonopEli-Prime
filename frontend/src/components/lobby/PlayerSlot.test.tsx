@@ -20,14 +20,7 @@ describe('PlayerSlot', () => {
   it('renders player name', () => {
     const player = createMockPlayer({ name: 'Alice' });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
   });
@@ -35,14 +28,7 @@ describe('PlayerSlot', () => {
   it('shows Host badge for host player', () => {
     const player = createMockPlayer();
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={true}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={true} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('Host')).toBeInTheDocument();
   });
@@ -50,14 +36,7 @@ describe('PlayerSlot', () => {
   it('shows You badge for self', () => {
     const player = createMockPlayer();
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={true}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={true} canManage={false} />);
 
     expect(screen.getByText('You')).toBeInTheDocument();
   });
@@ -65,14 +44,7 @@ describe('PlayerSlot', () => {
   it('shows AI badge for AI players', () => {
     const player = createMockPlayer({ is_ai: true });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('AI')).toBeInTheDocument();
   });
@@ -80,14 +52,7 @@ describe('PlayerSlot', () => {
   it('shows AI type for AI players', () => {
     const player = createMockPlayer({ is_ai: true, ai_type: 'rule_based' });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('rule based')).toBeInTheDocument();
   });
@@ -95,14 +60,7 @@ describe('PlayerSlot', () => {
   it('shows Ready status when player is ready', () => {
     const player = createMockPlayer({ is_ready: true });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('Ready')).toBeInTheDocument();
   });
@@ -110,14 +68,7 @@ describe('PlayerSlot', () => {
   it('shows Waiting status when player is not ready', () => {
     const player = createMockPlayer({ is_ready: false });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.getByText('Waiting')).toBeInTheDocument();
   });
@@ -125,14 +76,7 @@ describe('PlayerSlot', () => {
   it('does not show ready status for AI players', () => {
     const player = createMockPlayer({ is_ai: true, is_ready: true });
 
-    render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={false}
-      />
-    );
+    render(<PlayerSlot player={player} isHost={false} isSelf={false} canManage={false} />);
 
     expect(screen.queryByText('Ready')).not.toBeInTheDocument();
     expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
@@ -143,13 +87,7 @@ describe('PlayerSlot', () => {
     const onKick = vi.fn();
 
     render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={true}
-        onKick={onKick}
-      />
+      <PlayerSlot player={player} isHost={false} isSelf={false} canManage={true} onKick={onKick} />
     );
 
     expect(screen.getByTitle('Kick player')).toBeInTheDocument();
@@ -160,13 +98,7 @@ describe('PlayerSlot', () => {
     const onKick = vi.fn();
 
     render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={true}
-        canManage={true}
-        onKick={onKick}
-      />
+      <PlayerSlot player={player} isHost={false} isSelf={true} canManage={true} onKick={onKick} />
     );
 
     expect(screen.queryByTitle('Kick player')).not.toBeInTheDocument();
@@ -177,13 +109,7 @@ describe('PlayerSlot', () => {
     const onKick = vi.fn();
 
     render(
-      <PlayerSlot
-        player={player}
-        isHost={false}
-        isSelf={false}
-        canManage={true}
-        onKick={onKick}
-      />
+      <PlayerSlot player={player} isHost={false} isSelf={false} canManage={true} onKick={onKick} />
     );
 
     fireEvent.click(screen.getByTitle('Kick player'));

@@ -86,7 +86,9 @@ export function LobbyRoom({
         <div className="flex items-center justify-between">
           <div>
             <span className="text-sm text-gray-600">Lobby Code</span>
-            <p className="text-2xl font-mono font-bold tracking-wider">{lobby.invite_code || lobby.id.slice(0, 8)}</p>
+            <p className="text-2xl font-mono font-bold tracking-wider">
+              {lobby.invite_code || lobby.id.slice(0, 8)}
+            </p>
           </div>
           <button
             onClick={handleCopyCode}
@@ -201,7 +203,11 @@ export function LobbyRoom({
               }
             `}
           >
-            {isLoading ? 'Starting...' : canStart ? 'Start Game' : 'Waiting for players to ready up...'}
+            {isLoading
+              ? 'Starting...'
+              : canStart
+                ? 'Start Game'
+                : 'Waiting for players to ready up...'}
           </button>
         ) : mySlot && !mySlot.is_ai ? (
           <button

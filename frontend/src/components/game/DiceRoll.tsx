@@ -40,10 +40,7 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
 
       // Random dice animation
       const interval = setInterval(() => {
-        setDisplayDice([
-          Math.floor(Math.random() * 6) + 1,
-          Math.floor(Math.random() * 6) + 1,
-        ]);
+        setDisplayDice([Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1]);
       }, 50);
 
       // Stop after animation
@@ -70,22 +67,14 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
     <div className="flex flex-col items-center gap-3">
       {/* Dice display */}
       <div className="flex items-center gap-4">
-        <Die
-          value={roll ? displayDice[0] : null}
-          animating={animating || isRolling}
-        />
-        <Die
-          value={roll ? displayDice[1] : null}
-          animating={animating || isRolling}
-        />
+        <Die value={roll ? displayDice[0] : null} animating={animating || isRolling} />
+        <Die value={roll ? displayDice[1] : null} animating={animating || isRolling} />
       </div>
 
       {/* Roll result */}
       {roll && !animating && (
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-800">
-            {total}
-          </div>
+          <div className="text-2xl font-bold text-gray-800">{total}</div>
           {roll.isDoubles && (
             <div className="mt-1 px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-semibold animate-bounce">
               Doubles!
@@ -101,9 +90,10 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
           disabled={isRolling || animating}
           className={`
             px-6 py-3 rounded-lg font-bold text-lg transition-all
-            ${isRolling || animating
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95 shadow-lg hover:shadow-xl'
+            ${
+              isRolling || animating
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95 shadow-lg hover:shadow-xl'
             }
           `}
         >
@@ -214,9 +204,7 @@ export function DiceDisplay({ roll }: { roll: DiceRollType | null }) {
         <span className="font-bold text-lg text-gray-900">{total}</span>
       </div>
       {roll.isDoubles && (
-        <span className="px-1.5 py-0.5 text-xs bg-yellow-400 text-yellow-900 rounded">
-          Doubles
-        </span>
+        <span className="px-1.5 py-0.5 text-xs bg-yellow-400 text-yellow-900 rounded">Doubles</span>
       )}
     </div>
   );

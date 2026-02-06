@@ -34,10 +34,7 @@ export function PropertySpace({ position, name, type }: PropertySpaceProps) {
             {displayName}
           </div>
           {propertyInfo && (
-            <div
-              className="text-gray-600"
-              style={{ fontSize: 'var(--space-price-size)' }}
-            >
+            <div className="text-gray-600" style={{ fontSize: 'var(--space-price-size)' }}>
               {formatMoney(propertyInfo.price)}
             </div>
           )}
@@ -58,10 +55,7 @@ export function PropertySpace({ position, name, type }: PropertySpaceProps) {
             {displayName}
           </div>
           <div className="text-sm sm:text-lg mt-0.5">💰</div>
-          <div
-            className="text-gray-600"
-            style={{ fontSize: 'var(--space-price-size)' }}
-          >
+          <div className="text-gray-600" style={{ fontSize: 'var(--space-price-size)' }}>
             {position === 4 ? '$200' : '$100'}
           </div>
         </div>

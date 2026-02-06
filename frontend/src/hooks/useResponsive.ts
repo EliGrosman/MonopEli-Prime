@@ -138,19 +138,12 @@ export function useResponsive(debounceMs = 100): ResponsiveState {
   const isPortrait = orientation === 'portrait';
   const isLandscape = orientation === 'landscape';
 
-  const isAbove = useCallback(
-    (bp: Breakpoint) => width >= BREAKPOINTS[bp],
-    [width]
-  );
+  const isAbove = useCallback((bp: Breakpoint) => width >= BREAKPOINTS[bp], [width]);
 
-  const isBelow = useCallback(
-    (bp: Breakpoint) => width < BREAKPOINTS[bp],
-    [width]
-  );
+  const isBelow = useCallback((bp: Breakpoint) => width < BREAKPOINTS[bp], [width]);
 
   const isBetween = useCallback(
-    (min: Breakpoint, max: Breakpoint) =>
-      width >= BREAKPOINTS[min] && width < BREAKPOINTS[max],
+    (min: Breakpoint, max: Breakpoint) => width >= BREAKPOINTS[min] && width < BREAKPOINTS[max],
     [width]
   );
 

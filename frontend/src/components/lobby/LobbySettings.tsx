@@ -14,12 +14,9 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
   const [isEditing, setIsEditing] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
 
-  const handleChange = useCallback(
-    (key: keyof LobbySettingsType, value: number | boolean) => {
-      setLocalSettings((prev) => ({ ...prev, [key]: value }));
-    },
-    []
-  );
+  const handleChange = useCallback((key: keyof LobbySettingsType, value: number | boolean) => {
+    setLocalSettings((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const handleSave = useCallback(() => {
     onUpdate?.(localSettings);
@@ -47,7 +44,9 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
           <dd className="text-gray-900 font-medium">${settings.go_salary}</dd>
 
           <dt className="text-gray-600">Spectators</dt>
-          <dd className="text-gray-900 font-medium">{settings.allow_spectators ? 'Allowed' : 'Not Allowed'}</dd>
+          <dd className="text-gray-900 font-medium">
+            {settings.allow_spectators ? 'Allowed' : 'Not Allowed'}
+          </dd>
         </dl>
       </div>
     );
@@ -173,7 +172,9 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
           <dd className="text-gray-900 font-medium">${settings.go_salary}</dd>
 
           <dt className="text-gray-600">Spectators</dt>
-          <dd className="text-gray-900 font-medium">{settings.allow_spectators ? 'Allowed' : 'Not Allowed'}</dd>
+          <dd className="text-gray-900 font-medium">
+            {settings.allow_spectators ? 'Allowed' : 'Not Allowed'}
+          </dd>
         </dl>
       )}
     </div>

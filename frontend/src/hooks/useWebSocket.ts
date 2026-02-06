@@ -1,7 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
 import { useGameStore } from '@/store/gameStore';
-import type { WSMessage, WSMessageType, ConnectionState, ClientMessage, IdentityMessage } from '@/types';
+import type {
+  WSMessage,
+  WSMessageType,
+  ConnectionState,
+  ClientMessage,
+  IdentityMessage,
+} from '@/types';
 
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const HEARTBEAT_INTERVAL = 30000;
@@ -62,14 +68,17 @@ export function useWebSocket({
     }
   }, []);
 
-  const startHeartbeat = useCallback((ws: WebSocket) => {
-    clearHeartbeat();
-    heartbeatRef.current = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'heartbeat' }));
-      }
-    }, HEARTBEAT_INTERVAL);
-  }, [clearHeartbeat]);
+  const startHeartbeat = useCallback(
+    (ws: WebSocket) => {
+      clearHeartbeat();
+      heartbeatRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'heartbeat' }));
+        }
+      }, HEARTBEAT_INTERVAL);
+    },
+    [clearHeartbeat]
+  );
 
   // Store connect function in a ref to allow self-reference for reconnection
   const connectRef = useRef<() => void>(() => {});

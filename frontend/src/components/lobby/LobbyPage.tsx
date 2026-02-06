@@ -143,7 +143,9 @@ export function LobbyPage() {
             {isCreateRoute ? 'Create Game' : isJoinRoute ? 'Join Game' : 'Game Lobby'}
           </h1>
           {isLoggedIn && (
-            <p className="text-sm text-gray-800 mt-1">Playing as <span className="font-medium">{displayName}</span></p>
+            <p className="text-sm text-gray-800 mt-1">
+              Playing as <span className="font-medium">{displayName}</span>
+            </p>
           )}
         </div>
         {isListRoute && isLoggedIn && (
@@ -177,21 +179,11 @@ export function LobbyPage() {
 
       {/* Create form - includes name entry, so no separate login needed */}
       {isCreateRoute && (
-        <CreateLobbyForm
-          displayName={displayName}
-          onCreate={create}
-          isLoading={isLoading}
-        />
+        <CreateLobbyForm displayName={displayName} onCreate={create} isLoading={isLoading} />
       )}
 
       {/* Join form */}
-      {isJoinRoute && (
-        <JoinLobbyForm
-          isLoggedIn={isLoggedIn}
-          onJoin={join}
-          isLoading={isLoading}
-        />
-      )}
+      {isJoinRoute && <JoinLobbyForm isLoggedIn={isLoggedIn} onJoin={join} isLoading={isLoading} />}
 
       {/* Lobby list */}
       {isListRoute && (

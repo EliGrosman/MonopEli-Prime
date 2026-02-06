@@ -94,8 +94,24 @@ describe('lobbyStore', () => {
   describe('setLobbyList', () => {
     it('sets lobby list', () => {
       const lobbies = [
-        { id: '1', name: 'Game 1', host_name: 'Host', status: 'waiting', current_players: 2, max_players: 4, created_at: new Date().toISOString() },
-        { id: '2', name: 'Game 2', host_name: 'Host2', status: 'waiting', current_players: 1, max_players: 4, created_at: new Date().toISOString() },
+        {
+          id: '1',
+          name: 'Game 1',
+          host_name: 'Host',
+          status: 'waiting',
+          current_players: 2,
+          max_players: 4,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          name: 'Game 2',
+          host_name: 'Host2',
+          status: 'waiting',
+          current_players: 1,
+          max_players: 4,
+          created_at: new Date().toISOString(),
+        },
       ];
       act(() => {
         useLobbyStore.getState().setLobbyList(lobbies);

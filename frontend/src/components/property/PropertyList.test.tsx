@@ -13,16 +13,38 @@ const mockUseGameStore = vi.mocked(useGameStore);
 
 describe('PropertyList', () => {
   const mockPlayers: PlayerState[] = [
-    { id: 0, name: 'Player 1', color: '#FF0000', position: 0, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
-    { id: 1, name: 'Player 2', color: '#0000FF', position: 10, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
+    {
+      id: 0,
+      name: 'Player 1',
+      color: '#FF0000',
+      position: 0,
+      money: 1500,
+      jailTurns: 0,
+      bankrupt: false,
+      jailCards: 0,
+      inJail: false,
+      isAi: false,
+    },
+    {
+      id: 1,
+      name: 'Player 2',
+      color: '#0000FF',
+      position: 10,
+      money: 1500,
+      jailTurns: 0,
+      bankrupt: false,
+      jailCards: 0,
+      inJail: false,
+      isAi: false,
+    },
   ];
 
   const mockProperties: Record<number, PropertyState> = {
-    1: { position: 1, owner: 0, houses: 0, mortgaged: false },  // Brown
-    3: { position: 3, owner: 0, houses: 0, mortgaged: false },  // Brown
-    6: { position: 6, owner: 0, houses: 2, mortgaged: false },  // Light blue
-    8: { position: 8, owner: 1, houses: 0, mortgaged: false },  // Light blue
-    9: { position: 9, owner: 0, houses: 0, mortgaged: false },  // Light blue
+    1: { position: 1, owner: 0, houses: 0, mortgaged: false }, // Brown
+    3: { position: 3, owner: 0, houses: 0, mortgaged: false }, // Brown
+    6: { position: 6, owner: 0, houses: 2, mortgaged: false }, // Light blue
+    8: { position: 8, owner: 1, houses: 0, mortgaged: false }, // Light blue
+    9: { position: 9, owner: 0, houses: 0, mortgaged: false }, // Light blue
   };
 
   const mockGameState: GameState = {
@@ -50,7 +72,7 @@ describe('PropertyList', () => {
         return false;
       },
       getPlayerProperties: (playerId: number) => {
-        return Object.values(mockProperties).filter(p => p.owner === playerId);
+        return Object.values(mockProperties).filter((p) => p.owner === playerId);
       },
     } as ReturnType<typeof useGameStore>);
   });
@@ -122,13 +144,24 @@ describe('PropertyList', () => {
 
 describe('PropertySummary', () => {
   const mockPlayers: PlayerState[] = [
-    { id: 0, name: 'Player 1', color: '#FF0000', position: 0, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
+    {
+      id: 0,
+      name: 'Player 1',
+      color: '#FF0000',
+      position: 0,
+      money: 1500,
+      jailTurns: 0,
+      bankrupt: false,
+      jailCards: 0,
+      inJail: false,
+      isAi: false,
+    },
   ];
 
   const mockProperties: Record<number, PropertyState> = {
     1: { position: 1, owner: 0, houses: 2, mortgaged: false },
     3: { position: 3, owner: 0, houses: 1, mortgaged: false },
-    6: { position: 6, owner: 0, houses: 5, mortgaged: false },  // Hotel
+    6: { position: 6, owner: 0, houses: 5, mortgaged: false }, // Hotel
     8: { position: 8, owner: 0, houses: 0, mortgaged: false },
   };
 
@@ -156,7 +189,7 @@ describe('PropertySummary', () => {
         return false;
       },
       getPlayerProperties: (playerId: number) => {
-        return Object.values(mockProperties).filter(p => p.owner === playerId);
+        return Object.values(mockProperties).filter((p) => p.owner === playerId);
       },
     } as ReturnType<typeof useGameStore>);
   });
@@ -187,7 +220,7 @@ describe('PropertySummary', () => {
       gameState: mockGameState,
       hasMonopoly: () => false,
       getPlayerProperties: (playerId: number) => {
-        return Object.values(mockProperties).filter(p => p.owner === playerId);
+        return Object.values(mockProperties).filter((p) => p.owner === playerId);
       },
     } as ReturnType<typeof useGameStore>);
 

@@ -27,8 +27,30 @@ describe('PropertyModal', () => {
   const mockSend = vi.fn();
 
   const mockPlayers: PlayerState[] = [
-    { id: 0, name: 'Player 1', color: '#FF0000', position: 0, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
-    { id: 1, name: 'Player 2', color: '#0000FF', position: 10, money: 1500, jailTurns: 0, bankrupt: false, jailCards: 0, inJail: false, isAi: false },
+    {
+      id: 0,
+      name: 'Player 1',
+      color: '#FF0000',
+      position: 0,
+      money: 1500,
+      jailTurns: 0,
+      bankrupt: false,
+      jailCards: 0,
+      inJail: false,
+      isAi: false,
+    },
+    {
+      id: 1,
+      name: 'Player 2',
+      color: '#0000FF',
+      position: 10,
+      money: 1500,
+      jailTurns: 0,
+      bankrupt: false,
+      jailCards: 0,
+      inJail: false,
+      isAi: false,
+    },
   ];
 
   const mockProperties: Record<number, PropertyState> = {
@@ -100,9 +122,7 @@ describe('PropertyModal', () => {
   });
 
   it('renders property name as modal title', () => {
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     // Property name appears in title, card, and color group section
     const elements = screen.getAllByText('Mediterranean Avenue');
     expect(elements.length).toBeGreaterThanOrEqual(1);
@@ -111,9 +131,7 @@ describe('PropertyModal', () => {
   });
 
   it('shows ownership section', () => {
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('Ownership')).toBeInTheDocument();
     // Player 1 appears multiple times (owner, color group)
     const playerElements = screen.getAllByText('Player 1');
@@ -133,30 +151,22 @@ describe('PropertyModal', () => {
       hasMonopoly: () => false,
     } as ReturnType<typeof useGameStore>);
 
-    render(
-      <PropertyModal position={11} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={11} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('Not owned')).toBeInTheDocument();
   });
 
   it('shows color group section for properties', () => {
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('Brown Group')).toBeInTheDocument();
   });
 
   it('shows monopoly message when player has monopoly', () => {
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('You have a monopoly! Double rent applies.')).toBeInTheDocument();
   });
 
   it('shows development section for owned properties', () => {
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('Development')).toBeInTheDocument();
     expect(screen.getByText('No buildings')).toBeInTheDocument();
   });
@@ -173,9 +183,7 @@ describe('PropertyModal', () => {
       hasMonopoly: () => true,
     } as ReturnType<typeof useGameStore>);
 
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     const houses = screen.getAllByTitle('House');
     expect(houses).toHaveLength(3);
   });
@@ -192,9 +200,7 @@ describe('PropertyModal', () => {
       hasMonopoly: () => true,
     } as ReturnType<typeof useGameStore>);
 
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByTitle('Hotel')).toBeInTheDocument();
   });
 
@@ -209,40 +215,30 @@ describe('PropertyModal', () => {
       hasMonopoly: () => false,
     } as ReturnType<typeof useGameStore>);
 
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
     expect(screen.getByText('This property is mortgaged')).toBeInTheDocument();
   });
 
   describe('action buttons', () => {
     it('shows build button when can build', () => {
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       // Player has monopoly on brown, no houses yet, can build
       expect(screen.getByRole('button', { name: /Build House/ })).toBeInTheDocument();
     });
 
     it('shows mortgage button when can mortgage', () => {
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       expect(screen.getByRole('button', { name: /Mortgage/ })).toBeInTheDocument();
     });
 
     it('does not show buttons for properties not owned by player', () => {
-      render(
-        <PropertyModal position={6} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={6} isOpen={true} onClose={() => {}} send={mockSend} />);
       expect(screen.queryByRole('button', { name: /Build/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Mortgage/ })).not.toBeInTheDocument();
     });
 
     it('calls buildHouse when build house button clicked', () => {
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       fireEvent.click(screen.getByRole('button', { name: /Build House/ }));
       expect(mockActions.buildHouse).toHaveBeenCalledWith(1);
     });
@@ -259,17 +255,13 @@ describe('PropertyModal', () => {
         hasMonopoly: () => true,
       } as ReturnType<typeof useGameStore>);
 
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       fireEvent.click(screen.getByRole('button', { name: /Build Hotel/ }));
       expect(mockActions.buildHotel).toHaveBeenCalledWith(1);
     });
 
     it('calls mortgageProperty when mortgage button clicked', () => {
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       fireEvent.click(screen.getByRole('button', { name: /Mortgage/ }));
       expect(mockActions.mortgageProperty).toHaveBeenCalledWith(1);
     });
@@ -280,9 +272,7 @@ describe('PropertyModal', () => {
         isActionPending: true,
       } as unknown as ReturnType<typeof useActions>);
 
-      render(
-        <PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />
-      );
+      render(<PropertyModal position={1} isOpen={true} onClose={() => {}} send={mockSend} />);
       expect(screen.getByRole('button', { name: /Build House/ })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Mortgage/ })).toBeDisabled();
     });
@@ -290,9 +280,7 @@ describe('PropertyModal', () => {
 
   it('calls onClose when modal is closed', () => {
     const onClose = vi.fn();
-    render(
-      <PropertyModal position={1} isOpen={true} onClose={onClose} send={mockSend} />
-    );
+    render(<PropertyModal position={1} isOpen={true} onClose={onClose} send={mockSend} />);
     fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
     expect(onClose).toHaveBeenCalled();
   });

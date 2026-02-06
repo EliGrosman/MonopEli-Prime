@@ -128,11 +128,13 @@ export const useGameStore = create<GameStore>()(
           housesRemaining: raw.houses_remaining,
           hotelsRemaining: raw.hotels_remaining,
           gameOver: raw.game_over,
-          lastRoll: raw.last_roll ? {
-            die1: raw.last_roll[0],
-            die2: raw.last_roll[1],
-            isDoubles: rolledDoubles,
-          } : null,
+          lastRoll: raw.last_roll
+            ? {
+                die1: raw.last_roll[0],
+                die2: raw.last_roll[1],
+                isDoubles: rolledDoubles,
+              }
+            : null,
           gamePhase,
           rolledDoubles: rolledDoubles ?? false,
           doublesCount,
@@ -197,7 +199,15 @@ export const useGameStore = create<GameStore>()(
         if (!gameState) return false;
 
         const colorPositions = getColorGroupPositions(
-          colorGroup as 'brown' | 'lightblue' | 'magenta' | 'orange' | 'red' | 'yellow' | 'green' | 'blue'
+          colorGroup as
+            | 'brown'
+            | 'lightblue'
+            | 'magenta'
+            | 'orange'
+            | 'red'
+            | 'yellow'
+            | 'green'
+            | 'blue'
         );
         return colorPositions.every((pos) => {
           const prop = gameState.properties[pos];

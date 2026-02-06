@@ -110,9 +110,7 @@ export function BoardSpace({
           }}
         >
           {/* House indicators */}
-          {property && property.houses > 0 && (
-            <HouseIndicator houses={property.houses} />
-          )}
+          {property && property.houses > 0 && <HouseIndicator houses={property.houses} />}
         </div>
       )}
 

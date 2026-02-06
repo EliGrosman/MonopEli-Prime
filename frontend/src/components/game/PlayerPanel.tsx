@@ -23,7 +23,9 @@ export function PlayerPanel() {
     return (
       <aside className="bg-white rounded-lg shadow-md p-4" aria-label="Players" aria-busy="true">
         <h2 className="text-lg font-semibold mb-4 text-gray-900">Players</h2>
-        <p className="text-gray-500" role="status">Loading...</p>
+        <p className="text-gray-500" role="status">
+          Loading...
+        </p>
       </aside>
     );
   }
@@ -42,8 +44,13 @@ export function PlayerPanel() {
     <aside className="bg-white rounded-lg shadow-md p-4" aria-label="Players panel">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900" id="players-heading">Players</h2>
-        <span className="text-sm text-gray-500" aria-label={`${activePlayers} active players out of ${gameState.players.length} total`}>
+        <h2 className="text-lg font-semibold text-gray-900" id="players-heading">
+          Players
+        </h2>
+        <span
+          className="text-sm text-gray-500"
+          aria-label={`${activePlayers} active players out of ${gameState.players.length} total`}
+        >
           {activePlayers} active / {gameState.players.length} total
         </span>
       </div>
@@ -79,13 +86,19 @@ export function PlayerPanel() {
           </div>
           <div className="flex justify-between">
             <dt className="text-gray-500">Houses</dt>
-            <dd className="font-medium text-green-600" aria-label={`${gameState.housesRemaining} houses remaining`}>
+            <dd
+              className="font-medium text-green-600"
+              aria-label={`${gameState.housesRemaining} houses remaining`}
+            >
               {gameState.housesRemaining}
             </dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-gray-500">Hotels</dt>
-            <dd className="font-medium text-red-600" aria-label={`${gameState.hotelsRemaining} hotels remaining`}>
+            <dd
+              className="font-medium text-red-600"
+              aria-label={`${gameState.hotelsRemaining} hotels remaining`}
+            >
               {gameState.hotelsRemaining}
             </dd>
           </div>

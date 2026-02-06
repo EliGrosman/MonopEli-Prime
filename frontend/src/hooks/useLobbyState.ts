@@ -303,7 +303,16 @@ export function useLobbyState(lobbyId?: string) {
     } finally {
       setGlobalLoading(false);
     }
-  }, [sessionId, currentLobby, setGlobalLoading, disconnectWs, reset, setCurrentLobby, addToast, navigate]);
+  }, [
+    sessionId,
+    currentLobby,
+    setGlobalLoading,
+    disconnectWs,
+    reset,
+    setCurrentLobby,
+    addToast,
+    navigate,
+  ]);
 
   // Toggle ready status
   const toggleReady = useCallback(async () => {
@@ -411,7 +420,16 @@ export function useLobbyState(lobbyId?: string) {
     } finally {
       setGlobalLoading(false);
     }
-  }, [sessionId, currentLobby, canStartGame, setGlobalLoading, updateLobby, setCurrentGame, addToast, navigate]);
+  }, [
+    sessionId,
+    currentLobby,
+    canStartGame,
+    setGlobalLoading,
+    updateLobby,
+    setCurrentGame,
+    addToast,
+    navigate,
+  ]);
 
   // Connect WebSocket when lobbyId is provided
   useEffect(() => {

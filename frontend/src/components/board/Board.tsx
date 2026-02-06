@@ -60,14 +60,17 @@ export function Board({
         className="board-grid relative mx-auto"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'var(--corner-size) repeat(9, var(--space-width)) var(--corner-size)',
+          gridTemplateColumns:
+            'var(--corner-size) repeat(9, var(--space-width)) var(--corner-size)',
           gridTemplateRows: 'var(--corner-size) repeat(9, var(--space-width)) var(--corner-size)',
           width: 'var(--board-size)',
           height: 'var(--board-size)',
           minWidth: isMobile ? '320px' : undefined,
           minHeight: isMobile ? '320px' : undefined,
           backgroundColor: 'var(--color-board-bg)',
-          border: isMobile ? '2px solid var(--color-board-border)' : '3px solid var(--color-board-border)',
+          border: isMobile
+            ? '2px solid var(--color-board-border)'
+            : '3px solid var(--color-board-border)',
           borderRadius: isMobile ? '4px' : '8px',
           boxShadow: 'var(--shadow-card)',
         }}

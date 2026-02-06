@@ -43,9 +43,15 @@ export function ActionPanel({ send }: ActionPanelProps) {
 
   if (!gameState) {
     return (
-      <section className="bg-white rounded-lg shadow-md p-4" aria-label="Game actions" aria-busy="true">
+      <section
+        className="bg-white rounded-lg shadow-md p-4"
+        aria-label="Game actions"
+        aria-busy="true"
+      >
         <h2 className="text-lg font-semibold mb-4 text-gray-900">Actions</h2>
-        <p className="text-gray-500" role="status">Loading...</p>
+        <p className="text-gray-500" role="status">
+          Loading...
+        </p>
       </section>
     );
   }
@@ -57,9 +63,7 @@ export function ActionPanel({ send }: ActionPanelProps) {
         <h2 className="text-lg font-semibold mb-4 text-gray-900">Actions</h2>
         <div className="text-center py-4" role="status" aria-live="polite">
           <p className="text-red-500 font-medium">You are bankrupt</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Watch the rest of the game unfold!
-          </p>
+          <p className="text-gray-500 text-sm mt-2">Watch the rest of the game unfold!</p>
         </div>
       </section>
     );
@@ -89,7 +93,7 @@ export function ActionPanel({ send }: ActionPanelProps) {
 
   // Get current position info
   const currentPosition = currentPlayer?.position ?? 0;
-  const currentSpace = BOARD_SPACES.find(s => s.position === currentPosition);
+  const currentSpace = BOARD_SPACES.find((s) => s.position === currentPosition);
   const propertyInfo = PROPERTY_INFO[currentPosition];
   const propertyAtPosition = gameState.properties[currentPosition];
   const canBuyProperty =
@@ -233,7 +237,10 @@ export function ActionPanel({ send }: ActionPanelProps) {
           Position: <span className="font-medium text-gray-700">{currentSpace?.name}</span>
         </p>
         <p>
-          Cash: <span className="font-medium text-green-600">${currentPlayer?.money?.toLocaleString()}</span>
+          Cash:{' '}
+          <span className="font-medium text-green-600">
+            ${currentPlayer?.money?.toLocaleString()}
+          </span>
         </p>
       </div>
     </section>

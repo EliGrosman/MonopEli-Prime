@@ -15,8 +15,15 @@ interface BuildingControlsProps {
 export function BuildingControls({ send }: BuildingControlsProps) {
   const { gameState, hasMonopoly, getPlayerProperties } = useGameStore();
   const { playerId } = useSessionStore();
-  const { buildHouse, buildHotel, sellHouse, sellHotel, mortgageProperty, unmortgageProperty, isActionPending } =
-    useActions({ send });
+  const {
+    buildHouse,
+    buildHotel,
+    sellHouse,
+    sellHotel,
+    mortgageProperty,
+    unmortgageProperty,
+    isActionPending,
+  } = useActions({ send });
 
   // Get buildable properties (monopolies only)
   const buildableGroups = useMemo(() => {
@@ -129,7 +136,11 @@ export function BuildingControls({ send }: BuildingControlsProps) {
       });
   }, [gameState, playerId, getPlayerProperties]);
 
-  if (buildableGroups.length === 0 && mortgageableProperties.length === 0 && unmortgageableProperties.length === 0) {
+  if (
+    buildableGroups.length === 0 &&
+    mortgageableProperties.length === 0 &&
+    unmortgageableProperties.length === 0
+  ) {
     return null;
   }
 
@@ -150,12 +161,13 @@ export function BuildingControls({ send }: BuildingControlsProps) {
                 </div>
                 <div className="space-y-1">
                   {properties.map((prop) => (
-                    <div
-                      key={prop.position}
-                      className="flex items-center justify-between text-xs"
-                    >
+                    <div key={prop.position} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className={prop.mortgaged ? 'text-gray-400 line-through' : 'text-gray-900'}>
+                        <span
+                          className={
+                            prop.mortgaged ? 'text-gray-400 line-through' : 'text-gray-900'
+                          }
+                        >
                           {prop.name}
                         </span>
                         {prop.houses > 0 && (
@@ -178,7 +190,9 @@ export function BuildingControls({ send }: BuildingControlsProps) {
                         {prop.canSell && (
                           <button
                             onClick={() =>
-                              prop.houses === 5 ? sellHotel(prop.position) : sellHouse(prop.position)
+                              prop.houses === 5
+                                ? sellHotel(prop.position)
+                                : sellHouse(prop.position)
                             }
                             disabled={isActionPending}
                             className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50"
@@ -190,7 +204,9 @@ export function BuildingControls({ send }: BuildingControlsProps) {
                         {prop.canBuild && (
                           <button
                             onClick={() =>
-                              prop.houses === 4 ? buildHotel(prop.position) : buildHouse(prop.position)
+                              prop.houses === 4
+                                ? buildHotel(prop.position)
+                                : buildHouse(prop.position)
                             }
                             disabled={isActionPending}
                             className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 disabled:opacity-50"
@@ -215,7 +231,10 @@ export function BuildingControls({ send }: BuildingControlsProps) {
           <h3 className="text-sm font-medium text-gray-700 mb-2">Mortgage</h3>
           <div className="space-y-1">
             {mortgageableProperties.map((prop) => (
-              <div key={prop.position} className="flex items-center justify-between text-xs p-1 bg-gray-50 rounded">
+              <div
+                key={prop.position}
+                className="flex items-center justify-between text-xs p-1 bg-gray-50 rounded"
+              >
                 <span className="text-gray-900">{prop.name}</span>
                 <button
                   onClick={() => mortgageProperty(prop.position)}
@@ -227,7 +246,10 @@ export function BuildingControls({ send }: BuildingControlsProps) {
               </div>
             ))}
             {unmortgageableProperties.map((prop) => (
-              <div key={prop.position} className="flex items-center justify-between text-xs p-1 bg-gray-50 rounded">
+              <div
+                key={prop.position}
+                className="flex items-center justify-between text-xs p-1 bg-gray-50 rounded"
+              >
                 <span className="text-gray-400">{prop.name} (Mortgaged)</span>
                 <button
                   onClick={() => unmortgageProperty(prop.position)}

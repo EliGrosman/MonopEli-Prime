@@ -37,13 +37,7 @@ export interface GameState {
   [key: string]: unknown;
 }
 
-export type GamePhase =
-  | 'waiting'
-  | 'pre_roll'
-  | 'post_roll'
-  | 'in_jail'
-  | 'bankrupt'
-  | 'game_over';
+export type GamePhase = 'waiting' | 'pre_roll' | 'post_roll' | 'in_jail' | 'bankrupt' | 'game_over';
 
 export interface GameEvent {
   id: string;

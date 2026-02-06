@@ -18,14 +18,7 @@ export function GamePage() {
   const { setCurrentGame, playerId } = useSessionStore();
   const { addToast } = useUIStore();
   const { gameState } = useGameStore();
-  const {
-    isLoading,
-    error,
-    connectionState,
-    reconnect,
-    isMyTurn,
-    send,
-  } = useGameState();
+  const { isLoading, error, connectionState, reconnect, isMyTurn, send } = useGameState();
 
   // Property modal state
   const [selectedProperty, setSelectedProperty] = useState<number | null>(null);

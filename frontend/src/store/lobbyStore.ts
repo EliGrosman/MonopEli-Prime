@@ -48,9 +48,7 @@ export const useLobbyStore = create<LobbyStore>()(
 
       updateLobby: (updates) =>
         set((state) => ({
-          currentLobby: state.currentLobby
-            ? { ...state.currentLobby, ...updates }
-            : null,
+          currentLobby: state.currentLobby ? { ...state.currentLobby, ...updates } : null,
         })),
 
       setLobbyList: (lobbies) => set({ lobbyList: lobbies }),
@@ -79,9 +77,7 @@ export const useLobbyStore = create<LobbyStore>()(
           return {
             currentLobby: {
               ...state.currentLobby,
-              players: state.currentLobby.players.filter(
-                (p) => p.session_id !== sessionId
-              ),
+              players: state.currentLobby.players.filter((p) => p.session_id !== sessionId),
             },
           };
         }),
@@ -92,9 +88,7 @@ export const useLobbyStore = create<LobbyStore>()(
           return {
             currentLobby: {
               ...state.currentLobby,
-              players: state.currentLobby.players.filter(
-                (p) => p.slot_id !== slotId
-              ),
+              players: state.currentLobby.players.filter((p) => p.slot_id !== slotId),
             },
           };
         }),

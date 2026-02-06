@@ -105,10 +105,7 @@ export function useKeyboardNavigation({
   }, [target, handleKeyDown]);
 }
 
-function checkModifiers(
-  event: KeyboardEvent,
-  modifiers?: KeyboardShortcut['modifiers']
-): boolean {
+function checkModifiers(event: KeyboardEvent, modifiers?: KeyboardShortcut['modifiers']): boolean {
   if (!modifiers) {
     // If no modifiers specified, require none to be pressed
     return !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey;

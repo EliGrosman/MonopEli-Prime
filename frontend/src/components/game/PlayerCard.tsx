@@ -20,9 +20,7 @@ export function PlayerCard({
   onSelect,
 }: PlayerCardProps) {
   // Get properties owned by this player
-  const ownedProperties = Object.values(properties).filter(
-    (p) => p.owner === player.id
-  );
+  const ownedProperties = Object.values(properties).filter((p) => p.owner === player.id);
 
   // Group properties by color
   const propertyGroups = ownedProperties.reduce(
@@ -75,10 +73,7 @@ export function PlayerCard({
       aria-label={`${player.name}${isCurrentUser ? ' (You)' : ''}${isCurrentTurn ? ', current turn' : ''}`}
     >
       {/* Header with color and name */}
-      <div
-        className="h-2 rounded-t-md"
-        style={{ backgroundColor: player.color }}
-      />
+      <div className="h-2 rounded-t-md" style={{ backgroundColor: player.color }} />
 
       <div className="p-3">
         {/* Name and status */}
@@ -90,23 +85,17 @@ export function PlayerCard({
             />
             <span className="font-semibold text-gray-900">
               {player.name}
-              {isCurrentUser && (
-                <span className="text-green-600 text-sm ml-1">(You)</span>
-              )}
+              {isCurrentUser && <span className="text-green-600 text-sm ml-1">(You)</span>}
             </span>
           </div>
 
           {/* Status badges */}
           <div className="flex gap-1">
             {isCurrentTurn && !player.bankrupt && (
-              <span className="px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full">
-                Turn
-              </span>
+              <span className="px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full">Turn</span>
             )}
             {player.isAi && (
-              <span className="px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">
-                AI
-              </span>
+              <span className="px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">AI</span>
             )}
             {player.bankrupt && (
               <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
@@ -132,9 +121,7 @@ export function PlayerCard({
         {/* Net worth */}
         <div className="flex justify-between items-center mb-2 text-sm">
           <span className="text-gray-600">Net Worth</span>
-          <span className="font-mono text-gray-800">
-            ${netWorth.toLocaleString()}
-          </span>
+          <span className="font-mono text-gray-800">${netWorth.toLocaleString()}</span>
         </div>
 
         {/* Property indicators */}
@@ -161,15 +148,15 @@ export function PlayerCard({
 
         {/* Jail cards */}
         {player.jailCards > 0 && (
-          <div className="mt-2 text-xs text-gray-600">
-            Get Out of Jail Free: {player.jailCards}
-          </div>
+          <div className="mt-2 text-xs text-gray-600">Get Out of Jail Free: {player.jailCards}</div>
         )}
 
         {/* Position */}
         {!player.bankrupt && (
           <div className="mt-2 text-xs text-gray-500">
-            Position: {BOARD_SPACES.find(s => s.position === player.position)?.name || `Space ${player.position}`}
+            Position:{' '}
+            {BOARD_SPACES.find((s) => s.position === player.position)?.name ||
+              `Space ${player.position}`}
           </div>
         )}
       </div>

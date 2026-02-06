@@ -75,9 +75,7 @@ export function PropertyCard({
             )}
           </div>
         )}
-        {isMortgaged && (
-          <span className="text-xs text-red-500 font-medium">M</span>
-        )}
+        {isMortgaged && <span className="text-xs text-red-500 font-medium">M</span>}
       </div>
     );
   }
@@ -99,9 +97,7 @@ export function PropertyCard({
       {/* Property name */}
       <div className="px-4 py-2 text-center border-b">
         <h3 className="font-bold text-gray-900">{space.name}</h3>
-        {isMortgaged && (
-          <span className="text-xs text-red-500 font-semibold">MORTGAGED</span>
-        )}
+        {isMortgaged && <span className="text-xs text-red-500 font-semibold">MORTGAGED</span>}
       </div>
 
       {/* Rent schedule */}
@@ -112,23 +108,33 @@ export function PropertyCard({
               <span>Rent</span>
               <span>${info.rent[0]}</span>
             </div>
-            <div className={`flex justify-between ${houses === 1 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}>
+            <div
+              className={`flex justify-between ${houses === 1 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}
+            >
               <span>With 1 House</span>
               <span>${info.rent[1]}</span>
             </div>
-            <div className={`flex justify-between ${houses === 2 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}>
+            <div
+              className={`flex justify-between ${houses === 2 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}
+            >
               <span>With 2 Houses</span>
               <span>${info.rent[2]}</span>
             </div>
-            <div className={`flex justify-between ${houses === 3 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}>
+            <div
+              className={`flex justify-between ${houses === 3 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}
+            >
               <span>With 3 Houses</span>
               <span>${info.rent[3]}</span>
             </div>
-            <div className={`flex justify-between ${houses === 4 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}>
+            <div
+              className={`flex justify-between ${houses === 4 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}
+            >
               <span>With 4 Houses</span>
               <span>${info.rent[4]}</span>
             </div>
-            <div className={`flex justify-between ${houses === 5 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}>
+            <div
+              className={`flex justify-between ${houses === 5 ? 'font-semibold bg-yellow-100 -mx-2 px-2' : ''}`}
+            >
               <span>With Hotel</span>
               <span>${info.rent[5]}</span>
             </div>

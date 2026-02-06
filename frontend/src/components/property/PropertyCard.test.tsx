@@ -96,7 +96,9 @@ describe('PropertyCard', () => {
 
     it('highlights current rent level', () => {
       const property = { ...mockProperty, houses: 2 };
-      const { container } = render(<PropertyCard position={1} property={property} compact={false} />);
+      const { container } = render(
+        <PropertyCard position={1} property={property} compact={false} />
+      );
       // The "With 2 Houses" row should be highlighted
       const highlightedRow = container.querySelector('.bg-yellow-100');
       expect(highlightedRow).toBeInTheDocument();
