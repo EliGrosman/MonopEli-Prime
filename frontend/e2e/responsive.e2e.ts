@@ -39,7 +39,7 @@ test.describe('Responsive Design', () => {
       await page.goto('/lobby');
 
       // Form should be visible
-      await expect(page.getByPlaceholder(/code/i)).toBeVisible();
+      await expect(page.getByPlaceholder(/game code/i)).toBeVisible();
     });
   });
 
@@ -60,8 +60,8 @@ test.describe('Responsive Design', () => {
       const nameInput = page.getByLabel(/game name/i);
       await expect(nameInput).toBeVisible();
 
-      // Tap should work
-      await nameInput.tap();
+      // Click and fill (use click instead of tap for non-touch context)
+      await nameInput.click();
       await nameInput.fill('Mobile Test Game');
       await expect(nameInput).toHaveValue('Mobile Test Game');
     });
@@ -69,8 +69,8 @@ test.describe('Responsive Design', () => {
     test('should have touch-friendly buttons', async ({ page }) => {
       await page.goto('/lobby');
 
-      // Buttons should be large enough for touch
-      const joinButton = page.getByRole('button', { name: /join/i });
+      // Use .first() to avoid strict mode violation when multiple join buttons exist
+      const joinButton = page.getByRole('button', { name: /join/i }).first();
       if (await joinButton.isVisible()) {
         const box = await joinButton.boundingBox();
         // Minimum touch target is 44x44
