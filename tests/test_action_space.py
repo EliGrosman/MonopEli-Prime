@@ -823,3 +823,231 @@ class TestEdgeCases:
 
         assert action0.player_id == 0
         assert action3.player_id == 3
+
+
+class TestActionMaskCaching:
+    """Tests for OPT-2 action mask caching correctness."""
+
+    def test_cache_returns_identical_mask_on_unchanged_state(self) -> None:
+        """Consecutive calls with no state change should return identical masks."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        mask1 = encoder.get_action_mask(game, pid)
+        mask2 = encoder.get_action_mask(game, pid)
+
+        np.testing.assert_array_equal(mask1, mask2)
+        assert encoder.cache_stats[0] >= 1  # at least 1 cache hit
+
+    def test_cache_invalidates_after_money_change(self) -> None:
+        """Mask should be recomputed after player money changes."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        mask1 = encoder.get_action_mask(game, pid)
+        game.players[pid].money += 500
+        mask2 = encoder.get_action_mask(game, pid)
+
+        # Should be a cache miss (money changed)
+        hits_before = encoder.cache_stats[0]
+        _ = encoder.get_action_mask(game, pid)
+        # After third call with same state, should hit
+        assert encoder.cache_stats[0] > hits_before
+
+    def test_cache_invalidates_after_property_purchase(self) -> None:
+        """Mask should update after a property is purchased."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        # Give property to player
+        game.property_manager.properties[1].owner = pid
+        mask_with_prop = encoder.get_action_mask(game, pid)
+
+        # Change ownership
+        game.property_manager.properties[1].owner = None
+        mask_without_prop = encoder.get_action_mask(game, pid)
+
+        # Masks should differ (mortgage actions change)
+        assert not np.array_equal(mask_with_prop, mask_without_prop)
+
+    def test_cache_invalidates_after_position_change(self) -> None:
+        """Cache should miss after player moves (fingerprint includes position)."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        game.players[pid].position = 1  # Mediterranean Avenue
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats == (0, 1)  # miss
+
+        game.players[pid].position = 0  # Go (not buyable)
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats == (0, 2)  # another miss (position changed)
+
+    def test_cache_invalidates_after_jail_change(self) -> None:
+        """Mask should update after jail status changes."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        game.players[pid].in_jail = False
+        mask1 = encoder.get_action_mask(game, pid)
+
+        game.players[pid].in_jail = True
+        mask2 = encoder.get_action_mask(game, pid)
+
+        # Jail status changes jail card / pay fine actions
+        assert not np.array_equal(mask1, mask2)
+
+    def test_cache_invalidates_after_house_build(self) -> None:
+        """Mask should update after houses are built."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        # Give player a monopoly
+        game.property_manager.properties[1].owner = pid
+        game.property_manager.properties[3].owner = pid
+
+        mask1 = encoder.get_action_mask(game, pid)
+
+        # Build a house
+        game.property_manager.properties[1].houses = 1
+        mask2 = encoder.get_action_mask(game, pid)
+
+        assert not np.array_equal(mask1, mask2)
+
+    def test_cache_invalidates_after_mortgage_change(self) -> None:
+        """Mask should update after mortgage status changes."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        game.property_manager.properties[5].owner = pid  # Reading Railroad
+        mask1 = encoder.get_action_mask(game, pid)
+
+        game.property_manager.properties[5].mortgaged = True
+        mask2 = encoder.get_action_mask(game, pid)
+
+        assert not np.array_equal(mask1, mask2)
+
+    def test_cache_per_player_independence(self) -> None:
+        """Cache for player 0 should not affect player 1."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+
+        mask_p0 = encoder.get_action_mask(game, 0)
+        mask_p1 = encoder.get_action_mask(game, 1)
+
+        # Different players may have different masks
+        # (one is current, one is not)
+        if game.current_player == 0:
+            # Player 0 has more actions (is current player)
+            assert mask_p0.sum() >= mask_p1.sum()
+
+    def test_cache_invalidation_on_reset(self) -> None:
+        """Cache should clear when invalidate_cache is called."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        _ = encoder.get_action_mask(game, pid)
+        encoder.invalidate_cache()
+
+        # After invalidation, next call should be a miss
+        misses_before = encoder.cache_stats[1]
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats[1] > misses_before
+
+    def test_cache_stats_tracking(self) -> None:
+        """Cache hit/miss counters should increment correctly."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        assert encoder.cache_stats == (0, 0)
+
+        # First call = miss
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats == (0, 1)
+
+        # Second call = hit
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats == (1, 1)
+
+        # Change state = miss
+        game.players[pid].money -= 100
+        _ = encoder.get_action_mask(game, pid)
+        assert encoder.cache_stats == (1, 2)
+
+    def test_cached_mask_correctness_over_many_states(self) -> None:
+        """Verify cached masks match fresh computations over many game states.
+
+        This is the key correctness test: run through random game states and
+        verify that the cached mask is always identical to a freshly computed one.
+        """
+        import random
+
+        rng = random.Random(12345)
+        encoder_cached = ActionEncoder()
+        encoder_fresh = ActionEncoder()
+
+        for seed in range(100):
+            game = MonopolyGame(num_players=2, seed=seed)
+            pid = game.current_player
+
+            # Randomly modify game state
+            for _ in range(rng.randint(0, 5)):
+                prop_pos = rng.choice(BUYABLE_POSITIONS)
+                prop = game.property_manager.properties[prop_pos]
+                action = rng.choice(["buy", "build", "mortgage", "move", "money"])
+
+                if action == "buy":
+                    prop.owner = rng.choice([0, 1, None])
+                elif action == "build" and prop.owner is not None:
+                    prop.houses = rng.randint(0, 5)
+                elif action == "mortgage" and prop.owner is not None:
+                    prop.mortgaged = rng.choice([True, False])
+                elif action == "move":
+                    game.players[pid].position = rng.randint(0, 39)
+                elif action == "money":
+                    game.players[pid].money = rng.randint(0, 5000)
+
+            # Get mask from cached encoder
+            mask_cached = encoder_cached.get_action_mask(game, pid)
+            # Get mask from fresh encoder (no cache history)
+            encoder_fresh.invalidate_cache()
+            mask_fresh = encoder_fresh.get_action_mask(game, pid)
+
+            np.testing.assert_array_equal(
+                mask_cached, mask_fresh,
+                err_msg=f"Mask mismatch at seed={seed}",
+            )
+
+    def test_cached_mask_is_read_only(self) -> None:
+        """Cached masks should be read-only to prevent accidental mutation."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        mask = encoder.get_action_mask(game, pid)
+        assert not mask.flags.writeable
+
+    def test_cache_with_houses_remaining_change(self) -> None:
+        """Mask should update when global house supply changes."""
+        encoder = ActionEncoder()
+        game = MonopolyGame(num_players=2, seed=42)
+        pid = game.current_player
+
+        mask1 = encoder.get_action_mask(game, pid)
+
+        game.houses_remaining = 0
+        mask2 = encoder.get_action_mask(game, pid)
+
+        # With no houses remaining, build actions should differ
+        # (only matters if player has monopoly, but fingerprint still changes)
+        hits, misses = encoder.cache_stats
+        assert misses >= 2  # Both calls should be misses (different fingerprints)

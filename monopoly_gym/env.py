@@ -202,6 +202,9 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         self._trade_proposer_agent = None
         self._trade_responder_agent = None
 
+        # Clear action mask cache for new episode
+        self.action_encoder.invalidate_cache()
+
         # Update infos with action masks
         self._update_infos()
 
@@ -255,8 +258,12 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
 
         # Decode and execute action
         if action is not None:
-            # Validate action is in mask
-            mask = self.action_encoder.get_action_mask(self.game, player_id)
+            # Validate action against cached mask (computed in previous _update_infos)
+            cached_info = self.infos.get(agent, {})
+            if "_needs_mask_update" not in cached_info and "action_mask" in cached_info:
+                mask = cached_info["action_mask"]
+            else:
+                mask = self.action_encoder.get_action_mask(self.game, player_id)
             if not mask[action]:
                 # Invalid action: small penalty and skip
                 self.rewards[agent] = -0.01
