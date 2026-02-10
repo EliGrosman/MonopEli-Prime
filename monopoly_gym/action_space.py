@@ -3,7 +3,9 @@
 This module provides the ActionEncoder class that handles conversion between
 the game engine's Action objects and integer action indices used by RL agents.
 
-Action Space Structure (149 total dimensions):
+Action Space Structure (907 total dimensions for Phase 2.5a):
+
+Gameplay Actions (149):
 - Buy Property: 1 (index 0) - buy the property you landed on
 - Pass Buy: 1 (index 1) - decline to buy, triggers auction
 - Build House: 22 (indices 2-23) - on developable properties
@@ -16,7 +18,10 @@ Action Space Structure (149 total dimensions):
 - Use Jail Card: 1 (index 147)
 - Pay Jail Fine: 1 (index 148)
 
-Note: Trades are not included in Phase 2 action space.
+Trade Actions (758 - Phase 2.5a):
+- Simple 1-for-1 Trades: 756 (indices 149-904) - 28 x 27 property pairs
+- Accept Trade: 1 (index 905)
+- Reject Trade: 1 (index 906)
 """
 
 from typing import TYPE_CHECKING
@@ -25,6 +30,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from monopoly_engine import (
+    AcceptTrade,
     Action,
     Board,
     BuildHotel,
@@ -33,6 +39,8 @@ from monopoly_engine import (
     EndTurn,
     MortgageProperty,
     PayJailFine,
+    ProposeTrade,
+    RejectTrade,
     SellHotel,
     SellHouse,
     UnmortgageProperty,
@@ -42,6 +50,21 @@ from monopoly_engine import (
     can_sell_house,
     can_unmortgage_property,
     get_property_cost,
+)
+
+from .trades import (
+    OFFSET_ACCEPT_TRADE,
+    OFFSET_REJECT_TRADE,
+    OFFSET_SIMPLE_TRADE,
+    SIMPLE_TRADE_DIM,
+    decode_simple_trade,
+    encode_simple_trade,
+    find_trade_for_player,
+    get_simple_trade_mask,
+    get_trade_response_mask,
+)
+from .trades import (
+    TOTAL_ACTION_SPACE_SIZE as _TOTAL_WITH_TRADES,
 )
 
 if TYPE_CHECKING:
@@ -63,7 +86,7 @@ DEVELOPABLE_POSITIONS: tuple[int, ...] = (
 _BUYABLE_TO_INDEX: dict[int, int] = {pos: idx for idx, pos in enumerate(BUYABLE_POSITIONS)}
 _DEVELOPABLE_TO_INDEX: dict[int, int] = {pos: idx for idx, pos in enumerate(DEVELOPABLE_POSITIONS)}
 
-# Action space offsets
+# Action space offsets - Gameplay (0-148)
 OFFSET_BUY_PROPERTY = 0
 OFFSET_PASS_BUY = 1
 OFFSET_BUILD_HOUSE = 2
@@ -76,8 +99,45 @@ OFFSET_END_TURN = 146
 OFFSET_USE_JAIL_CARD = 147
 OFFSET_PAY_JAIL_FINE = 148
 
-# Total action space size
-ACTION_SPACE_SIZE = 149
+# Gameplay-only action space size (for backwards compatibility)
+GAMEPLAY_ACTION_SPACE_SIZE = 149
+
+# Total action space size (with Phase 2.5a trades)
+ACTION_SPACE_SIZE = _TOTAL_WITH_TRADES  # 907
+
+# Explicit exports for mypy strict mode
+__all__ = [
+    # Constants
+    "ACTION_SPACE_SIZE",
+    "GAMEPLAY_ACTION_SPACE_SIZE",
+    "BUYABLE_POSITIONS",
+    "DEVELOPABLE_POSITIONS",
+    # Gameplay offsets
+    "OFFSET_BUY_PROPERTY",
+    "OFFSET_PASS_BUY",
+    "OFFSET_BUILD_HOUSE",
+    "OFFSET_BUILD_HOTEL",
+    "OFFSET_SELL_HOUSE",
+    "OFFSET_SELL_HOTEL",
+    "OFFSET_MORTGAGE",
+    "OFFSET_UNMORTGAGE",
+    "OFFSET_END_TURN",
+    "OFFSET_USE_JAIL_CARD",
+    "OFFSET_PAY_JAIL_FINE",
+    # Trade offsets (re-exported from trades.py)
+    "OFFSET_SIMPLE_TRADE",
+    "OFFSET_ACCEPT_TRADE",
+    "OFFSET_REJECT_TRADE",
+    "SIMPLE_TRADE_DIM",
+    # Trade utilities (re-exported from trades.py)
+    "decode_simple_trade",
+    "encode_simple_trade",
+    "get_simple_trade_mask",
+    "get_trade_response_mask",
+    "find_trade_for_player",
+    # Encoder class
+    "ActionEncoder",
+]
 
 
 class ActionEncoder:
@@ -88,12 +148,22 @@ class ActionEncoder:
     It also provides action masking to identify valid actions in any game state.
 
     Attributes:
-        action_space_size: The total number of possible actions (149).
+        action_space_size: The total number of possible actions.
+        enable_trades: Whether trade actions are enabled (Phase 2.5a).
     """
 
-    def __init__(self) -> None:
-        """Initialize the ActionEncoder."""
-        self.action_space_size = ACTION_SPACE_SIZE
+    def __init__(self, enable_trades: bool = False) -> None:
+        """Initialize the ActionEncoder.
+
+        Args:
+            enable_trades: If True, include trade actions (907 total).
+                          If False, only gameplay actions (149 total).
+        """
+        self.enable_trades = enable_trades
+        if enable_trades:
+            self.action_space_size = ACTION_SPACE_SIZE  # 907
+        else:
+            self.action_space_size = GAMEPLAY_ACTION_SPACE_SIZE  # 149
 
     def encode(self, action: Action) -> int:
         """Convert an Action object to its corresponding action index.
@@ -152,6 +222,29 @@ class ActionEncoder:
         if isinstance(action, PayJailFine):
             return OFFSET_PAY_JAIL_FINE
 
+        # Trade actions (Phase 2.5a)
+        if self.enable_trades:
+            if isinstance(action, ProposeTrade):
+                # For simple 1-for-1 trades, encode using the properties
+                if (
+                    len(action.give_properties) == 1
+                    and len(action.want_properties) == 1
+                    and action.give_money == 0
+                    and action.want_money == 0
+                ):
+                    return encode_simple_trade(
+                        action.give_properties[0],
+                        action.want_properties[0],
+                    )
+                # Complex trades not supported in Phase 2.5a
+                raise ValueError("Only 1-for-1 property trades supported in Phase 2.5a")
+
+            if isinstance(action, AcceptTrade):
+                return OFFSET_ACCEPT_TRADE
+
+            if isinstance(action, RejectTrade):
+                return OFFSET_REJECT_TRADE
+
         raise ValueError(f"Unsupported action type: {type(action).__name__}")
 
     def decode(self, action_idx: int, player_id: int, game: "MonopolyGame") -> Action:
@@ -168,8 +261,10 @@ class ActionEncoder:
         Raises:
             ValueError: If the action index is out of range or invalid.
         """
-        if action_idx < 0 or action_idx >= ACTION_SPACE_SIZE:
-            raise ValueError(f"Action index {action_idx} out of range [0, {ACTION_SPACE_SIZE})")
+        if action_idx < 0 or action_idx >= self.action_space_size:
+            raise ValueError(
+                f"Action index {action_idx} out of range [0, {self.action_space_size})"
+            )
 
         # Buy Property (index 0)
         if action_idx == OFFSET_BUY_PROPERTY:
@@ -228,9 +323,49 @@ class ActionEncoder:
         if action_idx == OFFSET_PAY_JAIL_FINE:
             return PayJailFine(player_id=player_id)
 
+        # Trade actions (Phase 2.5a)
+        if self.enable_trades:
+            # Simple 1-for-1 trades (indices 149-904)
+            if OFFSET_SIMPLE_TRADE <= action_idx < OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM:
+                my_prop, their_prop = decode_simple_trade(action_idx)
+                # Find the owner of their_prop
+                prop = game.property_manager.get(their_prop)
+                if prop is None or prop.owner is None:
+                    raise ValueError(f"Property {their_prop} has no owner for trade")
+                to_player = prop.owner
+                return ProposeTrade(
+                    player_id=player_id,
+                    to_player=to_player,
+                    give_properties=[my_prop],
+                    want_properties=[their_prop],
+                    give_money=0,
+                    want_money=0,
+                )
+
+            # Accept Trade (index 905)
+            if action_idx == OFFSET_ACCEPT_TRADE:
+                # Find the pending trade for this player
+                trade_id = find_trade_for_player(game, player_id)
+                if trade_id is None:
+                    raise ValueError("No pending trade to accept")
+                return AcceptTrade(player_id=player_id, trade_id=trade_id)
+
+            # Reject Trade (index 906)
+            if action_idx == OFFSET_REJECT_TRADE:
+                # Find the pending trade for this player
+                trade_id = find_trade_for_player(game, player_id)
+                if trade_id is None:
+                    raise ValueError("No pending trade to reject")
+                return RejectTrade(player_id=player_id, trade_id=trade_id)
+
         raise ValueError(f"Invalid action index: {action_idx}")
 
-    def get_action_mask(self, game: "MonopolyGame", player_id: int) -> NDArray[np.bool_]:
+    def get_action_mask(
+        self,
+        game: "MonopolyGame",
+        player_id: int,
+        pending_trade_response: bool = False,
+    ) -> NDArray[np.bool_]:
         """Generate a boolean mask indicating which actions are valid.
 
         This method performs all validation upfront. If an action is marked
@@ -239,11 +374,22 @@ class ActionEncoder:
         Args:
             game: The current game state.
             player_id: The ID of the player for whom to generate the mask.
+            pending_trade_response: If True, only accept/reject actions are valid
+                (player is responding to a trade proposal).
 
         Returns:
-            A numpy boolean array of shape (149,) where True indicates a valid action.
+            A numpy boolean array of shape (action_space_size,) where True
+            indicates a valid action.
         """
-        mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
+        mask = np.zeros(self.action_space_size, dtype=np.bool_)
+
+        # If responding to a trade, only accept/reject are valid
+        if pending_trade_response and self.enable_trades:
+            response_mask = get_trade_response_mask(game, player_id)
+            if response_mask[0]:  # Has pending trade
+                mask[OFFSET_ACCEPT_TRADE] = True
+                mask[OFFSET_REJECT_TRADE] = True
+            return mask
 
         player = game.players[player_id]
 
@@ -354,6 +500,19 @@ class ActionEncoder:
             if player.can_afford(JAIL_FINE):
                 mask[OFFSET_PAY_JAIL_FINE] = True
 
+        # Trade actions (Phase 2.5a)
+        if self.enable_trades and is_current_player:
+            # Simple 1-for-1 trades - can propose trades on your turn
+            trade_mask = get_simple_trade_mask(game, player_id)
+            mask[OFFSET_SIMPLE_TRADE:OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM] = trade_mask
+
+            # Accept/Reject only valid if there's a pending trade for us
+            # (This shouldn't happen during normal turn - only in trade response mode)
+            # But we include it for completeness
+            response_mask = get_trade_response_mask(game, player_id)
+            mask[OFFSET_ACCEPT_TRADE] = response_mask[0]
+            mask[OFFSET_REJECT_TRADE] = response_mask[1]
+
         return mask
 
     def get_action_name(self, action_idx: int) -> str:
@@ -415,5 +574,19 @@ class ActionEncoder:
 
         if action_idx == OFFSET_PAY_JAIL_FINE:
             return "Pay $50 Jail Fine"
+
+        # Trade actions (Phase 2.5a)
+        if self.enable_trades:
+            if OFFSET_SIMPLE_TRADE <= action_idx < OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM:
+                my_prop, their_prop = decode_simple_trade(action_idx)
+                my_space = Board.get_space(my_prop)
+                their_space = Board.get_space(their_prop)
+                return f"Trade {my_space.name} for {their_space.name}"
+
+            if action_idx == OFFSET_ACCEPT_TRADE:
+                return "Accept Trade"
+
+            if action_idx == OFFSET_REJECT_TRADE:
+                return "Reject Trade"
 
         return f"Unknown Action ({action_idx})"

@@ -17,6 +17,7 @@ from hypothesis import given, settings, strategies as st
 
 from monopoly_gym import (
     ACTION_SPACE_SIZE,
+    GAMEPLAY_ACTION_SPACE_SIZE,
     MonopolyEnv,
     SingleAgentMonopolyEnv,
     OFFSET_END_TURN,
@@ -160,10 +161,10 @@ class TestSingleAgentEnvSpaces:
         assert isinstance(env.action_space, spaces.Discrete)
 
     def test_action_space_size_is_149(self) -> None:
-        """Test action space has 149 actions."""
+        """Test action space has 149 actions (no trades in single-agent)."""
         env = SingleAgentMonopolyEnv()
         assert env.action_space.n == 149
-        assert env.action_space.n == ACTION_SPACE_SIZE
+        assert env.action_space.n == GAMEPLAY_ACTION_SPACE_SIZE
 
     def test_observation_space_flattened_shape(self) -> None:
         """Test observation space shape when flatten_obs=True."""
@@ -248,7 +249,7 @@ class TestSingleAgentEnvReset:
         env = SingleAgentMonopolyEnv()
         _, info = env.reset()
         assert info["action_mask"].shape == (149,)
-        assert info["action_mask"].shape == (ACTION_SPACE_SIZE,)
+        assert info["action_mask"].shape == (GAMEPLAY_ACTION_SPACE_SIZE,)
 
     def test_reset_action_mask_dtype(self) -> None:
         """Test reset action_mask is boolean array."""
@@ -441,7 +442,7 @@ class TestSingleAgentEnvActionMask:
         env.reset(seed=42)
         mask = env.action_masks()
         assert mask.shape == (149,)
-        assert mask.shape == (ACTION_SPACE_SIZE,)
+        assert mask.shape == (GAMEPLAY_ACTION_SPACE_SIZE,)
 
     def test_action_masks_returns_boolean(self) -> None:
         """Test action_masks() returns boolean array."""
@@ -485,7 +486,7 @@ class TestSingleAgentEnvActionMask:
 
         mask = env.action_masks()
         assert isinstance(mask, np.ndarray)
-        assert mask.shape == (ACTION_SPACE_SIZE,)
+        assert mask.shape == (GAMEPLAY_ACTION_SPACE_SIZE,)
 
     @given(seed=st.integers(min_value=0, max_value=1000))
     @settings(max_examples=10)
@@ -494,7 +495,7 @@ class TestSingleAgentEnvActionMask:
         env = SingleAgentMonopolyEnv()
         env.reset(seed=seed)
         mask = env.action_masks()
-        assert mask.shape == (ACTION_SPACE_SIZE,)
+        assert mask.shape == (GAMEPLAY_ACTION_SPACE_SIZE,)
         assert mask.dtype == np.bool_
 
 
@@ -836,7 +837,7 @@ class TestSingleAgentEnvPropertyTests:
 
         assert obs.shape == env.observation_space.shape
         assert "action_mask" in info
-        assert info["action_mask"].shape == (ACTION_SPACE_SIZE,)
+        assert info["action_mask"].shape == (GAMEPLAY_ACTION_SPACE_SIZE,)
 
     @given(
         num_players=st.integers(min_value=2, max_value=4),

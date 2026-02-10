@@ -14,7 +14,7 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-from monopoly_gym import ACTION_SPACE_SIZE, MonopolyEnv
+from monopoly_gym import GAMEPLAY_ACTION_SPACE_SIZE, MonopolyEnv
 from monopoly_gym.observation import flatten_observation, get_flat_observation_size
 
 
@@ -81,8 +81,8 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
         # Create opponent agents (lazy import to avoid circular dependencies)
         self._opponents = self._create_opponents()
 
-        # Define spaces
-        self.action_space: spaces.Space[int] = spaces.Discrete(ACTION_SPACE_SIZE)
+        # Define spaces (no trades in single-agent env, so use gameplay-only space)
+        self.action_space: spaces.Space[int] = spaces.Discrete(GAMEPLAY_ACTION_SPACE_SIZE)
 
         if flatten_obs:
             flat_size = get_flat_observation_size(num_players)
@@ -238,7 +238,7 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
                     self._env.step(None)
                 else:
                     action_mask = info.get(
-                        "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+                        "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
                     )
                     # Pass None for observation - RandomAgent ignores it
                     action = opponent.choose_action(None, action_mask, self._env.game)
@@ -272,7 +272,7 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
         """
         agent_info = self._env.infos.get(self._agent_id, {})
         action_mask = agent_info.get(
-            "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+            "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
         )
         return {
             "action_mask": action_mask,
@@ -301,9 +301,9 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
         """
         agent_info = self._env.infos.get(self._agent_id, {})
         mask = agent_info.get(
-            "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+            "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
         )
         # Ensure it's a numpy array with correct dtype
         if isinstance(mask, np.ndarray):
             return mask.astype(np.bool_)
-        return np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
+        return np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
