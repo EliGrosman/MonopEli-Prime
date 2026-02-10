@@ -22,6 +22,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -61,6 +63,22 @@ Examples:
         choices=["random", "rule_based", "aggressive", "conservative", "mixed", "self"],
         default="random",
         help="Opponent type (default: random)",
+    )
+    # Mixed opponent training
+    parser.add_argument(
+        "--opponent-pool",
+        nargs="+",
+        type=str,
+        choices=["random", "rule_based", "conservative", "aggressive"],
+        default=None,
+        help="Pool of opponent types to sample from (default: use --opponent only)",
+    )
+    parser.add_argument(
+        "--opponent-weights",
+        nargs="+",
+        type=float,
+        default=None,
+        help="Sampling weights for opponent pool (must match pool length, default: uniform)",
     )
     parser.add_argument(
         "--num-envs",
@@ -185,6 +203,12 @@ Examples:
         help="PPO clip range (default: 0.2, try 0.1 for stability)",
     )
     parser.add_argument(
+        "--max-grad-norm",
+        type=float,
+        default=0.5,
+        help="Maximum gradient norm for clipping (default: 0.5)",
+    )
+    parser.add_argument(
         "--terminal-scale",
         type=float,
         default=5.0,
@@ -276,6 +300,7 @@ Examples:
             lr_schedule=args.lr_schedule,
             lr_min=args.lr_min,
             clip_range=args.clip_range,
+            max_grad_norm=args.max_grad_norm,
             terminal_win_reward=args.terminal_scale,
             terminal_loss_reward=-args.terminal_scale,
             load_model=args.load_model,
@@ -292,7 +317,21 @@ Examples:
             seed=args.seed,
             verbose=not args.quiet,
             diagnostic_logging=args.diagnostic_logging,
+            opponent_pool=args.opponent_pool,
+            opponent_weights=args.opponent_weights,
         )
+
+        # Validate opponent pool weights
+        if config.opponent_pool and config.opponent_weights:
+            if len(config.opponent_weights) != len(config.opponent_pool):
+                raise ValueError(
+                    f"opponent_weights length ({len(config.opponent_weights)}) "
+                    f"must match opponent_pool length ({len(config.opponent_pool)})"
+                )
+            if not np.isclose(sum(config.opponent_weights), 1.0):
+                raise ValueError(
+                    f"opponent_weights must sum to 1.0, got {sum(config.opponent_weights)}"
+                )
 
         trainer = SelfPlayTrainer(config)
         trainer.train()
@@ -351,6 +390,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
             lr_schedule=args.lr_schedule,
             lr_min=args.lr_min,
             clip_range=args.clip_range,
+            max_grad_norm=args.max_grad_norm,
             terminal_win_reward=args.terminal_scale,
             terminal_loss_reward=-args.terminal_scale,
             load_model=stage_load_model,
@@ -366,6 +406,8 @@ def run_curriculum(args: argparse.Namespace) -> None:
             seed=args.seed,
             verbose=not args.quiet,
             diagnostic_logging=args.diagnostic_logging,
+            opponent_pool=args.opponent_pool,
+            opponent_weights=args.opponent_weights,
         )
 
         trainer = SelfPlayTrainer(config)

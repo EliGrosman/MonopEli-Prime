@@ -70,6 +70,8 @@ class SelfPlayConfig:
     # Self-play
     opponent_type: str = "self"  # "self", "random", "rule_based", "mixed"
     update_opponent_freq: int = 10_000  # Update opponent policy every N steps
+    opponent_pool: list[str] | None = None  # Pool of opponent types to sample from
+    opponent_weights: list[float] | None = None  # Sampling weights (uniform if None)
 
     # Evaluation
     eval_freq: int = 25_000
@@ -476,6 +478,23 @@ class SelfPlayTrainer:
         self._model = None
         self._vec_env = None
 
+        # Set up opponent pool for mixed training
+        if config.opponent_pool is not None and len(config.opponent_pool) > 0:
+            self._opponent_pool = config.opponent_pool
+            self._opponent_weights = config.opponent_weights
+            if config.verbose:
+                print(f"Mixed opponent training: {self._opponent_pool}")
+                if self._opponent_weights:
+                    print(f"  Weights: {self._opponent_weights}")
+                else:
+                    print(f"  Weights: uniform")
+        else:
+            # Single opponent (backward compatible)
+            self._opponent_pool = [config.opponent_type]
+            self._opponent_weights = None
+            if config.verbose:
+                print(f"Single opponent training: {config.opponent_type}")
+
     def train(self) -> Any:
         """Run training and return the trained model."""
         try:
@@ -494,7 +513,19 @@ class SelfPlayTrainer:
 
         if config.verbose:
             print(f"Creating {config.num_envs} parallel environments...")
-            print(f"Opponent type: {config.opponent_type}")
+            # Show opponent info (pool or single type)
+            if config.opponent_pool is not None and len(config.opponent_pool) > 0:
+                pool_str = ", ".join(config.opponent_pool)
+                if len(config.opponent_pool) > 1:
+                    if config.opponent_weights:
+                        weights_str = ", ".join(f"{w:.1f}" for w in config.opponent_weights)
+                        print(f"Opponent pool: [{pool_str}] (weights: [{weights_str}])")
+                    else:
+                        print(f"Opponent pool: [{pool_str}] (uniform weights)")
+                else:
+                    print(f"Opponent type: {pool_str}")
+            else:
+                print(f"Opponent type: {config.opponent_type}")
             print(f"Reward type: {config.reward_type}")
             print(f"Players: {config.num_players}, Max turns: {config.max_turns}")
             print(f"n_steps: {config.n_steps}, batch_size: {config.batch_size}, "
@@ -518,11 +549,28 @@ class SelfPlayTrainer:
 
         # Create vectorized environment
         def make_env(rank: int) -> Callable[[], SelfPlayEnv]:
+            """Create a single environment instance.
+
+            Args:
+                rank: Environment index (for seeding)
+
+            Returns:
+                Callable that creates and returns a SelfPlayEnv
+            """
             def _init() -> SelfPlayEnv:
+                # Sample opponent type from pool
+                if len(self._opponent_pool) > 1:
+                    opponent_type = np.random.choice(
+                        self._opponent_pool,
+                        p=self._opponent_weights,  # None = uniform
+                    )
+                else:
+                    opponent_type = self._opponent_pool[0]
+
                 env = SelfPlayEnv(
                     num_players=config.num_players,
                     max_turns=config.max_turns,
-                    opponent_type=config.opponent_type,
+                    opponent_type=opponent_type,  # Sampled!
                     reward_type=config.reward_type,
                     terminal_win_reward=config.terminal_win_reward,
                     terminal_loss_reward=config.terminal_loss_reward,
