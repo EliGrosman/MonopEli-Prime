@@ -49,7 +49,7 @@ from .action_space import (
     decode_simple_trade,
     find_trade_for_player,
 )
-from .observation import ObservationEncoder
+from .observation import IncrementalObservationEncoder, ObservationEncoder
 from .trades import (
     TradeRewardConfig,
     calculate_trade_rewards,
@@ -85,6 +85,7 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         render_mode: str | None = None,
         enable_trades: bool = False,
         trade_reward_config: TradeRewardConfig | None = None,
+        incremental_obs: bool = True,
     ) -> None:
         """Initialize the Monopoly environment.
 
@@ -95,6 +96,7 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
             render_mode: "human", "ansi", or None
             enable_trades: Enable Phase 2.5a trade actions (907 actions total)
             trade_reward_config: Configuration for trade reward shaping
+            incremental_obs: Use incremental observation encoder (OPT-3)
 
         Raises:
             ValueError: If num_players is not 2-4
@@ -110,13 +112,19 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         self.render_mode = render_mode
         self.enable_trades = enable_trades
         self.trade_reward_config = trade_reward_config or TradeRewardConfig()
+        self.incremental_obs = incremental_obs
 
         # Agent IDs
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
         self.agent_name_mapping = {name: i for i, name in enumerate(self.possible_agents)}
 
         # Initialize encoders (with trade support if enabled)
-        self.obs_encoder = ObservationEncoder(num_players, enable_trades=enable_trades)
+        if incremental_obs:
+            self.obs_encoder: ObservationEncoder | IncrementalObservationEncoder = (
+                IncrementalObservationEncoder(num_players, enable_trades=enable_trades)
+            )
+        else:
+            self.obs_encoder = ObservationEncoder(num_players, enable_trades=enable_trades)
         self.action_encoder = ActionEncoder(enable_trades=enable_trades)
 
         # Define spaces (same for all agents)
@@ -201,6 +209,10 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         self._pending_trade_response = False
         self._trade_proposer_agent = None
         self._trade_responder_agent = None
+
+        # Reset incremental observation cache for new episode
+        if isinstance(self.obs_encoder, IncrementalObservationEncoder):
+            self.obs_encoder.reset()
 
         # Clear action mask cache for new episode
         self.action_encoder.invalidate_cache()
