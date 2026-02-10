@@ -56,6 +56,8 @@ class SelfPlayConfig:
     ent_coef: float = 0.01
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
+    lr_min: float = 0.0  # Minimum LR floor for linear schedule
+    policy_kwargs: dict[str, Any] | None = None  # Custom network architecture
 
     # Environment
     num_players: int = 4
@@ -63,6 +65,7 @@ class SelfPlayConfig:
     reward_type: str = "sparse"  # "sparse" or "dense"
     terminal_win_reward: float = 5.0  # Dense mode terminal win reward
     terminal_loss_reward: float = -5.0  # Dense mode terminal loss reward
+    worth_scale: float = 500.0  # Divisor for dense reward net worth delta
 
     # Self-play
     opponent_type: str = "self"  # "self", "random", "rule_based", "mixed"
@@ -82,6 +85,7 @@ class SelfPlayConfig:
     # Misc
     seed: int = 42
     verbose: bool = True
+    diagnostic_logging: bool = True  # Enable diagnostic callbacks
 
 
 @dataclass
@@ -128,6 +132,7 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         reward_type: str = "sparse",
         terminal_win_reward: float = 5.0,
         terminal_loss_reward: float = -5.0,
+        worth_scale: float = 500.0,
         render_mode: str | None = None,
     ):
         super().__init__()
@@ -138,6 +143,7 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         self.reward_type = reward_type
         self.terminal_win_reward = terminal_win_reward
         self.terminal_loss_reward = terminal_loss_reward
+        self.worth_scale = worth_scale
         self.render_mode = render_mode
 
         # Dense reward tracking
@@ -409,7 +415,7 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         # Net worth progress (scaled to ~0.01 per step)
         current_worth = calculate_net_worth(player, pm)
         worth_delta = current_worth - self._prev_net_worth
-        reward += worth_delta / 500.0
+        reward += worth_delta / self.worth_scale
         self._prev_net_worth = current_worth
 
         # Property acquisition bonus
@@ -495,6 +501,18 @@ class SelfPlayTrainer:
                   f"n_epochs: {config.n_epochs}")
             print(f"ent_coef: {config.ent_coef}, lr: {config.learning_rate}, "
                   f"lr_schedule: {config.lr_schedule}")
+            if config.lr_min > 0:
+                print(f"lr_min: {config.lr_min}")
+            if config.vf_coef != 0.5:
+                print(f"vf_coef: {config.vf_coef}")
+            if config.gamma != 0.99:
+                print(f"gamma: {config.gamma}")
+            if config.gae_lambda != 0.95:
+                print(f"gae_lambda: {config.gae_lambda}")
+            if config.policy_kwargs is not None:
+                print(f"policy_kwargs: {config.policy_kwargs}")
+            if config.worth_scale != 500.0:
+                print(f"worth_scale: {config.worth_scale}")
             if config.checkpoint_min_win_rate > 0:
                 print(f"Checkpoint min win rate: {config.checkpoint_min_win_rate:.0%}")
 
@@ -508,6 +526,7 @@ class SelfPlayTrainer:
                     reward_type=config.reward_type,
                     terminal_win_reward=config.terminal_win_reward,
                     terminal_loss_reward=config.terminal_loss_reward,
+                    worth_scale=config.worth_scale,
                 )
                 env.reset(seed=config.seed + rank)
                 return env
@@ -518,9 +537,17 @@ class SelfPlayTrainer:
         # Resolve learning rate schedule
         if config.lr_schedule == "linear":
             _base_lr = config.learning_rate
+            _lr_min = config.lr_min
             def lr_schedule_fn(progress_remaining: float) -> float:
-                return progress_remaining * _base_lr
+                return max(progress_remaining * _base_lr, _lr_min)
             lr_value: float | Callable[[float], float] = lr_schedule_fn
+        elif config.lr_schedule == "cosine":
+            _base_lr = config.learning_rate
+            _lr_min = config.lr_min
+            import math
+            def lr_schedule_fn_cosine(progress_remaining: float) -> float:
+                return _lr_min + 0.5 * (_base_lr - _lr_min) * (1 + math.cos(math.pi * (1 - progress_remaining)))
+            lr_value = lr_schedule_fn_cosine
         else:
             lr_value = config.learning_rate
 
@@ -540,6 +567,7 @@ class SelfPlayTrainer:
             ent_coef=config.ent_coef,
             vf_coef=config.vf_coef,
             max_grad_norm=config.max_grad_norm,
+            policy_kwargs=config.policy_kwargs,
             verbose=0,
             tensorboard_log=str(save_path / "tensorboard"),
             seed=config.seed,
@@ -549,8 +577,8 @@ class SelfPlayTrainer:
         if config.load_model:
             self._load_pretrained(Path(config.load_model))
 
-        # Create callback for evaluation and self-play updates
-        callback = SelfPlayCallback(
+        # Create main self-play callback
+        main_callback = SelfPlayCallback(
             trainer=self,
             eval_freq=config.eval_freq,
             eval_episodes=config.eval_episodes,
@@ -559,6 +587,23 @@ class SelfPlayTrainer:
             update_opponent_freq=config.update_opponent_freq,
             verbose=config.verbose,
         )
+
+        # Create callback list (using SB3's CallbackList for proper lifecycle)
+        from stable_baselines3.common.callbacks import CallbackList
+
+        callbacks: list[Any] = [CallableCallbackAdapter(main_callback)]
+
+        # Add diagnostic logging if enabled
+        if config.diagnostic_logging:
+            from training.callbacks import DiagnosticCallback
+            callbacks.append(DiagnosticCallback(
+                log_freq=1000,  # Log every 1000 steps
+                verbose=1 if config.verbose else 0,
+            ))
+            if config.verbose:
+                print("Diagnostic logging enabled (every 1000 steps)")
+
+        callback = CallbackList(callbacks)
 
         if config.verbose:
             print(f"\nStarting training for {config.total_timesteps:,} timesteps...")
@@ -760,7 +805,12 @@ class SelfPlayTrainer:
 
 
 class SelfPlayCallback:
-    """Callback for self-play training with evaluation and opponent updates."""
+    """Callback for self-play training with evaluation and opponent updates.
+
+    This callback is a plain callable (not a BaseCallback) because it needs
+    to access the trainer object directly, which SB3's callback system doesn't
+    support natively. It will be wrapped in a BaseCallbackAdapter.
+    """
 
     def __init__(
         self,
@@ -780,7 +830,6 @@ class SelfPlayCallback:
         self.update_opponent_freq = update_opponent_freq
         self.verbose = verbose
 
-        self.n_calls = 0
         self.num_timesteps = 0
         self.last_eval = 0
         self.last_save = 0
@@ -790,8 +839,6 @@ class SelfPlayCallback:
 
     def __call__(self, locals_dict: dict, globals_dict: dict) -> bool:
         """Called at each training step."""
-        self.n_calls += 1
-
         # Get model from locals
         model = locals_dict.get("self")
         if model is None:
@@ -917,6 +964,7 @@ def make_selfplay_env(
     reward_type: str = "sparse",
     terminal_win_reward: float = 5.0,
     terminal_loss_reward: float = -5.0,
+    worth_scale: float = 500.0,
     seed: int | None = None,
 ) -> SelfPlayEnv:
     """Factory function to create a self-play environment."""
@@ -927,7 +975,69 @@ def make_selfplay_env(
         reward_type=reward_type,
         terminal_win_reward=terminal_win_reward,
         terminal_loss_reward=terminal_loss_reward,
+        worth_scale=worth_scale,
     )
     if seed is not None:
         env.reset(seed=seed)
     return env
+
+
+class CallableCallbackAdapter:
+    """Adapter that wraps a plain callable callback into SB3's BaseCallback protocol.
+
+    This allows legacy callable callbacks (like SelfPlayCallback) to work with
+    SB3's CallbackList, which properly handles the callback lifecycle including
+    init_callback, on_training_start, on_step, etc.
+    """
+
+    def __init__(self, callable_callback: Any):
+        """Initialize with a callable callback.
+
+        Args:
+            callable_callback: A callable that takes (locals_dict, globals_dict)
+                              and returns bool to continue/stop training.
+        """
+        self.callback = callable_callback
+        self.locals: dict[str, Any] = {}
+        self.globals: dict[str, Any] = {}
+        self.n_calls = 0
+        self.model = None
+        self.logger = None
+
+    def init_callback(self, model: Any) -> None:
+        """Initialize the callback with the model.
+
+        The callable callback doesn't need model initialization, so we just
+        store the reference for potential use.
+        """
+        self.model = model
+        self.logger = model.logger if hasattr(model, 'logger') else None
+
+    def on_training_start(self, locals_dict: dict, globals_dict: dict) -> None:
+        """Called at the start of training."""
+        self.locals = locals_dict
+        self.globals = globals_dict
+
+    def on_rollout_start(self) -> None:
+        """Called at the start of each rollout."""
+        pass
+
+    def on_step(self) -> bool:
+        """Called at each training step.
+
+        Returns True to continue training, False to stop.
+        """
+        self.n_calls += 1
+        return self.callback(self.locals, self.globals)
+
+    def on_training_end(self) -> None:
+        """Called at the end of training."""
+        pass
+
+    def on_rollout_end(self) -> None:
+        """Called at the end of each rollout."""
+        pass
+
+    def update_locals(self, locals_dict: dict[str, Any]) -> None:
+        """Update locals dict (called by SB3 during training)."""
+        self.locals = locals_dict

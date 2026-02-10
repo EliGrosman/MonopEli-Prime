@@ -20,6 +20,7 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -136,9 +137,46 @@ Examples:
     parser.add_argument(
         "--lr-schedule",
         type=str,
-        choices=["linear", "constant"],
+        choices=["linear", "constant", "cosine"],
         default="linear",
         help="Learning rate schedule (default: linear)",
+    )
+    parser.add_argument(
+        "--lr-min",
+        type=float,
+        default=0.0,
+        help="Minimum LR floor for linear schedule (default: 0.0)",
+    )
+    parser.add_argument(
+        "--vf-coef",
+        type=float,
+        default=0.5,
+        help="Value function loss coefficient (default: 0.5)",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.99,
+        help="Discount factor (default: 0.99)",
+    )
+    parser.add_argument(
+        "--gae-lambda",
+        type=float,
+        default=0.95,
+        help="GAE lambda (default: 0.95)",
+    )
+    parser.add_argument(
+        "--net-arch",
+        type=str,
+        choices=["default", "large", "separate-large"],
+        default="default",
+        help="Network architecture (default: [64,64] shared)",
+    )
+    parser.add_argument(
+        "--worth-scale",
+        type=float,
+        default=500.0,
+        help="Divisor for dense reward net worth delta (default: 500.0)",
     )
     parser.add_argument(
         "--clip-range",
@@ -187,8 +225,28 @@ Examples:
         action="store_true",
         help="Suppress progress output",
     )
+    parser.add_argument(
+        "--diagnostic-logging",
+        action="store_true",
+        default=True,
+        help="Enable diagnostic logging (value stats, gradients, etc.)",
+    )
+    parser.add_argument(
+        "--no-diagnostic-logging",
+        dest="diagnostic_logging",
+        action="store_false",
+        help="Disable diagnostic logging",
+    )
 
     args = parser.parse_args()
+
+    # Resolve network architecture
+    net_arch_map: dict[str, dict[str, Any] | None] = {
+        "default": None,
+        "large": {"net_arch": [256, 256]},
+        "separate-large": {"net_arch": dict(pi=[256, 256], vf=[256, 256])},
+    }
+    policy_kwargs = net_arch_map.get(args.net_arch)
 
     # Import training module
     try:
@@ -216,6 +274,7 @@ Examples:
             save_dir=args.save_dir,
             learning_rate=args.learning_rate,
             lr_schedule=args.lr_schedule,
+            lr_min=args.lr_min,
             clip_range=args.clip_range,
             terminal_win_reward=args.terminal_scale,
             terminal_loss_reward=-args.terminal_scale,
@@ -224,9 +283,15 @@ Examples:
             batch_size=args.batch_size,
             n_epochs=args.n_epochs,
             ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            policy_kwargs=policy_kwargs,
+            worth_scale=args.worth_scale,
             checkpoint_min_win_rate=args.min_win_rate,
             seed=args.seed,
             verbose=not args.quiet,
+            diagnostic_logging=args.diagnostic_logging,
         )
 
         trainer = SelfPlayTrainer(config)
@@ -255,6 +320,14 @@ def run_curriculum(args: argparse.Namespace) -> None:
     model = None
     save_dir = Path(args.save_dir)
 
+    # Resolve network architecture
+    net_arch_map_cur: dict[str, dict[str, Any] | None] = {
+        "default": None,
+        "large": {"net_arch": [256, 256]},
+        "separate-large": {"net_arch": dict(pi=[256, 256], vf=[256, 256])},
+    }
+    policy_kwargs_cur = net_arch_map_cur.get(args.net_arch)
+
     for stage_name, stage_steps in stages:
         print(f"\n{'='*60}")
         print(f"STAGE: {stage_name.upper()} ({stage_steps:,} steps)")
@@ -276,6 +349,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
             save_dir=str(save_dir / stage_name),
             learning_rate=args.learning_rate,
             lr_schedule=args.lr_schedule,
+            lr_min=args.lr_min,
             clip_range=args.clip_range,
             terminal_win_reward=args.terminal_scale,
             terminal_loss_reward=-args.terminal_scale,
@@ -284,8 +358,14 @@ def run_curriculum(args: argparse.Namespace) -> None:
             batch_size=args.batch_size,
             n_epochs=args.n_epochs,
             ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            policy_kwargs=policy_kwargs_cur,
+            worth_scale=args.worth_scale,
             seed=args.seed,
             verbose=not args.quiet,
+            diagnostic_logging=args.diagnostic_logging,
         )
 
         trainer = SelfPlayTrainer(config)
@@ -304,6 +384,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
                         max_turns=config.max_turns,
                         opponent_type=config.opponent_type,
                         reward_type=config.reward_type,
+                        worth_scale=config.worth_scale,
                     )
                     env.reset(seed=config.seed + rank)
                     return env
