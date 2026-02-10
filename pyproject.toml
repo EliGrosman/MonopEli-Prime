@@ -19,6 +19,7 @@ dependencies = [
     "tqdm>=4.67.2",
     "rich>=14.3.2",
     "prometheus-client>=0.20.0",
+    "h5py>=3.11.0",
 ]
 
 [project.optional-dependencies]

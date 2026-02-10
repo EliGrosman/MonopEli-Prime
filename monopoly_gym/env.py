@@ -767,10 +767,12 @@ class MonopolyEnv(AECEnv):  # type: ignore[misc]
         if self._agent_selector is None or self.game is None:
             return
 
-        # Remove terminated agents from active list (but keep in terminations/truncations dicts)
+        # Remove terminated/truncated agents from active list
+        # (but keep in terminations/truncations dicts for PettingZoo API)
         self.agents = [
             agent for agent in self.agents
             if not self.terminations.get(agent, True)
+            and not self.truncations.get(agent, False)
         ]
 
         # Ensure all possible agents remain in terminations/truncations dicts
