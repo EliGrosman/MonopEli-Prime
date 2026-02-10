@@ -426,6 +426,7 @@ class TestMonopolyEnvWithTrades:
         # Give players properties
         env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
         env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
+        env._update_infos()  # Refresh cached action mask after state change
 
         # Player 0 starts
         assert env.agent_selection == "player_0"
@@ -448,6 +449,7 @@ class TestMonopolyEnvWithTrades:
         # Give players properties
         env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
         env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
+        env._update_infos()  # Refresh cached action mask after state change
 
         # Player 0 proposes trade: Mediterranean for Baltic
         trade_action = encode_simple_trade(1, 3)
@@ -474,6 +476,7 @@ class TestMonopolyEnvWithTrades:
         # Give players properties
         env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
         env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
+        env._update_infos()  # Refresh cached action mask after state change
 
         # Player 0 proposes trade
         trade_action = encode_simple_trade(1, 3)
@@ -508,6 +511,7 @@ class TestMonopolyEnvWithTrades:
         # Give players properties
         env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
         env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
+        env._update_infos()  # Refresh cached action mask after state change
 
         # Player 0 proposes trade
         trade_action = encode_simple_trade(1, 3)
