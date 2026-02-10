@@ -83,8 +83,8 @@ Examples:
     parser.add_argument(
         "--num-envs",
         type=int,
-        default=8,
-        help="Number of parallel environments (default: 8)",
+        default=16,
+        help="Number of parallel environments (default: 16)",
     )
     parser.add_argument(
         "--num-players",
@@ -137,8 +137,8 @@ Examples:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=64,
-        help="Minibatch size (default: 64)",
+        default=256,
+        help="Minibatch size (default: 256)",
     )
     parser.add_argument(
         "--n-epochs",
@@ -261,6 +261,14 @@ Examples:
         action="store_false",
         help="Disable diagnostic logging",
     )
+    parser.add_argument(
+        "--vec-env",
+        type=str,
+        choices=["auto", "subproc", "dummy"],
+        default="auto",
+        help="Vectorization backend: auto (SubprocVecEnv except self-play), "
+             "subproc (force SubprocVecEnv), dummy (force DummyVecEnv) (default: auto)",
+    )
 
     args = parser.parse_args()
 
@@ -285,6 +293,9 @@ Examples:
         run_curriculum(args)
     else:
         # Single opponent type training
+        # Resolve vec-env flag
+        use_subproc = args.vec_env != "dummy"  # "auto" and "subproc" both enable it
+
         config = SelfPlayConfig(
             total_timesteps=args.timesteps,
             num_envs=args.num_envs,
@@ -319,6 +330,7 @@ Examples:
             diagnostic_logging=args.diagnostic_logging,
             opponent_pool=args.opponent_pool,
             opponent_weights=args.opponent_weights,
+            use_subproc=use_subproc,
         )
 
         # Validate opponent pool weights
@@ -367,6 +379,8 @@ def run_curriculum(args: argparse.Namespace) -> None:
     }
     policy_kwargs_cur = net_arch_map_cur.get(args.net_arch)
 
+    use_subproc = args.vec_env != "dummy"
+
     for stage_name, stage_steps in stages:
         print(f"\n{'='*60}")
         print(f"STAGE: {stage_name.upper()} ({stage_steps:,} steps)")
@@ -408,6 +422,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
             diagnostic_logging=args.diagnostic_logging,
             opponent_pool=args.opponent_pool,
             opponent_weights=args.opponent_weights,
+            use_subproc=use_subproc,
         )
 
         trainer = SelfPlayTrainer(config)
@@ -416,7 +431,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
         if model is not None:
             trainer._model = model
             # Need to set up environment first
-            from stable_baselines3.common.vec_env import DummyVecEnv
+            from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
             from training.pettingzoo_selfplay import SelfPlayEnv
 
             def make_env(rank: int):
@@ -432,7 +447,16 @@ def run_curriculum(args: argparse.Namespace) -> None:
                     return env
                 return _init
 
-            trainer._vec_env = DummyVecEnv([make_env(i) for i in range(config.num_envs)])
+            env_fns = [make_env(i) for i in range(config.num_envs)]
+            stage_use_subproc = (
+                config.use_subproc
+                and config.num_envs > 1
+                and stage_name != "self"
+            )
+            if stage_use_subproc:
+                trainer._vec_env = SubprocVecEnv(env_fns)
+            else:
+                trainer._vec_env = DummyVecEnv(env_fns)
             trainer._model.set_env(trainer._vec_env)
 
         model = trainer.train()
