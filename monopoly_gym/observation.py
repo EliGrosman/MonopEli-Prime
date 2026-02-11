@@ -518,6 +518,197 @@ def flatten_observation(
     return np.concatenate(flat_parts)
 
 
+class IncrementalObservationEncoder:
+    """Observation encoder with incremental update support.
+
+    Wraps ObservationEncoder and caches observation arrays per player.
+    Uses two strategies for efficient change detection:
+
+    1. **Player-identity tracking**: opponent_states only changes when a
+       different player acts. By tracking the last-encoded player_id,
+       consecutive encodes for the same player skip the expensive
+       opponent_states recomputation entirely (O(1) check).
+
+    2. **Lightweight snapshots**: board_state and game_state use cheap
+       tuple snapshots of scalar fields (owner, mortgaged, houses per
+       property; turn_number, houses_remaining, etc.) for change detection.
+
+    player_state is always recomputed (money changes almost every step,
+    and encoding is cheap relative to the snapshot cost).
+
+    Attributes:
+        num_players: Total number of players in the game.
+        enable_trades: Whether trade context is included.
+    """
+
+    def __init__(self, num_players: int, enable_trades: bool = False) -> None:
+        """Initialize the incremental observation encoder.
+
+        Args:
+            num_players: Total number of players (2-8).
+            enable_trades: If True, include trade context in observations.
+        """
+        self._base = ObservationEncoder(num_players, enable_trades)
+        self.num_players = num_players
+        self.max_opponents = num_players - 1
+        self.enable_trades = enable_trades
+
+        # Per-player cached observations
+        self._cache: dict[int, dict[str, Any]] = {}
+
+        # Track which player was last encoded — consecutive encodes for the
+        # same player can skip opponent_states (no other player acted).
+        self._last_encoded_pid: int | None = None
+
+        # Lightweight snapshots for board and game state
+        self._board_snap: dict[int, tuple[Any, ...]] = {}
+        self._game_snap: tuple[Any, ...] | None = None
+
+        # Per-section hit/miss counters
+        self._section_hits: dict[str, int] = {
+            "player_state": 0, "opponent_states": 0,
+            "board_state": 0, "game_state": 0,
+        }
+        self._section_misses: dict[str, int] = {
+            "player_state": 0, "opponent_states": 0,
+            "board_state": 0, "game_state": 0,
+        }
+
+    def get_observation_space(self) -> spaces.Dict:
+        """Define the gymnasium observation space (delegates to base encoder)."""
+        return self._base.get_observation_space()
+
+    def reset(self) -> None:
+        """Clear all caches. Must be called on env.reset()."""
+        self._cache.clear()
+        self._board_snap.clear()
+        self._game_snap = None
+        self._last_encoded_pid = None
+
+    def encode(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+        pending_trade_response: bool = False,
+    ) -> dict[str, np.ndarray | dict[str, np.ndarray]]:
+        """Encode observation, reusing cached sections when unchanged.
+
+        Args:
+            game: The MonopolyGame instance to encode.
+            player_id: The player ID whose perspective to encode from.
+            pending_trade_response: If True, this player is responding to a trade.
+
+        Returns:
+            Dictionary matching the observation space structure.
+        """
+        same_player = (self._last_encoded_pid == player_id)
+
+        if player_id not in self._cache:
+            # Cold start: full computation
+            obs = self._base.encode(game, player_id, pending_trade_response)
+            self._cache[player_id] = obs
+            self._board_snap[player_id] = self._snap_board(game, player_id)
+            self._game_snap = self._snap_game(game)
+            self._last_encoded_pid = player_id
+            for key in self._section_misses:
+                self._section_misses[key] += 1
+            return obs
+
+        cached = self._cache[player_id]
+
+        # --- player_state: always recompute (money changes almost every step) ---
+        cached["player_state"] = self._base._encode_player_state(game, player_id)
+        self._section_misses["player_state"] += 1
+
+        # --- opponent_states: skip if same player (opponents haven't acted) ---
+        if same_player:
+            self._section_hits["opponent_states"] += 1
+        else:
+            cached["opponent_states"] = self._base._encode_opponent_states(
+                game, player_id
+            )
+            self._section_misses["opponent_states"] += 1
+
+        # --- board_state: use lightweight snapshot ---
+        bs = self._snap_board(game, player_id)
+        if bs != self._board_snap.get(player_id):
+            cached["board_state"] = self._base._encode_board_state(game, player_id)
+            self._board_snap[player_id] = bs
+            self._section_misses["board_state"] += 1
+        else:
+            self._section_hits["board_state"] += 1
+
+        # --- game_state: use lightweight snapshot ---
+        gs = self._snap_game(game)
+        if gs != self._game_snap:
+            cached["game_state"] = self._base._encode_game_state(game)
+            self._game_snap = gs
+            self._section_misses["game_state"] += 1
+        else:
+            self._section_hits["game_state"] += 1
+
+        # Action mask: always recompute (depends on full state, has own caching)
+        cached["action_mask"] = self._base._encode_action_mask(
+            game, player_id, pending_trade_response
+        )
+
+        if self.enable_trades:
+            cached["trade_context"] = self._base._encode_trade_context(
+                game, player_id
+            )
+
+        self._last_encoded_pid = player_id
+        return cached
+
+    def _snap_board(self, game: MonopolyGame, player_id: int) -> tuple[Any, ...]:
+        """Snapshot fields that board_state encoding depends on.
+
+        Includes player_id since board encodes ownership relative to self.
+        """
+        parts: list[tuple[Any, ...]] = []
+        for pos in PROPERTY_POSITIONS:
+            prop = game.property_manager.get(pos)
+            if prop is None:
+                parts.append((None, False, 0))
+            else:
+                parts.append((prop.owner, prop.mortgaged, prop.houses))
+        return (player_id, tuple(parts))
+
+    def _snap_game(self, game: MonopolyGame) -> tuple[Any, ...]:
+        """Snapshot fields that game_state encoding depends on."""
+        return (
+            game.turn_number, game.houses_remaining,
+            game.hotels_remaining, game.last_roll,
+        )
+
+    @property
+    def cache_stats(self) -> dict[str, Any]:
+        """Return cache hit/miss statistics per section.
+
+        Returns:
+            Dictionary with hit rates and per-section breakdown.
+        """
+        stats: dict[str, Any] = {}
+        for section in self._section_hits:
+            total = self._section_hits[section] + self._section_misses[section]
+            stats[section] = {
+                "hits": self._section_hits[section],
+                "misses": self._section_misses[section],
+                "hit_rate": (
+                    self._section_hits[section] / total if total > 0 else 0.0
+                ),
+            }
+        total_hits = sum(self._section_hits.values())
+        total_misses = sum(self._section_misses.values())
+        total = total_hits + total_misses
+        stats["overall"] = {
+            "hits": total_hits,
+            "misses": total_misses,
+            "hit_rate": total_hits / total if total > 0 else 0.0,
+        }
+        return stats
+
+
 def get_flat_observation_size(num_players: int) -> int:
     """Calculate the size of a flattened observation.
 

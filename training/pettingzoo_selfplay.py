@@ -44,11 +44,11 @@ class SelfPlayConfig:
 
     # Training
     total_timesteps: int = 1_000_000
-    num_envs: int = 8
+    num_envs: int = 16
     learning_rate: float = 3e-4
     lr_schedule: str = "linear"  # "linear" or "constant"
     n_steps: int = 2048
-    batch_size: int = 64
+    batch_size: int = 256
     n_epochs: int = 10
     gamma: float = 0.99
     gae_lambda: float = 0.95
@@ -83,6 +83,9 @@ class SelfPlayConfig:
     checkpoint_min_win_rate: float = 0.0  # Min win rate vs random to save (0=disabled)
     collapse_detection: bool = True  # Stop training if win rate collapses to 0%
     load_model: str | None = None  # Path to pre-trained model to load
+
+    # Vectorization
+    use_subproc: bool = True  # Use SubprocVecEnv for true parallelism (auto-disabled for self-play)
 
     # Misc
     seed: int = 42
@@ -580,7 +583,24 @@ class SelfPlayTrainer:
                 return env
             return _init
 
-        self._vec_env = DummyVecEnv([make_env(i) for i in range(config.num_envs)])
+        # Use SubprocVecEnv for true parallelism when possible.
+        # Self-play mode needs direct env access for policy updates, so it
+        # must use DummyVecEnv. All other modes benefit from SubprocVecEnv.
+        use_subproc = (
+            config.use_subproc
+            and config.num_envs > 1
+            and config.opponent_type != "self"
+        )
+        env_fns = [make_env(i) for i in range(config.num_envs)]
+        if use_subproc:
+            self._vec_env = SubprocVecEnv(env_fns)
+            if config.verbose:
+                print(f"Using SubprocVecEnv ({config.num_envs} processes)")
+        else:
+            self._vec_env = DummyVecEnv(env_fns)
+            if config.verbose:
+                reason = "self-play" if config.opponent_type == "self" else "single env or disabled"
+                print(f"Using DummyVecEnv ({reason})")
 
         # Resolve learning rate schedule
         if config.lr_schedule == "linear":

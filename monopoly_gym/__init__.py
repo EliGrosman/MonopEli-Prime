@@ -54,6 +54,7 @@ from .observation import (
     NUM_PROPERTIES,
     PROPERTY_POS_TO_IDX,
     PROPERTY_POSITIONS,
+    IncrementalObservationEncoder,
     ObservationEncoder,
     flatten_observation,
     get_flat_observation_size,
@@ -105,6 +106,7 @@ __all__ = [
     "TradeRewardConfig",
     # Observation space
     "ObservationEncoder",
+    "IncrementalObservationEncoder",
     "flatten_observation",
     "get_flat_observation_size",
     "MAX_MONEY",

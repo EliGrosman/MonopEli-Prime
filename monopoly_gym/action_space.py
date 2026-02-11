@@ -165,6 +165,48 @@ class ActionEncoder:
         else:
             self.action_space_size = GAMEPLAY_ACTION_SPACE_SIZE  # 149
 
+        # Mask cache: {player_id: (fingerprint_tuple, cached_mask)}
+        self._mask_cache: dict[int, tuple[tuple[object, ...], NDArray[np.bool_]]] = {}
+        self._cache_hits: int = 0
+        self._cache_misses: int = 0
+
+    def _compute_state_fingerprint(
+        self, game: "MonopolyGame", player_id: int
+    ) -> tuple[object, ...]:
+        """Compute a lightweight fingerprint of state relevant to action masking.
+
+        Returns a tuple that changes if and only if the mask would differ.
+        """
+        player = game.players[player_id]
+        # Property state: (owner, houses, mortgaged) for all buyable positions
+        pm = game.property_manager
+        prop_state = tuple(
+            (p.owner, p.houses, p.mortgaged)
+            for pos in BUYABLE_POSITIONS
+            if (p := pm.properties.get(pos)) is not None
+        )
+        return (
+            player_id,
+            player.bankrupt,
+            player.money,
+            player.position,
+            player.in_jail,
+            player.jail_cards,
+            game.current_player,
+            game.houses_remaining,
+            game.hotels_remaining,
+            prop_state,
+        )
+
+    def invalidate_cache(self) -> None:
+        """Clear the mask cache (call on env reset)."""
+        self._mask_cache.clear()
+
+    @property
+    def cache_stats(self) -> tuple[int, int]:
+        """Return (cache_hits, cache_misses)."""
+        return (self._cache_hits, self._cache_misses)
+
     def encode(self, action: Action) -> int:
         """Convert an Action object to its corresponding action index.
 
@@ -381,6 +423,15 @@ class ActionEncoder:
             A numpy boolean array of shape (action_space_size,) where True
             indicates a valid action.
         """
+        # Check cache for non-trade-response calls
+        if not pending_trade_response:
+            fingerprint = self._compute_state_fingerprint(game, player_id)
+            cached = self._mask_cache.get(player_id)
+            if cached is not None and cached[0] == fingerprint:
+                self._cache_hits += 1
+                return cached[1]
+            self._cache_misses += 1
+
         mask = np.zeros(self.action_space_size, dtype=np.bool_)
 
         # If responding to a trade, only accept/reject are valid
@@ -512,6 +563,12 @@ class ActionEncoder:
             response_mask = get_trade_response_mask(game, player_id)
             mask[OFFSET_ACCEPT_TRADE] = response_mask[0]
             mask[OFFSET_REJECT_TRADE] = response_mask[1]
+
+        # Cache the result (only for non-trade-response calls)
+        if not pending_trade_response:
+            # Make mask read-only to prevent accidental mutation of cached value
+            mask.flags.writeable = False
+            self._mask_cache[player_id] = (fingerprint, mask)
 
         return mask
 
