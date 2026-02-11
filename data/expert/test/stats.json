@@ -1,0 +1,21 @@
+{
+  "num_games_requested": 10000,
+  "num_games_completed": 10000,
+  "num_games_skipped": 0,
+  "num_players": 4,
+  "agent_type": "rule_based",
+  "total_experiences": 8090230,
+  "train_experiences": 7281207,
+  "val_experiences": 809023,
+  "avg_game_length": 809.023,
+  "std_game_length": 356.1558850714108,
+  "min_game_length": 101,
+  "max_game_length": 1128,
+  "winner_distribution": {
+    "0": 2858,
+    "1": 2563,
+    "2": 2381,
+    "3": 2198
+  },
+  "enable_trades": false
+}

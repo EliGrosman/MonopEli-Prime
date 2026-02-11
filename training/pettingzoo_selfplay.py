@@ -732,14 +732,15 @@ class SelfPlayTrainer:
             print(f"Loading pre-trained model from {path}...")
 
         try:
-            # Try direct load (same observation dimensions)
-            self._model = MaskablePPO.load(load_str, env=self._vec_env)
+            # Load source model and copy policy weights (preserves training hyperparameters)
+            source_model = MaskablePPO.load(load_str)
+            self._model.policy.load_state_dict(source_model.policy.state_dict())
             if self.config.verbose:
-                print("Direct model load successful (matching dimensions)")
+                print("Model weights loaded successfully (matching dimensions)")
             return
         except Exception as direct_err:
             if self.config.verbose:
-                print(f"Direct load failed ({direct_err}), attempting weight surgery...")
+                print(f"Direct weight copy failed ({direct_err}), attempting weight surgery...")
 
         # Weight surgery for cross-player-count transfer
         try:

@@ -1,0 +1,41 @@
+  Step 1 — Generate expert data:
+  uv run python scripts/generate_expert_data.py \                                                                                               
+    --agent rule_based \
+    --num-games 10000 \                                                                                                                         
+    --num-players 4 \                                                                                                                         
+    --save-dir data/expert/test \                                                                                                             
+    --seed 42
+
+  Step 2 — Train BC model:
+  uv run python scripts/train_bc.py \
+    --data-dir data/expert/test \
+    --save-dir models/bc \
+    --epochs 10 \
+    --batch-size 512 \
+    --learning-rate 1e-3 \
+    --net-arch separate-large \
+    --num-players 4 \
+    --eval-games 100 \
+    --seed 42
+
+Step 3 - Train model starting with pretrained bc_model
+uv run python scripts/train_selfplay.py \
+    --load-model models/bc/bc_model \
+    --opponent rule_based \
+    --num-players 4 \
+    --timesteps 2000000 \
+    --reward-type dense \
+    --worth-scale 200.0 \
+    --lr-schedule constant \
+    --learning-rate 1e-4 \
+    --vf-coef 1.0 \
+    --batch-size 256 \
+    --net-arch separate-large \
+    --max-grad-norm 0.5 \
+    --ent-coef 0.01 \
+    --diagnostic-logging \
+    --eval-freq 50000 \
+    --eval-episodes 100 \
+    --save-freq 100000 \
+    --save-dir models/ExpBC_finetune \
+    --seed 42

@@ -22,6 +22,5 @@ htmlcov/
 # Training artifacts
 logs/*
 training_log_*.txt
-models/*
 
 results/
