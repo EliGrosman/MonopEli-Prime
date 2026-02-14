@@ -1077,16 +1077,17 @@ class SelfPlayCallback:
                             # Optimizer state mismatch (e.g., separate value LR
                             # creates 2 param groups but load() expects 1).
                             # Fall back to loading just policy network weights.
-                            model_cls = type(self.trainer._model)
-                            _, params, _ = model_cls._load_from_file(
-                                str(self.save_path / "best_model"),
-                                device=self.trainer._model.device,
-                            )
-                            if "policy" in params:
-                                self.trainer._model.policy.load_state_dict(
-                                    params["policy"]
-                                )
-                                print("Restored policy weights (optimizer reset)")
+                            import zipfile, io, torch as _torch
+                            zip_path = self.save_path / "best_model.zip"
+                            with zipfile.ZipFile(str(zip_path), "r") as zf:
+                                with zf.open("policy.pth") as f:
+                                    policy_state = _torch.load(
+                                        io.BytesIO(f.read()),
+                                        map_location=self.trainer._model.device,
+                                        weights_only=False,
+                                    )
+                            self.trainer._model.policy.load_state_dict(policy_state)
+                            print("Restored policy weights (optimizer reset)")
                     print(f"Stopping training early.")
                     print(f"{'!'*60}\n")
                     return False
