@@ -87,6 +87,12 @@ class SelfPlayConfig:
     # Vectorization
     use_subproc: bool = True  # Use SubprocVecEnv for true parallelism (auto-disabled for self-play)
 
+    # Normalization
+    normalize_env: bool = False  # Enable VecNormalize for obs/reward normalization
+
+    # Separate value function learning rate
+    vf_lr_multiplier: float = 1.0  # Value function LR = this * policy LR (1.0 = same LR)
+
     # Misc
     seed: int = 42
     verbose: bool = True
@@ -502,7 +508,7 @@ class SelfPlayTrainer:
         """Run training and return the trained model."""
         try:
             from sb3_contrib import MaskablePPO
-            from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+            from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
             from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
         except ImportError as e:
             raise ImportError(
@@ -602,6 +608,19 @@ class SelfPlayTrainer:
                 reason = "self-play" if config.opponent_type == "self" else "single env or disabled"
                 print(f"Using DummyVecEnv ({reason})")
 
+        # Add VecNormalize for observation and return normalization
+        if config.normalize_env:
+            self._vec_env = VecNormalize(
+                self._vec_env,
+                norm_obs=True,
+                norm_reward=True,
+                clip_obs=10.0,
+                clip_reward=10.0,
+                gamma=config.gamma,
+            )
+            if config.verbose:
+                print("VecNormalize enabled (obs + reward normalization)")
+
         # Resolve learning rate schedule
         if config.lr_schedule == "linear":
             _base_lr = config.learning_rate
@@ -671,6 +690,16 @@ class SelfPlayTrainer:
             if config.verbose:
                 print("Diagnostic logging enabled (every 1000 steps)")
 
+        # Add separate value function learning rate if configured
+        if config.vf_lr_multiplier != 1.0:
+            from training.callbacks import SeparateValueLRCallback
+            callbacks.append(SeparateValueLRCallback(
+                vf_lr_multiplier=config.vf_lr_multiplier,
+                verbose=1 if config.verbose else 0,
+            ))
+            if config.verbose:
+                print(f"Separate value function LR: {config.vf_lr_multiplier}x policy LR")
+
         callback = CallbackList(callbacks)
 
         if config.verbose:
@@ -689,6 +718,10 @@ class SelfPlayTrainer:
         # Save final model
         final_path = save_path / "final_model"
         self._model.save(str(final_path))
+
+        # Save VecNormalize statistics alongside the model
+        if isinstance(self._vec_env, VecNormalize):
+            self._vec_env.save(str(save_path / "vecnormalize.pkl"))
 
         if config.verbose:
             print(f"\n{'='*60}")
@@ -756,6 +789,8 @@ class SelfPlayTrainer:
             self._model = MaskablePPO.load(load_str, env=self._vec_env)
             if self.config.verbose:
                 print("Direct model load successful (matching dimensions)")
+            # Load VecNormalize statistics if they exist
+            self._load_vecnormalize_stats(path)
             return
         except Exception as direct_err:
             if self.config.verbose:
@@ -829,6 +864,26 @@ class SelfPlayTrainer:
         except Exception as e:
             print(f"Warning: Model loading failed ({e}), starting from scratch")
 
+    def _load_vecnormalize_stats(self, model_path: Path) -> None:
+        """Load VecNormalize statistics if they exist alongside the model."""
+        from stable_baselines3.common.vec_env import VecNormalize
+        if not isinstance(self._vec_env, VecNormalize):
+            return
+
+        vecnorm_path = model_path.parent / "vecnormalize.pkl"
+        if not vecnorm_path.exists():
+            return
+
+        try:
+            saved_env = VecNormalize.load(str(vecnorm_path), self._vec_env.venv)
+            self._vec_env.obs_rms = saved_env.obs_rms
+            self._vec_env.ret_rms = saved_env.ret_rms
+            if self.config.verbose:
+                print(f"Loaded VecNormalize stats from {vecnorm_path}")
+        except Exception as e:
+            if self.config.verbose:
+                print(f"Warning: Could not load VecNormalize stats: {e}")
+
     def evaluate(
         self,
         opponent_type: str,
@@ -837,6 +892,8 @@ class SelfPlayTrainer:
         """Evaluate current model against specified opponent type."""
         if self._model is None:
             return 0.0
+
+        from stable_baselines3.common.vec_env import VecNormalize
 
         # Create evaluation environment with shorter games for speed
         eval_env = SelfPlayEnv(
@@ -847,6 +904,10 @@ class SelfPlayTrainer:
             terminal_loss_reward=self.config.terminal_loss_reward,
         )
 
+        # If training uses VecNormalize, normalize eval observations using
+        # the training env's running statistics (but don't update them)
+        normalize_obs = isinstance(self._vec_env, VecNormalize)
+
         wins = 0
         for ep in range(n_episodes):
             obs, info = eval_env.reset(seed=self.config.seed + 10000 + ep)
@@ -856,6 +917,11 @@ class SelfPlayTrainer:
 
             while not done and steps < max_steps:
                 mask = eval_env.action_masks()
+
+                # Normalize observation using training env's stats
+                if normalize_obs:
+                    obs = self._vec_env.normalize_obs(obs)
+
                 action, _ = self._model.predict(
                     obs.reshape(1, -1),
                     action_masks=mask.reshape(1, -1),
@@ -1007,6 +1073,13 @@ class SelfPlayCallback:
         checkpoint_path = self.save_path / f"checkpoint_{self.num_timesteps}"
         self.trainer._model.save(str(checkpoint_path))
 
+        # Save VecNormalize stats with each checkpoint
+        from stable_baselines3.common.vec_env import VecNormalize
+        if isinstance(self.trainer._vec_env, VecNormalize):
+            self.trainer._vec_env.save(
+                str(self.save_path / f"vecnormalize_{self.num_timesteps}.pkl")
+            )
+
         # Track best model
         if self.trainer.metrics.eval_results:
             last_eval = self.trainer.metrics.eval_results[-1]
@@ -1017,6 +1090,10 @@ class SelfPlayCallback:
                 self._best_win_rate = vs_random
                 best_path = self.save_path / "best_model"
                 self.trainer._model.save(str(best_path))
+                if isinstance(self.trainer._vec_env, VecNormalize):
+                    self.trainer._vec_env.save(
+                        str(self.save_path / "best_vecnormalize.pkl")
+                    )
                 if self.verbose:
                     print(f"[{self.num_timesteps:,}] New best model! "
                           f"({vs_random:.0%} vs random)")

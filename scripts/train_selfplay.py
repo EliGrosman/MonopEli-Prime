@@ -269,6 +269,18 @@ Examples:
         help="Vectorization backend: auto (SubprocVecEnv except self-play), "
              "subproc (force SubprocVecEnv), dummy (force DummyVecEnv) (default: auto)",
     )
+    parser.add_argument(
+        "--normalize-env", action="store_true", default=False,
+        help="Enable VecNormalize for observation and reward normalization",
+    )
+    parser.add_argument(
+        "--no-normalize-env", dest="normalize_env", action="store_false",
+        help="Disable VecNormalize (default)",
+    )
+    parser.add_argument(
+        "--vf-lr-multiplier", type=float, default=1.0,
+        help="Value function LR multiplier (e.g., 3.0 = 3x policy LR). Default: 1.0 (same LR).",
+    )
 
     args = parser.parse_args()
 
@@ -331,6 +343,8 @@ Examples:
             opponent_pool=args.opponent_pool,
             opponent_weights=args.opponent_weights,
             use_subproc=use_subproc,
+            normalize_env=args.normalize_env,
+            vf_lr_multiplier=args.vf_lr_multiplier,
         )
 
         # Validate opponent pool weights
@@ -423,6 +437,8 @@ def run_curriculum(args: argparse.Namespace) -> None:
             opponent_pool=args.opponent_pool,
             opponent_weights=args.opponent_weights,
             use_subproc=use_subproc,
+            normalize_env=args.normalize_env,
+            vf_lr_multiplier=args.vf_lr_multiplier,
         )
 
         trainer = SelfPlayTrainer(config)

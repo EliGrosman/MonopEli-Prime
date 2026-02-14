@@ -9,6 +9,72 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 
+class SeparateValueLRCallback(BaseCallback):
+    """Sets a separate (higher) learning rate for the value function.
+
+    After model initialization, splits the optimizer into two parameter groups:
+    - Policy parameters: use the base learning rate
+    - Value function parameters: use vf_lr_multiplier * base_lr
+
+    Args:
+        vf_lr_multiplier: Multiplier for value function LR (e.g., 3.0 means 3x policy LR)
+    """
+
+    def __init__(self, vf_lr_multiplier: float = 3.0, verbose: int = 0):
+        super().__init__(verbose)
+        self.vf_lr_multiplier = vf_lr_multiplier
+        self._initialized = False
+
+    def _on_step(self) -> bool:
+        if not self._initialized:
+            self._setup_separate_lr()
+            self._initialized = True
+        return True
+
+    def _setup_separate_lr(self) -> None:
+        """Rebuild the optimizer with separate parameter groups."""
+        policy = self.model.policy
+        optimizer = policy.optimizer
+
+        # Get current base learning rate
+        base_lr = optimizer.param_groups[0]["lr"]
+        vf_lr = base_lr * self.vf_lr_multiplier
+
+        # Separate parameters into policy and value groups
+        policy_params = []
+        value_params = []
+
+        for name, param in policy.named_parameters():
+            if "value" in name or "vf" in name:
+                value_params.append(param)
+            else:
+                policy_params.append(param)
+
+        # Create new optimizer with separate groups
+        new_optimizer = torch.optim.Adam([
+            {"params": policy_params, "lr": base_lr},
+            {"params": value_params, "lr": vf_lr},
+        ], eps=1e-5)
+
+        # Replace the optimizer
+        policy.optimizer = new_optimizer
+
+        if self.verbose >= 1:
+            print(f"[SeparateValueLR] Policy LR: {base_lr:.2e}, "
+                  f"Value LR: {vf_lr:.2e} ({self.vf_lr_multiplier}x)")
+            print(f"  Policy params: {len(policy_params)}, Value params: {len(value_params)}")
+
+    def _on_rollout_start(self) -> None:
+        """Update value LR when base LR changes (for LR schedules)."""
+        if not self._initialized:
+            return
+
+        optimizer = self.model.policy.optimizer
+        if len(optimizer.param_groups) >= 2:
+            base_lr = optimizer.param_groups[0]["lr"]
+            optimizer.param_groups[1]["lr"] = base_lr * self.vf_lr_multiplier
+
+
 class DiagnosticCallback(BaseCallback):
     """
     Logs detailed diagnostics for debugging training instability.
