@@ -281,6 +281,22 @@ Examples:
         "--vf-lr-multiplier", type=float, default=1.0,
         help="Value function LR multiplier (e.g., 3.0 = 3x policy LR). Default: 1.0 (same LR).",
     )
+    parser.add_argument(
+        "--ppg", action="store_true", default=False,
+        help="Enable Phasic Policy Gradient (extra value training)",
+    )
+    parser.add_argument(
+        "--ppg-n-pi", type=int, default=32,
+        help="PPG: policy phases between auxiliary phases (default: 32)",
+    )
+    parser.add_argument(
+        "--ppg-n-aux-epochs", type=int, default=6,
+        help="PPG: epochs in auxiliary value training phase (default: 6)",
+    )
+    parser.add_argument(
+        "--ppg-beta-clone", type=float, default=1.0,
+        help="PPG: KL penalty coefficient for policy preservation (default: 1.0)",
+    )
 
     args = parser.parse_args()
 
@@ -345,6 +361,10 @@ Examples:
             use_subproc=use_subproc,
             normalize_env=args.normalize_env,
             vf_lr_multiplier=args.vf_lr_multiplier,
+            ppg_enabled=args.ppg,
+            ppg_n_pi=args.ppg_n_pi,
+            ppg_n_aux_epochs=args.ppg_n_aux_epochs,
+            ppg_beta_clone=args.ppg_beta_clone,
         )
 
         # Validate opponent pool weights
@@ -439,6 +459,10 @@ def run_curriculum(args: argparse.Namespace) -> None:
             use_subproc=use_subproc,
             normalize_env=args.normalize_env,
             vf_lr_multiplier=args.vf_lr_multiplier,
+            ppg_enabled=args.ppg,
+            ppg_n_pi=args.ppg_n_pi,
+            ppg_n_aux_epochs=args.ppg_n_aux_epochs,
+            ppg_beta_clone=args.ppg_beta_clone,
         )
 
         trainer = SelfPlayTrainer(config)

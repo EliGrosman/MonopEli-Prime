@@ -93,6 +93,12 @@ class SelfPlayConfig:
     # Separate value function learning rate
     vf_lr_multiplier: float = 1.0  # Value function LR = this * policy LR (1.0 = same LR)
 
+    # PPG (Phasic Policy Gradient)
+    ppg_enabled: bool = False          # Enable PPG auxiliary phases
+    ppg_n_pi: int = 32                 # Policy phases between auxiliary phases
+    ppg_n_aux_epochs: int = 6          # Epochs in auxiliary phase
+    ppg_beta_clone: float = 1.0        # KL penalty coefficient
+
     # Misc
     seed: int = 42
     verbose: bool = True
@@ -737,6 +743,19 @@ class SelfPlayTrainer:
             ))
             if config.verbose:
                 print(f"Separate value function LR: {config.vf_lr_multiplier}x policy LR")
+
+        # Add PPG auxiliary phase if configured
+        if config.ppg_enabled:
+            from training.ppg_trainer import PPGCallback
+            callbacks.append(PPGCallback(
+                n_pi=config.ppg_n_pi,
+                n_aux_epochs=config.ppg_n_aux_epochs,
+                beta_clone=config.ppg_beta_clone,
+                verbose=1 if config.verbose else 0,
+            ))
+            if config.verbose:
+                print(f"PPG enabled: aux phase every {config.ppg_n_pi} rollouts, "
+                      f"{config.ppg_n_aux_epochs} aux epochs")
 
         callback = CallbackList(callbacks)
 
