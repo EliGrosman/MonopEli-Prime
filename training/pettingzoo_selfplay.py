@@ -1049,10 +1049,25 @@ class SelfPlayCallback:
                     best_path = self.save_path / "best_model.zip"
                     if best_path.exists():
                         print(f"Loading best model from {best_path}")
-                        self.trainer._model = type(self.trainer._model).load(
-                            str(self.save_path / "best_model"),
-                            env=self.trainer._vec_env,
-                        )
+                        try:
+                            self.trainer._model = type(self.trainer._model).load(
+                                str(self.save_path / "best_model"),
+                                env=self.trainer._vec_env,
+                            )
+                        except ValueError:
+                            # Optimizer state mismatch (e.g., separate value LR
+                            # creates 2 param groups but load() expects 1).
+                            # Fall back to loading just policy network weights.
+                            model_cls = type(self.trainer._model)
+                            _, params, _ = model_cls._load_from_file(
+                                str(self.save_path / "best_model"),
+                                device=self.trainer._model.device,
+                            )
+                            if "policy" in params:
+                                self.trainer._model.policy.load_state_dict(
+                                    params["policy"]
+                                )
+                                print("Restored policy weights (optimizer reset)")
                     print(f"Stopping training early.")
                     print(f"{'!'*60}\n")
                     return False
