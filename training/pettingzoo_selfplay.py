@@ -62,7 +62,7 @@ class SelfPlayConfig:
     # Environment
     num_players: int = 4
     max_turns: int = 500
-    reward_type: str = "sparse"  # "sparse" or "dense"
+    reward_type: str = "sparse"  # "sparse", "dense", or "rank"
     terminal_win_reward: float = 5.0  # Dense mode terminal win reward
     terminal_loss_reward: float = -5.0  # Dense mode terminal loss reward
     worth_scale: float = 500.0  # Divisor for dense reward net worth delta
@@ -398,9 +398,9 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         if game_over:
             winner = self._env.game.winner
             if winner == self._learning_agent_id:
-                return self.terminal_win_reward if self.reward_type == "dense" else 1.0
+                return self.terminal_win_reward if self.reward_type in ("dense", "rank") else 1.0
             elif winner is not None:
-                return self.terminal_loss_reward if self.reward_type == "dense" else -1.0
+                return self.terminal_loss_reward if self.reward_type in ("dense", "rank") else -1.0
             else:
                 # Truncation - reward based on relative net worth
                 my_worth = calculate_net_worth(player, pm)
@@ -419,6 +419,44 @@ class SelfPlayEnv(gym.Env[NDArray[np.float32], int]):
         # For sparse reward, no intermediate signal
         if self.reward_type == "sparse":
             return 0.0
+
+        # Rank-based reward: relative position among alive players
+        if self.reward_type == "rank":
+            # Calculate all players' net worths
+            worths = []
+            for i in range(self.num_players):
+                p = self._env.game.players[i]
+                if p.bankrupt:
+                    worths.append(0)
+                else:
+                    worths.append(calculate_net_worth(p, pm))
+
+            my_worth = worths[self._learning_agent_id]
+
+            # Calculate rank (0 = last, num_alive-1 = first)
+            alive_worths = [w for w in worths if w > 0]
+            num_alive = len(alive_worths)
+
+            if num_alive <= 1:
+                return 0.0
+
+            # Count how many alive players I'm beating
+            rank = sum(1 for w in alive_worths if my_worth > w)
+
+            # Normalize to [-1, 1] range
+            # rank=0 (last) -> -1.0, rank=num_alive-1 (first) -> +1.0
+            normalized_rank = (2.0 * rank / (num_alive - 1)) - 1.0
+
+            # Scale down to per-step reward magnitude (~0.01)
+            reward = normalized_rank * 0.01
+
+            # Bonus for property acquisition (player's own achievement)
+            current_props = len(pm.get_owned_by(self._learning_agent_id))
+            if current_props > self._prev_num_properties:
+                reward += 0.05 * (current_props - self._prev_num_properties)
+            self._prev_num_properties = current_props
+
+            return reward
 
         # Dense reward: per-step shaping
         reward = 0.0

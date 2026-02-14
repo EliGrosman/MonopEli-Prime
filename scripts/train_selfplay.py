@@ -223,9 +223,9 @@ Examples:
     parser.add_argument(
         "--reward-type",
         type=str,
-        choices=["sparse", "dense"],
+        choices=["sparse", "dense", "rank"],
         default="dense",
-        help="Reward type: sparse (win/loss only) or dense (per-step shaping) (default: dense)",
+        help="Reward type: sparse (win/loss only), dense (net worth delta), rank (relative position) (default: dense)",
     )
     parser.add_argument(
         "--min-win-rate",
