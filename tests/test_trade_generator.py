@@ -6,7 +6,11 @@ from typing import Any
 from unittest.mock import patch
 
 from mcts.llm.client import LLMClient, LLMConfig
-from mcts.llm.trade_generator import TradeGenerator, _format_trade_candidates
+from mcts.llm.trade_generator import (
+    TradeGenerator,
+    _format_trade_candidates,
+    _format_trade_options,
+)
 from mcts.trade_utils import TradeCandidate
 from monopoly_engine.game import MonopolyGame
 
@@ -341,4 +345,125 @@ class TestGenerateProposal:
         }])
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _format_trade_options
+# ---------------------------------------------------------------------------
+
+class TestFormatTradeOptions:
+    def test_numbered_list(self) -> None:
+        candidates = [
+            TradeCandidate(
+                to_player=1, give_properties=[9], want_properties=[6],
+                give_money=0, want_money=0, estimated_value=300.0,
+            ),
+            TradeCandidate(
+                to_player=2, give_properties=[3], want_properties=[11],
+                give_money=50, want_money=0, estimated_value=100.0,
+            ),
+        ]
+        result = _format_trade_options(candidates)
+        assert result.startswith("1.")
+        assert "2." in result
+        assert "0. None" in result
+
+    def test_includes_cash(self) -> None:
+        candidates = [
+            TradeCandidate(
+                to_player=1, give_properties=[9], want_properties=[6],
+                give_money=100, want_money=50, estimated_value=200.0,
+            ),
+        ]
+        result = _format_trade_options(candidates)
+        assert "$100" in result
+        assert "$50" in result
+
+
+# ---------------------------------------------------------------------------
+# TradeGenerator.generate_proposal_from_candidates
+# ---------------------------------------------------------------------------
+
+class TestGenerateProposalFromCandidates:
+    def test_selects_valid_candidate(self) -> None:
+        game = _make_game()
+        game.state.current_player = 0
+
+        client = _FakeLLMClient([{
+            "choice": 1,
+            "reasoning": "Completing light blue is valuable",
+        }])
+        gen = TradeGenerator(client)
+
+        with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
+            mock_suggest.return_value = [
+                TradeCandidate(
+                    to_player=1, give_properties=[9], want_properties=[6],
+                    give_money=0, want_money=0, estimated_value=300.0,
+                ),
+            ]
+            result = gen.generate_proposal_from_candidates(game, player_id=0)
+
+        assert result is not None
+        assert result.player_id == 0
+        assert result.to_player == 1
+        assert result.give_properties == [9]
+        assert result.want_properties == [6]
+        assert client._call_count == 1
+
+    def test_choice_zero_returns_none(self) -> None:
+        game = _make_game()
+        game.state.current_player = 0
+
+        client = _FakeLLMClient([{
+            "choice": 0,
+            "reasoning": "None of these are good",
+        }])
+        gen = TradeGenerator(client)
+
+        with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
+            mock_suggest.return_value = [
+                TradeCandidate(
+                    to_player=1, give_properties=[9], want_properties=[6],
+                    give_money=0, want_money=0, estimated_value=300.0,
+                ),
+            ]
+            result = gen.generate_proposal_from_candidates(game, player_id=0)
+
+        assert result is None
+
+    def test_no_candidates_returns_none_without_llm_call(self) -> None:
+        game = _make_game()
+
+        client = _FakeLLMClient([{"choice": 1, "reasoning": "pick"}])
+        gen = TradeGenerator(client)
+
+        with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
+            mock_suggest.return_value = []
+            result = gen.generate_proposal_from_candidates(game, player_id=0)
+
+        assert result is None
+        assert client._call_count == 0
+
+    def test_invalid_choice_returns_none(self) -> None:
+        game = _make_game()
+        game.state.current_player = 0
+
+        # Choice 5 is out of range when there's only 1 candidate
+        client = _FakeLLMClient([{
+            "choice": 5,
+            "reasoning": "I pick option 5",
+        }])
+        gen = TradeGenerator(client)
+
+        with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
+            mock_suggest.return_value = [
+                TradeCandidate(
+                    to_player=1, give_properties=[9], want_properties=[6],
+                    give_money=0, want_money=0, estimated_value=300.0,
+                ),
+            ]
+            result = gen.generate_proposal_from_candidates(game, player_id=0)
+
         assert result is None

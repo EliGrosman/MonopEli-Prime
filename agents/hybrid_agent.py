@@ -300,7 +300,7 @@ class HybridAgent(Agent):
             True if a trade was proposed, False otherwise.
         """
         # Generate proposal via LLM
-        proposal = self._generator.generate_proposal(game, self.player_id)
+        proposal = self._generator.generate_proposal_from_candidates(game, self.player_id)
         self._budget.record_usage()
 
         if proposal is None:
