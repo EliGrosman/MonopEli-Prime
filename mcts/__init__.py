@@ -9,13 +9,22 @@ from .data import ReplayBuffer, TrainingExample, compute_outcomes, generate_trai
 from .features import extract_features, get_feature_size
 from .network import ValueNetwork
 from .search import MCTSConfig, MCTSNode, MCTSSearch, clone_game_state
-from .training import TrainingConfig, TrainingStats, train_value_network
+from .training import (
+    SelfPlayConfig,
+    TrainingConfig,
+    TrainingStats,
+    load_checkpoint,
+    save_checkpoint,
+    self_play_loop,
+    train_value_network,
+)
 
 __all__ = [
     "MCTSConfig",
     "MCTSNode",
     "MCTSSearch",
     "ReplayBuffer",
+    "SelfPlayConfig",
     "TrainingConfig",
     "TrainingExample",
     "TrainingStats",
@@ -25,5 +34,8 @@ __all__ = [
     "extract_features",
     "generate_training_data",
     "get_feature_size",
+    "load_checkpoint",
+    "save_checkpoint",
+    "self_play_loop",
     "train_value_network",
 ]

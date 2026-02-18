@@ -50,13 +50,15 @@ class ValueNetwork(nn.Module):
         self.hidden_size = hidden_size
         self.trunk_layers = trunk_layers
 
-        # Build shared trunk: FC layers with ReLU + BatchNorm
+        # Build shared trunk: FC layers with ReLU + LayerNorm
+        # LayerNorm is used instead of BatchNorm1d so the network works correctly
+        # with any batch size, including single-sample batches during MCTS self-play.
         trunk_modules: list[nn.Module] = []
         in_dim = input_size
         for i in range(trunk_layers):
             out_dim = hidden_size if i < trunk_layers - 1 else hidden_size // 2
             trunk_modules.append(nn.Linear(in_dim, out_dim))
-            trunk_modules.append(nn.BatchNorm1d(out_dim))
+            trunk_modules.append(nn.LayerNorm(out_dim))
             trunk_modules.append(nn.ReLU())
             in_dim = out_dim
 

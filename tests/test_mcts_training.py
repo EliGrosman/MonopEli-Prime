@@ -1,4 +1,4 @@
-"""Tests for MCTS value network training loop (B4)."""
+"""Tests for MCTS value network training loop (B4) and self-play loop (B5+B6)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,15 @@ import torch
 from mcts.data import ReplayBuffer, TrainingExample
 from mcts.features import get_feature_size
 from mcts.network import ValueNetwork
-from mcts.training import TrainingConfig, TrainingStats, train_value_network
+from mcts.training import (
+    SelfPlayConfig,
+    TrainingConfig,
+    TrainingStats,
+    load_checkpoint,
+    save_checkpoint,
+    self_play_loop,
+    train_value_network,
+)
 
 
 def _make_buffer(n: int = 50, num_players: int = 4) -> ReplayBuffer:
@@ -330,3 +338,202 @@ class TestTensorBoardLogging:
 
         stats = train_value_network(net, buf, config, tensorboard_dir=None)
         assert len(stats.epoch_losses) == 2
+
+
+# ===========================================================================
+# B6: Checkpoint Management
+# ===========================================================================
+
+
+class TestCheckpoint:
+    """Test save_checkpoint and load_checkpoint."""
+
+    def _make_network(self) -> ValueNetwork:
+        return ValueNetwork(input_size=get_feature_size(4), num_players=4)
+
+    def _make_buffer(self) -> ReplayBuffer:
+        buf = ReplayBuffer(capacity=100)
+        rng = np.random.default_rng(0)
+        feature_size = get_feature_size(4)
+        for i in range(5):
+            buf.add(TrainingExample(
+                features=rng.random(feature_size).astype(np.float32),
+                mcts_policy=rng.random(149).astype(np.float32),
+                outcome=np.array([1.0, -1.0, -1.0, -1.0], dtype=np.float32),
+                player_id=i % 4,
+            ))
+        return buf
+
+    def test_checkpoint_directory_structure(self, tmp_path: pytest.TempPathFactory) -> None:
+        """save_checkpoint creates the expected files."""
+        net = self._make_network()
+        buf = self._make_buffer()
+        ckpt_dir = tmp_path / "ckpt"  # type: ignore[operator]
+
+        save_checkpoint(ckpt_dir, net, buf, iteration=3, stats={"loss": 0.5})
+
+        assert (ckpt_dir / "network.pt").exists()  # type: ignore[operator]
+        assert (ckpt_dir / "buffer.npz").exists()  # type: ignore[operator]
+        assert (ckpt_dir / "metadata.json").exists()  # type: ignore[operator]
+
+    def test_save_load_roundtrip(self, tmp_path: pytest.TempPathFactory) -> None:
+        """Loaded checkpoint should match what was saved."""
+        net = self._make_network()
+        buf = self._make_buffer()
+        original_stats = {"win_rate": 0.62, "iteration": 7}
+        ckpt_dir = tmp_path / "ckpt"  # type: ignore[operator]
+
+        save_checkpoint(ckpt_dir, net, buf, iteration=7, stats=original_stats)
+        loaded_net, loaded_buf, loaded_iter, loaded_stats = load_checkpoint(ckpt_dir)
+
+        assert loaded_iter == 7
+        assert loaded_stats["win_rate"] == pytest.approx(0.62)
+        assert len(loaded_buf) == len(buf)
+        assert loaded_net.input_size == net.input_size
+        assert loaded_net.num_players == net.num_players
+
+    def test_checkpoint_network_weights_preserved(self, tmp_path: pytest.TempPathFactory) -> None:
+        """Network weights should be identical after save/load."""
+        net = self._make_network()
+        ckpt_dir = tmp_path / "ckpt"  # type: ignore[operator]
+
+        save_checkpoint(ckpt_dir, net, self._make_buffer(), iteration=0, stats={})
+        loaded_net, _, _, _ = load_checkpoint(ckpt_dir)
+
+        for (name, p1), (_, p2) in zip(
+            net.named_parameters(), loaded_net.named_parameters()
+        ):
+            assert torch.allclose(p1, p2), f"Parameter {name} differs after load"
+
+    def test_checkpoint_creates_parent_dirs(self, tmp_path: pytest.TempPathFactory) -> None:
+        """save_checkpoint should create nested directories."""
+        net = self._make_network()
+        deep_path = tmp_path / "a" / "b" / "c"  # type: ignore[operator]
+
+        save_checkpoint(deep_path, net, self._make_buffer(), iteration=0, stats={})
+
+        assert (deep_path / "network.pt").exists()  # type: ignore[operator]
+
+    def test_metadata_iteration_field(self, tmp_path: pytest.TempPathFactory) -> None:
+        """metadata.json should contain the iteration number."""
+        import json as json_mod
+
+        net = self._make_network()
+        ckpt_dir = tmp_path / "ckpt"  # type: ignore[operator]
+        save_checkpoint(ckpt_dir, net, self._make_buffer(), iteration=42, stats={})
+
+        with open(ckpt_dir / "metadata.json") as f:  # type: ignore[operator]
+            meta = json_mod.load(f)
+
+        assert meta["iteration"] == 42
+        assert "network_config" in meta
+
+
+# ===========================================================================
+# B5: SelfPlayConfig and self_play_loop
+# ===========================================================================
+
+
+class TestSelfPlayConfig:
+    """Test SelfPlayConfig defaults."""
+
+    def test_defaults(self) -> None:
+        """Verify all default configuration values."""
+        config = SelfPlayConfig()
+
+        assert config.num_iterations == 50
+        assert config.games_per_iteration == 100
+        assert config.mcts_simulations == 100
+        assert config.num_players == 4
+        assert config.temperature == 1.0
+        assert config.eval_games == 50
+        assert config.eval_frequency == 5
+        assert config.acceptance_threshold == 0.55
+        assert config.max_turns_per_game == 500
+        assert isinstance(config.training_config, TrainingConfig)
+
+    def test_training_config_is_independent(self) -> None:
+        """Each SelfPlayConfig instance gets its own TrainingConfig."""
+        c1 = SelfPlayConfig()
+        c2 = SelfPlayConfig()
+        assert c1.training_config is not c2.training_config
+
+    def test_custom_training_config(self) -> None:
+        """Can pass a custom TrainingConfig."""
+        tc = TrainingConfig(learning_rate=0.01, num_epochs=5)
+        config = SelfPlayConfig(training_config=tc)
+        assert config.training_config.learning_rate == 0.01
+        assert config.training_config.num_epochs == 5
+
+
+class TestSelfPlayLoop:
+    """Test the self_play_loop function."""
+
+    def _small_config(self) -> SelfPlayConfig:
+        """Return a fast self-play config for testing."""
+        return SelfPlayConfig(
+            num_iterations=1,
+            games_per_iteration=1,
+            mcts_simulations=5,
+            num_players=4,
+            temperature=1.0,
+            eval_games=2,
+            eval_frequency=1,
+            max_turns_per_game=30,
+            training_config=TrainingConfig(
+                num_epochs=2,
+                batch_size=8,
+                device="cpu",
+                validation_fraction=0.0,
+            ),
+        )
+
+    def test_self_play_one_iteration_runs(self, tmp_path: pytest.TempPathFactory) -> None:
+        """self_play_loop should complete one iteration without error."""
+        config = self._small_config()
+        save_dir = tmp_path / "selfplay"  # type: ignore[operator]
+
+        self_play_loop(config, save_dir=save_dir)
+
+        # Should have created an iteration checkpoint
+        assert (save_dir / "mcts_iter_0").exists()  # type: ignore[operator]
+
+    def test_self_play_creates_best_checkpoint(self, tmp_path: pytest.TempPathFactory) -> None:
+        """First eval should create mcts_best checkpoint."""
+        config = self._small_config()
+        save_dir = tmp_path / "selfplay"  # type: ignore[operator]
+
+        self_play_loop(config, save_dir=save_dir)
+
+        # eval_frequency=1 means iteration 0 triggers eval, first eval always accepts
+        assert (save_dir / "mcts_best").exists()  # type: ignore[operator]
+        assert (save_dir / "mcts_best" / "network.pt").exists()  # type: ignore[operator]
+
+    def test_self_play_iter_checkpoint_structure(self, tmp_path: pytest.TempPathFactory) -> None:
+        """Iteration checkpoint should have all required files."""
+        config = self._small_config()
+        save_dir = tmp_path / "selfplay"  # type: ignore[operator]
+
+        self_play_loop(config, save_dir=save_dir)
+
+        ckpt = save_dir / "mcts_iter_0"  # type: ignore[operator]
+        assert (ckpt / "network.pt").exists()  # type: ignore[operator]
+        assert (ckpt / "buffer.npz").exists()  # type: ignore[operator]
+        assert (ckpt / "metadata.json").exists()  # type: ignore[operator]
+
+    def test_self_play_resume(self, tmp_path: pytest.TempPathFactory) -> None:
+        """self_play_loop should resume from checkpoint and run more iterations."""
+        config = self._small_config()
+        save_dir = tmp_path / "selfplay"  # type: ignore[operator]
+
+        # Run iteration 0
+        self_play_loop(config, save_dir=save_dir)
+        assert (save_dir / "mcts_iter_0").exists()  # type: ignore[operator]
+
+        # Resume: should create iteration 1
+        self_play_loop(
+            config,
+            save_dir=save_dir,
+            resume_from=save_dir / "mcts_iter_0",  # type: ignore[operator]
+        )
+        assert (save_dir / "mcts_iter_1").exists()  # type: ignore[operator]
