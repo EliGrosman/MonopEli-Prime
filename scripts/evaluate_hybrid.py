@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from dataclasses import dataclass, field
@@ -446,6 +447,11 @@ def parse_args() -> argparse.Namespace:
         "--enable-trades", action="store_true",
         help="Enable 1-for-1 property trading for heuristic agents",
     )
+    parser.add_argument(
+        "--json", type=str, default=None,
+        metavar="FILE",
+        help="Write results to JSON file for later analysis",
+    )
     return parser.parse_args()
 
 
@@ -467,6 +473,22 @@ def main() -> None:
     print()
 
     all_results: list[EvalResults] = []
+    json_data: dict[str, Any] = {
+        "config": {
+            "games": args.games,
+            "opponents": args.opponents,
+            "num_players": args.num_players,
+            "mcts_sims": args.mcts_sims,
+            "max_turns": args.max_turns,
+            "seed": args.seed,
+            "llm": args.llm,
+            "llm_model": args.llm_model,
+            "enable_trades": args.enable_trades,
+        },
+        "results": [],
+    }
+
+    total_t0 = time.monotonic()
 
     for opp_type in args.opponents:
         print(f"\n--- vs {opp_type} ---")
@@ -484,7 +506,42 @@ def main() -> None:
         )
         all_results.append(result)
 
+        json_data["results"].append({
+            "opponent_type": opp_type,
+            "games_played": result.games_played,
+            "wins": result.wins,
+            "losses": result.losses,
+            "draws": result.draws,
+            "win_rate": result.win_rate,
+            "total_trades_proposed": result.total_trades_proposed,
+            "total_trades_accepted": result.total_trades_accepted,
+            "trade_acceptance_rate": result.trade_acceptance_rate,
+            "avg_game_length": result.avg_game_length,
+            "total_tokens": result.total_tokens,
+            "total_time_sec": result.total_time_sec,
+            "games": [
+                {
+                    "winner": gr.winner,
+                    "action_count": gr.action_count,
+                    "elapsed_sec": gr.elapsed_sec,
+                    "trades_proposed": gr.trades_proposed,
+                    "trades_accepted": gr.trades_accepted,
+                    "tokens_used": gr.tokens_used,
+                }
+                for gr in result.game_results
+            ],
+        })
+
     print_results_table(all_results)
+
+    total_elapsed = time.monotonic() - total_t0
+    print(f"\nTotal evaluation time: {total_elapsed:.1f}s")
+
+    if args.json:
+        json_data["total_time_sec"] = total_elapsed
+        with open(args.json, "w") as f:
+            json.dump(json_data, f, indent=2)
+        print(f"Results written to {args.json}")
 
 
 if __name__ == "__main__":
