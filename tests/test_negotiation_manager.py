@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from mcts.negotiation import NegotiationManager, NegotiationStatus
 from monopoly_engine.game import MonopolyGame
-from mcts.negotiation import NegotiationManager, NegotiationRecord, NegotiationStatus
-
 
 # ---------------------------------------------------------------------------
 # Helpers
