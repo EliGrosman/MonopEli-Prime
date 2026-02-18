@@ -6,16 +6,20 @@ This package provides agent implementations for playing Monopoly:
 - RuleBasedAgent: Heuristic agent using configurable strategy rules
 - AggressiveAgent: Rule-based agent that buys and builds more eagerly
 - ConservativeAgent: Rule-based agent that keeps larger cash reserves
+- MCTSAgent: Monte Carlo Tree Search agent with optional value network
 """
 
 from .base import Agent
+from .mcts_agent import MCTSAgent, SearchStats
 from .random_agent import RandomAgent
 from .rule_based import AggressiveAgent, ConservativeAgent, RuleBasedAgent
 
 __all__ = [
     "Agent",
+    "MCTSAgent",
     "RandomAgent",
     "RuleBasedAgent",
     "AggressiveAgent",
     "ConservativeAgent",
+    "SearchStats",
 ]
