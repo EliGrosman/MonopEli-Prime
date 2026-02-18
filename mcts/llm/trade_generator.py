@@ -16,7 +16,7 @@ from monopoly_engine.game import MonopolyGame
 
 from ..trade_utils import TradeCandidate, suggest_valuable_trades
 from .client import LLMClient
-from .prompts import SYSTEM_PROMPT, build_propose_prompt
+from .prompts import SYSTEM_PROMPT, build_propose_choice_prompt, build_propose_prompt
 from .state_prompt import serialize_game_state
 
 logger = logging.getLogger(__name__)
@@ -153,6 +153,79 @@ class TradeGenerator:
             want_money=want_money,
         )
 
+    def generate_proposal_from_candidates(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+        max_candidates: int = 5,
+    ) -> ProposeTrade | None:
+        """Generate a trade by asking the LLM to pick from heuristic candidates.
+
+        Unlike :meth:`generate_proposal`, this constrains the LLM to choosing
+        from a numbered list of pre-computed candidates rather than generating
+        a trade from scratch.  Much more reliable for small models.
+
+        Args:
+            game: Current game instance.
+            player_id: The player generating the trade.
+            max_candidates: Maximum number of candidates to present.
+
+        Returns:
+            A validated ``ProposeTrade`` action, or ``None`` if no candidates
+            exist, the LLM picks "none", or validation fails.
+        """
+        # 1. Get heuristic candidates
+        candidates = suggest_valuable_trades(game, player_id, max_candidates)
+        if not candidates:
+            logger.info("No trade candidates for player %d", player_id)
+            return None
+
+        # 2. Build prompt
+        state_text = serialize_game_state(game, player_id)
+        options_text = _format_trade_options(candidates)
+        user_prompt = build_propose_choice_prompt(state_text, options_text)
+
+        # 3. Call LLM
+        response = self.client.complete_json(SYSTEM_PROMPT, user_prompt)
+
+        if "error" in response:
+            logger.warning("LLM returned error: %s", response.get("error"))
+            return None
+
+        # 4. Parse choice
+        try:
+            choice = int(response["choice"])
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("Failed to parse LLM choice: %s", exc)
+            return None
+
+        if choice <= 0 or choice > len(candidates):
+            logger.info(
+                "LLM chose no trade (choice=%d): %s",
+                choice,
+                response.get("reasoning", ""),
+            )
+            return None
+
+        # 5. Convert selected candidate to ProposeTrade
+        selected = candidates[choice - 1]
+        proposal = ProposeTrade(
+            player_id=player_id,
+            to_player=selected.to_player,
+            give_properties=selected.give_properties,
+            give_money=selected.give_money,
+            want_properties=selected.want_properties,
+            want_money=selected.want_money,
+        )
+
+        # 6. Validate
+        valid, reason = self._validate_proposal(proposal, game)
+        if not valid:
+            logger.warning("Selected candidate failed validation: %s", reason)
+            return None
+
+        return proposal
+
     def _validate_proposal(
         self,
         proposal: ProposeTrade,
@@ -184,4 +257,21 @@ def _format_trade_candidates(candidates: list[TradeCandidate]) -> str:
         parts.append(f" (estimated value: {c.estimated_value:.0f})")
         lines.append("".join(parts))
 
+    return "\n".join(lines)
+
+
+def _format_trade_options(candidates: list[TradeCandidate]) -> str:
+    """Format trade candidates as a numbered list for the multiple-choice prompt."""
+    lines: list[str] = []
+    for i, c in enumerate(candidates, 1):
+        give = ", ".join(f"[{p}]" for p in c.give_properties) or "nothing"
+        want = ", ".join(f"[{p}]" for p in c.want_properties) or "nothing"
+        parts = [f"{i}. Give {give}"]
+        if c.give_money > 0:
+            parts.append(f" + ${c.give_money}")
+        parts.append(f" to Player {c.to_player} for {want}")
+        if c.want_money > 0:
+            parts.append(f" + ${c.want_money}")
+        lines.append("".join(parts))
+    lines.append("0. None of these trades are worthwhile")
     return "\n".join(lines)
