@@ -9,17 +9,21 @@ from .data import ReplayBuffer, TrainingExample, compute_outcomes, generate_trai
 from .features import extract_features, get_feature_size
 from .network import ValueNetwork
 from .search import MCTSConfig, MCTSNode, MCTSSearch, clone_game_state
+from .training import TrainingConfig, TrainingStats, train_value_network
 
 __all__ = [
     "MCTSConfig",
     "MCTSNode",
     "MCTSSearch",
     "ReplayBuffer",
+    "TrainingConfig",
     "TrainingExample",
+    "TrainingStats",
     "ValueNetwork",
     "clone_game_state",
     "compute_outcomes",
     "extract_features",
     "generate_training_data",
     "get_feature_size",
+    "train_value_network",
 ]
