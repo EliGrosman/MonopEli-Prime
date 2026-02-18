@@ -537,3 +537,47 @@ class TestSelfPlayLoop:
             resume_from=save_dir / "mcts_iter_0",  # type: ignore[operator]
         )
         assert (save_dir / "mcts_iter_1").exists()  # type: ignore[operator]
+
+
+# ===========================================================================
+# C3: Training Script CLI
+# ===========================================================================
+
+
+class TestTrainingScript:
+    """Tests for scripts/train_mcts.py CLI entry point."""
+
+    def test_training_script_runs(self, tmp_path: pytest.TempPathFactory) -> None:
+        """Script should run without errors with minimal config (1 iter, 2 games)."""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        script = Path(__file__).parent.parent / "scripts" / "train_mcts.py"
+        save_dir = str(tmp_path / "mcts_test")  # type: ignore[operator]
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--iterations", "1",
+                "--games-per-iter", "2",
+                "--simulations", "5",
+                "--max-turns", "30",
+                "--eval-freq", "999",  # skip head-to-head eval
+                "--epochs", "1",
+                "--save-dir", save_dir,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).parent.parent),
+        )
+
+        assert result.returncode == 0, (
+            f"Script exited with code {result.returncode}.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+        # Checkpoint for iteration 0 should exist
+        ckpt = Path(save_dir) / "mcts_iter_0"
+        assert ckpt.exists(), f"Expected checkpoint at {ckpt}"
