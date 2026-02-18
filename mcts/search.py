@@ -461,3 +461,23 @@ class MCTSSearch:
         # For now, return zeros if somehow called without a proper network.
         num_players = len(game.players)
         return {i: 0.0 for i in range(num_players)}
+
+    def backpropagate(self, node: MCTSNode, values: dict[int, float]) -> None:
+        """Propagate simulation values from leaf to root.
+
+        Updates visit_count and total_value for every node on the path
+        from the given node back to the root. Each player's value is
+        stored independently at every node.
+
+        Args:
+            node: The leaf node where simulation ended.
+            values: Per-player value estimates from simulation.
+        """
+        current: MCTSNode | None = node
+        while current is not None:
+            current.visit_count += 1
+            for player_id, value in values.items():
+                current.total_value[player_id] = (
+                    current.total_value.get(player_id, 0.0) + value
+                )
+            current = current.parent

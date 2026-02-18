@@ -886,3 +886,139 @@ class TestSimulate:
         assert len(values) == 4
         for v in values.values():
             assert v == 0.0
+
+
+# ===========================================================================
+# A5: Backpropagation tests
+# ===========================================================================
+
+
+class TestBackpropagate:
+    """Test MCTSSearch.backpropagate() method."""
+
+    def test_backprop_updates_visit_counts(self) -> None:
+        """Visit counts should be incremented for all ancestors up to root."""
+        root = _make_root()
+        child = _add_child(root, action=0)
+        grandchild = _add_child(child, action=1)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(grandchild, {0: 1.0, 1: -1.0})
+
+        assert grandchild.visit_count == 1
+        assert child.visit_count == 1
+        assert root.visit_count == 1
+
+    def test_backprop_accumulates_visit_counts(self) -> None:
+        """Multiple backpropagations should accumulate visit counts."""
+        root = _make_root()
+        child = _add_child(root, action=0)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(child, {0: 1.0})
+        search.backpropagate(child, {0: -1.0})
+        search.backpropagate(child, {0: 0.5})
+
+        assert child.visit_count == 3
+        assert root.visit_count == 3
+
+    def test_backprop_updates_values(self) -> None:
+        """Values should be accumulated correctly at each node."""
+        root = _make_root()
+        child = _add_child(root, action=0)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(child, {0: 1.0, 1: -1.0})
+
+        assert child.total_value[0] == 1.0
+        assert child.total_value[1] == -1.0
+        assert root.total_value[0] == 1.0
+        assert root.total_value[1] == -1.0
+
+    def test_backprop_accumulates_values(self) -> None:
+        """Multiple backpropagations should sum values."""
+        root = _make_root()
+        child = _add_child(root, action=0)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(child, {0: 1.0, 1: -1.0})
+        search.backpropagate(child, {0: 0.5, 1: -0.5})
+
+        assert abs(child.total_value[0] - 1.5) < 1e-10
+        assert abs(child.total_value[1] - (-1.5)) < 1e-10
+        assert abs(root.total_value[0] - 1.5) < 1e-10
+        assert abs(root.total_value[1] - (-1.5)) < 1e-10
+
+    def test_backprop_multi_player_independent(self) -> None:
+        """Per-player values should be tracked independently."""
+        root = _make_root()
+        child = _add_child(root, action=0)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(child, {0: 1.0, 1: -1.0, 2: 0.5, 3: -0.5})
+
+        assert child.total_value[0] == 1.0
+        assert child.total_value[1] == -1.0
+        assert child.total_value[2] == 0.5
+        assert child.total_value[3] == -0.5
+
+    def test_backprop_deep_tree(self) -> None:
+        """Backpropagation should work through a deep tree (5 levels)."""
+        root = _make_root()
+        nodes = [root]
+        for i in range(4):
+            child = _add_child(nodes[-1], action=i)
+            nodes.append(child)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        leaf = nodes[-1]
+        search.backpropagate(leaf, {0: 1.0})
+
+        # All 5 nodes should have been updated
+        for node in nodes:
+            assert node.visit_count == 1
+            assert node.total_value[0] == 1.0
+
+    def test_backprop_sibling_independence(self) -> None:
+        """Backpropagation through one child should not affect siblings."""
+        root = _make_root()
+        child_a = _add_child(root, action=0)
+        child_b = _add_child(root, action=1)
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(child_a, {0: 1.0})
+
+        # child_b should be unaffected
+        assert child_b.visit_count == 0
+        assert child_b.total_value == {}
+
+        # root should be updated (it's an ancestor of child_a)
+        assert root.visit_count == 1
+        assert root.total_value[0] == 1.0
+
+    def test_backprop_root_only(self) -> None:
+        """Backpropagating from root should update only the root."""
+        root = _make_root()
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        search.backpropagate(root, {0: 0.5, 1: -0.5})
+
+        assert root.visit_count == 1
+        assert root.total_value[0] == 0.5
+        assert root.total_value[1] == -0.5
