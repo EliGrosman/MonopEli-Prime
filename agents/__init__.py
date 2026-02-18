@@ -13,6 +13,10 @@ This package provides agent implementations for playing Monopoly:
 from .base import Agent
 from .hybrid_agent import HybridAgent, HybridAgentConfig
 from .mcts_agent import MCTSAgent, SearchStats
+- MCTSAgent: Monte Carlo Tree Search agent with optional value network (requires torch)
+"""
+
+from .base import Agent
 from .random_agent import RandomAgent
 from .rule_based import AggressiveAgent, ConservativeAgent, RuleBasedAgent
 
@@ -25,5 +29,12 @@ __all__ = [
     "RuleBasedAgent",
     "AggressiveAgent",
     "ConservativeAgent",
-    "SearchStats",
 ]
+
+# MCTSAgent requires torch — only export when available
+try:
+    from .mcts_agent import MCTSAgent, SearchStats
+
+    __all__ += ["MCTSAgent", "SearchStats"]
+except ImportError:
+    pass

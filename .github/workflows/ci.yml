@@ -25,7 +25,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --extra training
 
       - name: Run linting (ruff)
         run: uv run python -m ruff check monopoly_engine

@@ -15,12 +15,12 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from mcts.network import ValueNetwork
 from mcts.search import MCTSConfig, MCTSSearch
 
 from .base import Agent
 
 if TYPE_CHECKING:
+    from mcts.network import ValueNetwork
     from monopoly_engine.game import MonopolyGame
 
 
@@ -99,9 +99,11 @@ class MCTSAgent(Agent):
         self.temperature = temperature
         self.search_stats = SearchStats()
 
-        # Load network if a path is provided
-        network: ValueNetwork | None = None
+        # Load network if a path is provided (requires torch)
+        network: Any = None
         if network_path is not None:
+            from mcts.network import ValueNetwork
+
             network = ValueNetwork.load(Path(network_path))
 
         config = MCTSConfig(
@@ -156,6 +158,6 @@ class MCTSAgent(Agent):
         self.search_stats = SearchStats()
 
     @property
-    def network(self) -> ValueNetwork | None:
+    def network(self) -> Any:
         """The loaded value network, or None for pure-rollout mode."""
         return self._mcts.value_network
