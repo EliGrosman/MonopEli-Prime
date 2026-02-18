@@ -1,8 +1,8 @@
 """MCTS search engine for Monopoly.
 
-Contains the core MCTS data structures, expansion, and state cloning utilities.
-Simulation, backpropagation, and the main search loop are added in
-subsequent tasks (A4-A8).
+Contains the core MCTS data structures, expansion, simulation, and state
+cloning utilities. Backpropagation and the main search loop are added in
+subsequent tasks (A5-A8).
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from numpy.typing import NDArray
 
 from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
+from monopoly_engine.rules import calculate_net_worth
 from monopoly_gym.action_space import ActionEncoder
 
 
@@ -226,6 +227,43 @@ def _auto_roll_dice(game: MonopolyGame) -> None:
         roll_action.execute(game)
 
 
+def _terminal_values(game: MonopolyGame) -> dict[int, float]:
+    """Compute per-player values for a terminal or truncated game state.
+
+    If the game has a winner: winner gets +1.0, all others get -1.0.
+    If the game is ongoing (truncated): rank players by net worth.
+    Best net worth gets +1.0, worst gets -1.0, intermediate ranks
+    are linearly interpolated.
+
+    Args:
+        game: The game state to evaluate.
+
+    Returns:
+        Dict mapping player_id -> value in [-1, 1].
+    """
+    num_players = len(game.players)
+    values: dict[int, float] = {}
+
+    if game.game_over and game.winner is not None:
+        for i in range(num_players):
+            values[i] = 1.0 if i == game.winner else -1.0
+        return values
+
+    # Truncated or ongoing -- rank by net worth
+    net_worths = [
+        calculate_net_worth(game.players[i], game.property_manager)
+        for i in range(num_players)
+    ]
+    ranked = list(np.argsort(net_worths))  # ascending: index 0 = worst
+    for rank, pid in enumerate(ranked):
+        if num_players > 1:
+            values[pid] = 2.0 * rank / (num_players - 1) - 1.0
+        else:
+            values[pid] = 0.0
+
+    return values
+
+
 class MCTSSearch:
     """Orchestrates the MCTS search process.
 
@@ -307,3 +345,119 @@ class MCTSSearch:
                 is_terminal=child_game.game_over,
             )
             node.children[int(action_idx)] = child
+
+    def simulate(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+    ) -> dict[int, float]:
+        """Evaluate a game state, returning estimated value per player.
+
+        If a value network is available and config.use_value_network is True,
+        uses the network for instant evaluation. Otherwise, performs a random
+        rollout to terminal state.
+
+        Args:
+            game: The game state to evaluate (will be mutated during rollout).
+            player_id: The player whose perspective we primarily care about
+                       (used for feature encoding with value network).
+
+        Returns:
+            Dict mapping player_id -> estimated value in [-1, 1].
+            +1 = win, -1 = loss, intermediate for ongoing games.
+        """
+        if game.game_over:
+            return _terminal_values(game)
+
+        if (
+            self.config.use_value_network
+            and self.value_network is not None
+        ):
+            return self._value_network_evaluate(game, player_id)
+
+        return self._random_rollout(game, self.config.max_rollout_depth)
+
+    def _random_rollout(
+        self,
+        game: MonopolyGame,
+        max_depth: int,
+    ) -> dict[int, float]:
+        """Play game to completion using random actions.
+
+        Each step: get the current player's valid actions, pick one
+        uniformly at random, decode and execute it. If the action ends
+        the turn, auto-roll dice for the next player.
+
+        Args:
+            game: Game state (will be mutated).
+            max_depth: Maximum number of actions before truncating.
+
+        Returns:
+            Per-player values: +1 for winner, -1 for losers.
+            If truncated, uses net worth ranking to assign fractional values.
+        """
+        rng = np.random.RandomState()  # noqa: NPY002
+
+        for _ in range(max_depth):
+            if game.game_over:
+                break
+
+            current = game.current_player
+            player = game.players[current]
+            if player.bankrupt:
+                # Skip bankrupt players by ending their turn
+                from monopoly_engine.actions import EndTurn
+
+                end = EndTurn(player_id=current)
+                valid, _ = end.validate(game)
+                if valid:
+                    end.execute(game)
+                    _auto_roll_dice(game)
+                continue
+
+            mask = self._encoder.get_action_mask(game, current)
+            valid_indices = np.where(mask)[0]
+
+            if len(valid_indices) == 0:
+                # No valid actions -- force end turn
+                from monopoly_engine.actions import EndTurn
+
+                end = EndTurn(player_id=current)
+                valid, _ = end.validate(game)
+                if valid:
+                    end.execute(game)
+                    _auto_roll_dice(game)
+                continue
+
+            chosen = int(rng.choice(valid_indices))
+            action = self._encoder.decode(chosen, current, game)
+            action.execute(game)
+
+            # Auto-roll dice if turn changed
+            if game.current_player != current:
+                _auto_roll_dice(game)
+
+        return _terminal_values(game)
+
+    def _value_network_evaluate(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+    ) -> dict[int, float]:
+        """Evaluate game state using the value network.
+
+        Extracts features, runs a forward pass, and returns per-player
+        value estimates. This is a placeholder that will be fully wired
+        in Workstream B (B1-B2).
+
+        Args:
+            game: Game state to evaluate.
+            player_id: Player perspective for feature encoding.
+
+        Returns:
+            Per-player value estimates from the network.
+        """
+        # Value network integration will be completed in Workstream B.
+        # For now, return zeros if somehow called without a proper network.
+        num_players = len(game.players)
+        return {i: 0.0 for i in range(num_players)}

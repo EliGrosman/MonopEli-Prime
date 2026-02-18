@@ -11,7 +11,13 @@ from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
 from monopoly_gym.action_space import ActionEncoder
 
-from mcts.search import MCTSConfig, MCTSNode, MCTSSearch, clone_game_state
+from mcts.search import (
+    MCTSConfig,
+    MCTSNode,
+    MCTSSearch,
+    _terminal_values,
+    clone_game_state,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -677,3 +683,206 @@ class TestMCTSExpansion:
         if 146 in node.children:
             end_turn_child = node.children[146]
             assert end_turn_child.player_to_move != node.player_to_move
+
+
+# ===========================================================================
+# A4: Simulation / Rollout tests
+# ===========================================================================
+
+
+class TestTerminalValues:
+    """Test _terminal_values helper function."""
+
+    def test_winner_gets_positive(self) -> None:
+        """Winner should get +1.0, all others -1.0."""
+        game = MonopolyGame(num_players=4, seed=42)
+        game.state.game_over = True
+        game.state.winner = 2
+
+        values = _terminal_values(game)
+        assert values[2] == 1.0
+        assert values[0] == -1.0
+        assert values[1] == -1.0
+        assert values[3] == -1.0
+
+    def test_truncated_uses_net_worth_ranking(self) -> None:
+        """Without a winner, values should be based on net worth ranking."""
+        game = MonopolyGame(num_players=4, seed=42)
+        # Give players different amounts of money to create a ranking
+        game.players[0].money = 100
+        game.players[1].money = 500
+        game.players[2].money = 300
+        game.players[3].money = 1000
+
+        values = _terminal_values(game)
+
+        # Player 3 (most money) should be highest
+        assert values[3] == 1.0
+        # Player 0 (least money) should be lowest
+        assert values[0] == -1.0
+        # Middle players should be intermediate
+        assert -1.0 < values[1] < 1.0
+        assert -1.0 < values[2] < 1.0
+        # Player 1 ($500) should be ranked above player 2 ($300)
+        assert values[1] > values[2]
+
+    def test_all_values_bounded(self) -> None:
+        """All values should be in [-1, 1]."""
+        game = MonopolyGame(num_players=4, seed=42)
+        values = _terminal_values(game)
+
+        for v in values.values():
+            assert -1.0 <= v <= 1.0
+
+    def test_all_players_have_values(self) -> None:
+        """Every player should have a value entry."""
+        game = MonopolyGame(num_players=4, seed=42)
+        values = _terminal_values(game)
+        assert set(values.keys()) == {0, 1, 2, 3}
+
+    def test_two_player_game(self) -> None:
+        """Terminal values should work for 2-player games."""
+        game = MonopolyGame(num_players=2, seed=42)
+        game.state.game_over = True
+        game.state.winner = 0
+
+        values = _terminal_values(game)
+        assert values[0] == 1.0
+        assert values[1] == -1.0
+
+
+class TestRandomRollout:
+    """Test MCTSSearch._random_rollout() method."""
+
+    def test_random_rollout_terminates(self) -> None:
+        """Rollout should terminate within max_depth actions."""
+        game = MonopolyGame(num_players=2, seed=42)
+        # Roll dice first so the game is in a valid action state
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(max_rollout_depth=50)
+        search = MCTSSearch(config)
+
+        clone = clone_game_state(game, new_seed=123)
+        values = search._random_rollout(clone, max_depth=50)
+
+        # Should return values for all players
+        assert len(values) == 2
+        assert 0 in values
+        assert 1 in values
+
+    def test_random_rollout_values_bounded(self) -> None:
+        """All rollout values should be in [-1, 1]."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(max_rollout_depth=100)
+        search = MCTSSearch(config)
+
+        clone = clone_game_state(game, new_seed=456)
+        values = search._random_rollout(clone, max_depth=100)
+
+        for v in values.values():
+            assert -1.0 <= v <= 1.0
+
+    def test_random_rollout_different_seeds_different_results(self) -> None:
+        """Rollouts with different RNG should produce different trajectories."""
+        game = MonopolyGame(num_players=2, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(max_rollout_depth=100)
+        search = MCTSSearch(config)
+
+        results = []
+        for seed in range(10):
+            clone = clone_game_state(game, new_seed=seed)
+            values = search._random_rollout(clone, max_depth=100)
+            results.append(values[0])
+
+        # Not all results should be identical (different RNG seeds)
+        assert len(set(results)) > 1
+
+    def test_random_rollout_completed_game_returns_winner(self) -> None:
+        """If game completes naturally, winner should get +1."""
+        game = MonopolyGame(num_players=2, seed=42)
+        game.state.game_over = True
+        game.state.winner = 1
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        values = search._random_rollout(game, max_depth=100)
+        assert values[1] == 1.0
+        assert values[0] == -1.0
+
+
+class TestSimulate:
+    """Test MCTSSearch.simulate() dispatch method."""
+
+    def test_simulate_uses_rollout_by_default(self) -> None:
+        """Without value network, simulate should use random rollout."""
+        game = MonopolyGame(num_players=2, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(use_value_network=False, max_rollout_depth=50)
+        search = MCTSSearch(config)
+
+        clone = clone_game_state(game, new_seed=789)
+        values = search.simulate(clone, player_id=0)
+
+        assert len(values) == 2
+        for v in values.values():
+            assert -1.0 <= v <= 1.0
+
+    def test_simulate_returns_terminal_values_for_finished_game(self) -> None:
+        """If game is already over, simulate returns terminal values directly."""
+        game = MonopolyGame(num_players=4, seed=42)
+        game.state.game_over = True
+        game.state.winner = 0
+
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        values = search.simulate(game, player_id=0)
+        assert values[0] == 1.0
+        assert values[1] == -1.0
+        assert values[2] == -1.0
+        assert values[3] == -1.0
+
+    def test_simulate_with_value_network_flag_but_no_network(self) -> None:
+        """With use_value_network=True but no network, should fall back to rollout."""
+        game = MonopolyGame(num_players=2, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(use_value_network=True, max_rollout_depth=50)
+        search = MCTSSearch(config, value_network=None)
+
+        clone = clone_game_state(game, new_seed=111)
+        values = search.simulate(clone, player_id=0)
+
+        # Should fall back to rollout since network is None
+        assert len(values) == 2
+
+    def test_simulate_dispatches_to_value_network(self) -> None:
+        """With use_value_network=True and a network, should use network eval."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(use_value_network=True)
+        # Use a sentinel object as "network" to verify dispatch
+        fake_network = object()
+        search = MCTSSearch(config, value_network=fake_network)
+
+        clone = clone_game_state(game, new_seed=222)
+        values = search.simulate(clone, player_id=0)
+
+        # _value_network_evaluate returns zeros for now
+        assert len(values) == 4
+        for v in values.values():
+            assert v == 0.0
