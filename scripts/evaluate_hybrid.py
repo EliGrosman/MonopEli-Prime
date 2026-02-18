@@ -226,6 +226,7 @@ def play_eval_game(
     llm_client: _EvalLLMClient | _TrackingLLMClient,
     max_turns: int = 500,
     seed: int | None = None,
+    enable_trades: bool = False,
 ) -> GameResult:
     """Play a single evaluation game.
 
@@ -233,7 +234,7 @@ def play_eval_game(
     """
     num_players = 1 + len(opponents)
     game = MonopolyGame(num_players=num_players, seed=seed)
-    encoder = ActionEncoder(enable_trades=False)
+    encoder = ActionEncoder(enable_trades=enable_trades)
 
     # Reset agents
     hybrid_agent.reset()
@@ -296,6 +297,7 @@ def run_evaluation(
     verbose: bool = True,
     llm_provider: str | None = None,
     llm_model: str | None = None,
+    enable_trades: bool = False,
 ) -> EvalResults:
     """Run evaluation of HybridAgent against a specific opponent type."""
     results = EvalResults(
@@ -333,6 +335,7 @@ def run_evaluation(
             llm_client,
             max_turns=max_turns,
             seed=game_seed,
+            enable_trades=enable_trades,
         )
 
         # Aggregate
@@ -439,6 +442,10 @@ def parse_args() -> argparse.Namespace:
         "--llm-model", type=str, default=None,
         help="LLM model name (default: gemma3:4b for ollama)",
     )
+    parser.add_argument(
+        "--enable-trades", action="store_true",
+        help="Enable 1-for-1 property trading for heuristic agents",
+    )
     return parser.parse_args()
 
 
@@ -456,6 +463,7 @@ def main() -> None:
     print(f"MCTS simulations: {args.mcts_sims}")
     print(f"LLM: {llm_label}")
     print(f"Max turns: {args.max_turns}")
+    print(f"Trades enabled: {args.enable_trades}")
     print()
 
     all_results: list[EvalResults] = []
@@ -472,6 +480,7 @@ def main() -> None:
             verbose=not args.quiet,
             llm_provider=args.llm,
             llm_model=args.llm_model,
+            enable_trades=args.enable_trades,
         )
         all_results.append(result)
 

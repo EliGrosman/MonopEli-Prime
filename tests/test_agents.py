@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 from agents import Agent, AggressiveAgent, ConservativeAgent, RandomAgent, RuleBasedAgent
 from monopoly_engine import PROPERTY_GROUPS, MonopolyGame, PropertyColor
+from monopoly_engine.types import TradeOfferData
 from monopoly_gym import (
     ACTION_SPACE_SIZE,
     OFFSET_BUILD_HOTEL,
@@ -23,6 +24,12 @@ from monopoly_gym import (
     OFFSET_USE_JAIL_CARD,
     ActionEncoder,
     MonopolyEnv,
+)
+from monopoly_gym.trades import (
+    OFFSET_ACCEPT_TRADE,
+    OFFSET_REJECT_TRADE,
+    OFFSET_SIMPLE_TRADE,
+    TOTAL_ACTION_SPACE_SIZE,
 )
 
 # =============================================================================
@@ -1265,3 +1272,260 @@ class TestPropertyBasedAgent:
         action2 = agent2.choose_action({}, mask, game)
 
         assert action1 == action2
+
+
+# =============================================================================
+# Test RuleBasedAgent Trading
+# =============================================================================
+
+
+def _make_trade_mask(game: MonopolyGame, player_id: int) -> NDArray[np.bool_]:
+    """Build a full 907-dim action mask with trades enabled."""
+    encoder = ActionEncoder(enable_trades=True)
+    return encoder.get_action_mask(game, player_id)
+
+
+def _setup_near_monopoly_game() -> MonopolyGame:
+    """Set up a 2-player game where player 0 owns 2/3 of ORANGE,
+    and player 1 owns the missing ORANGE property plus some other property.
+
+    ORANGE = (16, 18, 19). Player 0 owns 16 and 18, player 1 owns 19.
+    Player 0 also owns position 6 (LIGHT_BLUE 1/3, expendable) as trade fodder.
+    Player 1 also owns position 3 (BROWN).
+    """
+    game = MonopolyGame(num_players=2, seed=42)
+    pm = game.property_manager
+
+    # Player 0 owns: 16, 18 (ORANGE partial) and 6 (LIGHT_BLUE 1/3, expendable)
+    pm.properties[16].owner = 0
+    pm.properties[18].owner = 0
+    pm.properties[6].owner = 0
+
+    # Player 1 owns: 19 (ORANGE, the missing piece) and 3 (BROWN)
+    pm.properties[19].owner = 1
+    pm.properties[3].owner = 1
+
+    # Put players on non-purchasable spaces
+    game.players[0].position = 0  # Go
+    game.players[1].position = 0
+
+    return game
+
+
+class TestRuleBasedAgentTrading:
+    """Tests for RuleBasedAgent trade proposal and response logic."""
+
+    def test_trade_parameters_default(self) -> None:
+        """RuleBasedAgent should have default trade thresholds."""
+        agent = RuleBasedAgent(player_id=0)
+        assert agent.trade_eagerness == 0.5
+        assert agent.trade_accept_threshold == 0.0
+
+    def test_aggressive_trade_parameters(self) -> None:
+        """AggressiveAgent should have eager trade thresholds."""
+        agent = AggressiveAgent(player_id=0)
+        assert agent.trade_eagerness == 0.8
+        assert agent.trade_accept_threshold == -50.0
+
+    def test_conservative_trade_parameters(self) -> None:
+        """ConservativeAgent should have cautious trade thresholds."""
+        agent = ConservativeAgent(player_id=0)
+        assert agent.trade_eagerness == 0.3
+        assert agent.trade_accept_threshold == 50.0
+
+    def test_proposes_trade_to_complete_monopoly(self) -> None:
+        """Agent with 2/3 of a color group should propose a trade."""
+        game = _setup_near_monopoly_game()
+        agent = RuleBasedAgent(player_id=0, trade_eagerness=0.8)
+        mask = _make_trade_mask(game, 0)
+
+        action = agent.choose_action({}, mask, game)
+        # Should be a trade proposal action (149-904)
+        assert OFFSET_SIMPLE_TRADE <= action < OFFSET_ACCEPT_TRADE, (
+            f"Expected trade proposal, got action {action}"
+        )
+
+    def test_does_not_propose_when_no_candidates(self) -> None:
+        """Agent with no near-complete sets should not propose trades."""
+        game = MonopolyGame(num_players=2, seed=42)
+        # Player 0 owns one random property, no near-monopoly
+        game.property_manager.properties[1].owner = 0
+        game.players[0].position = 0
+        game.players[1].position = 0
+
+        # Player 1 owns unrelated property
+        game.property_manager.properties[6].owner = 1
+
+        agent = RuleBasedAgent(player_id=0)
+        mask = _make_trade_mask(game, 0)
+
+        action = agent.choose_action({}, mask, game)
+        # Should be a gameplay action (end turn), not a trade
+        assert action == OFFSET_END_TURN
+
+    def test_accepts_trade_completing_our_monopoly(self) -> None:
+        """Agent should accept a trade that gives us a monopoly."""
+        game = _setup_near_monopoly_game()
+        agent = RuleBasedAgent(player_id=0, trade_eagerness=0.8)
+
+        # Set up a pending trade: player 1 offers position 19 (ORANGE)
+        # and wants position 6 (LIGHT_BLUE, expendable for player 0)
+        trade: TradeOfferData = {
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [19],
+            "want_properties": [6],
+            "give_money": 0,
+            "want_money": 0,
+        }
+        game.state.pending_trades[0] = trade
+
+        mask = _make_trade_mask(game, 0)
+
+        action = agent.choose_action({}, mask, game)
+        assert action == OFFSET_ACCEPT_TRADE
+
+    def test_rejects_trade_giving_opponent_monopoly(self) -> None:
+        """Agent should reject a trade that gives opponent a monopoly."""
+        game = MonopolyGame(num_players=2, seed=42)
+        pm = game.property_manager
+
+        # Player 1 owns 1 (BROWN), player 0 owns 3 (BROWN)
+        # Player 1 proposes: give some random prop for our 3 -> gives them BROWN monopoly
+        pm.properties[1].owner = 1
+        pm.properties[3].owner = 0
+        pm.properties[8].owner = 1  # Light blue, offered
+
+        trade: TradeOfferData = {
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [8],
+            "want_properties": [3],
+            "give_money": 0,
+            "want_money": 0,
+        }
+        game.state.pending_trades[0] = trade
+        game.players[0].position = 0
+        game.players[1].position = 0
+
+        agent = RuleBasedAgent(player_id=0)
+        mask = _make_trade_mask(game, 0)
+
+        action = agent.choose_action({}, mask, game)
+        assert action == OFFSET_REJECT_TRADE
+
+    def test_rejects_trade_breaking_our_monopoly(self) -> None:
+        """Agent should reject a trade that breaks our monopoly."""
+        game = MonopolyGame(num_players=2, seed=42)
+        pm = game.property_manager
+
+        # Player 0 has BROWN monopoly (1, 3)
+        pm.properties[1].owner = 0
+        pm.properties[3].owner = 0
+        # Player 1 owns something
+        pm.properties[8].owner = 1
+
+        # Player 1 proposes: give 8 for our 3 -> breaks our monopoly
+        trade: TradeOfferData = {
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [8],
+            "want_properties": [3],
+            "give_money": 0,
+            "want_money": 0,
+        }
+        game.state.pending_trades[0] = trade
+        game.players[0].position = 0
+        game.players[1].position = 0
+
+        agent = RuleBasedAgent(player_id=0)
+        mask = _make_trade_mask(game, 0)
+
+        action = agent.choose_action({}, mask, game)
+        assert action == OFFSET_REJECT_TRADE
+
+    def test_trade_response_has_top_priority(self) -> None:
+        """When both buy and accept/reject are available, trade response comes first."""
+        game = _setup_near_monopoly_game()
+        agent = RuleBasedAgent(player_id=0, buy_threshold=0.9, trade_eagerness=0.8)
+
+        # Put player 0 on an unowned property so buy is available
+        game.players[0].position = 1  # Mediterranean Ave (unowned)
+
+        # Also set up a pending trade for player 0
+        trade: TradeOfferData = {
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [19],
+            "want_properties": [6],
+            "give_money": 0,
+            "want_money": 0,
+        }
+        game.state.pending_trades[0] = trade
+
+        mask = _make_trade_mask(game, 0)
+        # Verify both buy and accept are available
+        assert mask[OFFSET_BUY_PROPERTY]
+        assert mask[OFFSET_ACCEPT_TRADE]
+
+        action = agent.choose_action({}, mask, game)
+        # Trade response should have priority over buying
+        assert action == OFFSET_ACCEPT_TRADE
+
+    def test_does_not_propose_when_trade_already_pending(self) -> None:
+        """Agent should not propose a second trade when one is already pending."""
+        game = _setup_near_monopoly_game()
+        agent = RuleBasedAgent(player_id=0, trade_eagerness=0.8)
+
+        # Simulate that agent already proposed a trade
+        agent._has_pending_outgoing_trade = True
+
+        mask = _make_trade_mask(game, 0)
+        action = agent.choose_action({}, mask, game)
+
+        # Should be a gameplay action, not another trade proposal
+        assert action < OFFSET_SIMPLE_TRADE or action >= OFFSET_ACCEPT_TRADE
+
+    def test_reset_clears_trade_state(self) -> None:
+        """Agent reset should clear rejected trades and pending state."""
+        agent = RuleBasedAgent(player_id=0)
+        agent._rejected_trades.add((1, 3))
+        agent._has_pending_outgoing_trade = True
+
+        agent.reset()
+
+        assert len(agent._rejected_trades) == 0
+        assert not agent._has_pending_outgoing_trade
+
+    def test_backward_compatible_with_gameplay_only_mask(self) -> None:
+        """Agent should work normally with a 149-dim mask (no trades)."""
+        game = _setup_near_monopoly_game()
+        agent = RuleBasedAgent(player_id=0, trade_eagerness=0.8)
+
+        # Use gameplay-only encoder (149-dim mask)
+        encoder = ActionEncoder(enable_trades=False)
+        mask = encoder.get_action_mask(game, 0)
+
+        assert len(mask) == 149
+        action = agent.choose_action({}, mask, game)
+        # Should be a valid gameplay action
+        assert 0 <= action < 149
+
+    def test_integration_game_with_trades(self) -> None:
+        """Short game with trading enabled should run without errors."""
+        from mcts.eval import _make_opponent, play_evaluation_game
+        from agents.mcts_agent import MCTSAgent
+
+        mcts_agent = MCTSAgent(
+            player_id=0, num_simulations=5, temperature=0.0,
+        )
+        opponents = [_make_opponent("rule_based", player_id=1)]
+
+        winner, actions, elapsed = play_evaluation_game(
+            mcts_agent, opponents,
+            max_turns=200, seed=42, enable_trades=True,
+        )
+
+        # Game should have progressed
+        assert actions > 0
+        assert elapsed > 0

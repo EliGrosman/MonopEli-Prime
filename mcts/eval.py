@@ -111,6 +111,7 @@ def play_evaluation_game(
     opponents: list[Agent],
     max_turns: int = 500,
     seed: int | None = None,
+    enable_trades: bool = False,
 ) -> tuple[int | None, int, float]:
     """Play a single evaluation game between MCTSAgent and opponents.
 
@@ -123,6 +124,7 @@ def play_evaluation_game(
         opponents: List of opponent agents (players 1..N-1).
         max_turns: Maximum action steps before truncation.
         seed: Random seed for game creation.
+        enable_trades: Whether to enable trade actions in the action space.
 
     Returns:
         Tuple of (winner_id, action_count, elapsed_seconds).
@@ -130,7 +132,7 @@ def play_evaluation_game(
     """
     num_players = 1 + len(opponents)
     game = MonopolyGame(num_players=num_players, seed=seed)
-    encoder = ActionEncoder(enable_trades=False)
+    encoder = ActionEncoder(enable_trades=enable_trades)
 
     # Reset all agents for a fresh game
     mcts_agent.reset()
@@ -172,6 +174,7 @@ def evaluate_mcts_agent(
     seed: int | None = 42,
     verbose: bool = True,
     tensorboard_dir: str | Path | None = None,
+    enable_trades: bool = False,
 ) -> dict[str, dict[str, float]]:
     """Evaluate MCTSAgent against various opponent types.
 
@@ -190,6 +193,7 @@ def evaluate_mcts_agent(
         seed: Base random seed (each game uses seed + game_index).
         verbose: Print per-game and summary results to stdout.
         tensorboard_dir: Optional directory for TensorBoard scalar logging.
+        enable_trades: Whether to enable trade actions in the action space.
 
     Returns:
         Dict mapping opponent_type -> flat metrics dict with keys:
@@ -238,6 +242,7 @@ def evaluate_mcts_agent(
                 opp_agents,
                 max_turns=max_turns,
                 seed=game_seed,
+                enable_trades=enable_trades,
             )
 
             if winner == 0:

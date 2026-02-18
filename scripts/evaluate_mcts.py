@@ -103,6 +103,10 @@ def parse_args() -> argparse.Namespace:
         metavar="FILE",
         help="Write results to JSON file for later analysis",
     )
+    parser.add_argument(
+        "--enable-trades", action="store_true",
+        help="Enable 1-for-1 property trading for heuristic agents",
+    )
     return parser.parse_args()
 
 
@@ -118,6 +122,7 @@ def main() -> None:
     print(f"Players:            {args.num_players}")
     print(f"Network:            {args.network or 'None (random rollouts)'}")
     print(f"Max turns:          {args.max_turns}")
+    print(f"Trades enabled:     {args.enable_trades}")
     print()
 
     # We call evaluate_mcts_agent for each simulation budget.
@@ -137,6 +142,7 @@ def main() -> None:
             "network": args.network,
             "max_turns": args.max_turns,
             "seed": args.seed,
+            "enable_trades": args.enable_trades,
         },
         "results": [],
     }
@@ -177,6 +183,7 @@ def main() -> None:
                 winner, actions, elapsed = play_evaluation_game(
                     mcts_agent, opp_agents,
                     max_turns=args.max_turns, seed=game_seed,
+                    enable_trades=args.enable_trades,
                 )
 
                 if winner == 0:
