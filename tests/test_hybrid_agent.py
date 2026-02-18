@@ -226,6 +226,246 @@ class TestShouldAttemptTrade:
 
 
 # ---------------------------------------------------------------------------
+# C3: Trade timing heuristics
+# ---------------------------------------------------------------------------
+
+class TestMonopolyGap:
+    """Tests for _has_monopoly_gap heuristic."""
+
+    def test_detects_one_away(self) -> None:
+        """Player 0 owns [1],[3] (Brown) and [9] but is 1 away from Light Blue."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        # Player 0 owns [1],[3] (Brown complete) and [9] (1 of 3 Light Blue)
+        # Not 1 away from Light Blue (owns 1/3), but IS a full Brown monopoly
+        # Brown has 2 positions [1,3] — owns 2/2 = complete, not a gap
+        # Need to set up a gap: own 2/3 of a 3-property group
+        game.property_manager.properties[6].owner = 0  # Take Oriental from P1
+        # Now P0 owns [6],[9] of Light Blue [6,8,9] — missing [8]
+        assert agent._has_monopoly_gap(game) is True
+
+    def test_no_gap_when_far(self) -> None:
+        """No gap when we own 0 or 1 of a 3-property group."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=2, llm_client=client)
+        game = _make_game()
+        # Player 2 owns only [11] (Magenta has 3 positions: [11,13,14])
+        # 1/3 = not a gap (need 2/3)
+        assert agent._has_monopoly_gap(game) is False
+
+    def test_complete_monopoly_not_a_gap(self) -> None:
+        """Full monopoly is not a gap."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        # Player 0 owns [1],[3] = Brown complete (2/2)
+        # No other near-complete groups — should only detect gaps, not completions
+        # Remove CT[9] so P0 has no other group progress
+        game.property_manager.properties[9].owner = None
+        assert agent._has_monopoly_gap(game) is False
+
+
+class TestBlockOpponent:
+    """Tests for _can_block_opponent heuristic."""
+
+    def test_detects_blocking_opportunity(self) -> None:
+        """Player 0 holds CT[9], blocking Player 1's Light Blue monopoly."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        # Player 1 owns [6],[8] (2/3 Light Blue), Player 0 owns [9]
+        assert agent._can_block_opponent(game) is True
+
+    def test_no_block_when_unowned(self) -> None:
+        """Can't block if the missing property is unowned (not ours)."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        # Give [9] to nobody — now Player 1 needs [9] but we don't hold it
+        game.property_manager.properties[9].owner = None
+        assert agent._can_block_opponent(game) is False
+
+    def test_no_block_when_opponent_far(self) -> None:
+        """No blocking when opponent owns 0 or 1 of a group."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        # Remove Player 1's Oriental[6] — now P1 only has [8] (1/3 LB)
+        game.property_manager.properties[6].owner = None
+        assert agent._can_block_opponent(game) is False
+
+    def test_ignores_bankrupt_opponents(self) -> None:
+        """Don't consider bankrupt players as blocking targets."""
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+        game.players[1].bankrupt = True
+        assert agent._can_block_opponent(game) is False
+
+
+class TestStagnation:
+    """Tests for _is_stagnating heuristic."""
+
+    def test_detects_stagnation(self) -> None:
+        config = HybridAgentConfig(stagnation_threshold=5)
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+
+        # Simulate flat net worth for 5 turns
+        for turn in range(5):
+            agent._net_worth_history.append((turn, 1500))
+
+        assert agent._is_stagnating() is True
+
+    def test_no_stagnation_when_growing(self) -> None:
+        config = HybridAgentConfig(stagnation_threshold=5)
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+
+        # Net worth increasing
+        for turn in range(5):
+            agent._net_worth_history.append((turn, 1500 + turn * 100))
+
+        assert agent._is_stagnating() is False
+
+    def test_no_stagnation_when_insufficient_data(self) -> None:
+        config = HybridAgentConfig(stagnation_threshold=10)
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+
+        # Only 3 entries, threshold is 10
+        for turn in range(3):
+            agent._net_worth_history.append((turn, 1500))
+
+        assert agent._is_stagnating() is False
+
+
+class TestRecordNetWorth:
+    """Tests for _record_net_worth helper."""
+
+    def test_records_once_per_turn(self) -> None:
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+
+        agent._record_net_worth(game)
+        agent._record_net_worth(game)  # Same turn, should not duplicate
+
+        assert len(agent._net_worth_history) == 1
+
+    def test_records_net_worth_value(self) -> None:
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        game = _make_game()
+
+        agent._record_net_worth(game)
+
+        turn, nw = agent._net_worth_history[0]
+        assert turn == game.state.turn_number
+        assert nw > 0  # Player 0 has money + properties
+
+
+class TestTimingIntegration:
+    """Integration tests for _should_attempt_trade with full heuristics."""
+
+    def test_monopoly_gap_triggers_trade(self) -> None:
+        """Monopoly gap should trigger trade attempt."""
+        config = HybridAgentConfig(
+            trade_check_interval=1,
+            trade_on_monopoly_gap=True,
+            trade_on_stagnation=False,
+            trade_to_block=False,
+        )
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Give Player 0 two of three Light Blue
+        game.property_manager.properties[6].owner = 0
+        # Now owns [6],[9] of [6,8,9] — 1 away
+
+        assert agent._should_attempt_trade(game) is True
+
+    def test_blocking_triggers_trade(self) -> None:
+        """Blocking opportunity should trigger trade attempt."""
+        config = HybridAgentConfig(
+            trade_check_interval=1,
+            trade_on_monopoly_gap=False,
+            trade_on_stagnation=False,
+            trade_to_block=True,
+        )
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        # P1 has [6],[8], P0 holds [9] — blocking opportunity
+        assert agent._should_attempt_trade(game) is True
+
+    def test_stagnation_triggers_trade(self) -> None:
+        """Stagnation should trigger trade attempt."""
+        config = HybridAgentConfig(
+            trade_check_interval=1,
+            stagnation_threshold=3,
+            trade_on_monopoly_gap=False,
+            trade_on_stagnation=True,
+            trade_to_block=False,
+        )
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Pre-fill stagnation history
+        for turn in range(3):
+            agent._net_worth_history.append((turn, 1500))
+
+        # Set game turn to match last entry so _record_net_worth is a no-op
+        game.state.turn_number = 2
+        assert agent._should_attempt_trade(game) is True
+
+    def test_periodic_triggers_trade(self) -> None:
+        """Periodic interval should trigger trade on matching turns."""
+        config = HybridAgentConfig(
+            trade_check_interval=5,
+            trade_on_monopoly_gap=False,
+            trade_on_stagnation=False,
+            trade_to_block=False,
+        )
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Turn 0 — periodic fires only when turn > 0 and turn % interval == 0
+        game.state.turn_number = 0
+        assert agent._should_attempt_trade(game) is False
+
+        game.state.turn_number = 5
+        assert agent._should_attempt_trade(game) is True
+
+    def test_all_heuristics_disabled(self) -> None:
+        """With all heuristics disabled and non-periodic turn, should not trade."""
+        config = HybridAgentConfig(
+            trade_check_interval=5,
+            trade_on_monopoly_gap=False,
+            trade_on_stagnation=False,
+            trade_to_block=False,
+        )
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        game.state.turn_number = 3  # Not periodic (3 % 5 != 0)
+        assert agent._should_attempt_trade(game) is False
+
+    def test_reset_clears_net_worth_history(self) -> None:
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, llm_client=client)
+        agent._net_worth_history.append((0, 1500))
+        agent._net_worth_history.append((1, 1500))
+
+        agent.reset()
+        assert agent._net_worth_history == []
+
+
+# ---------------------------------------------------------------------------
 # _generate_and_verify_trade
 # ---------------------------------------------------------------------------
 

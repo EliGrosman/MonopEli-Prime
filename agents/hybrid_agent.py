@@ -24,7 +24,10 @@ from mcts.llm.client import LLMClient, LLMConfig, create_client
 from mcts.llm.trade_generator import TradeGenerator
 from mcts.llm.trade_responder import TradeResponder
 from mcts.negotiation import NegotiationManager, NegotiationRecord
+from mcts.trade_utils import monopoly_proximity
 from mcts.trade_verifier import MCTSTradeVerifier
+from monopoly_engine.rules import calculate_net_worth
+from monopoly_engine.types import PROPERTY_GROUPS, PropertyColor
 
 from .base import Agent
 from .mcts_agent import MCTSAgent
@@ -54,8 +57,12 @@ class HybridAgentConfig:
     max_negotiation_rounds: int = 3
     max_trades_per_game: int = 10
 
-    # Trade timing (see C3 for full implementation)
+    # Trade timing
     trade_check_interval: int = 5
+    trade_on_monopoly_gap: bool = True
+    trade_on_stagnation: bool = True
+    stagnation_threshold: int = 15
+    trade_to_block: bool = True
 
     # Fast-path thresholds
     fast_accept_threshold: float = 0.10
@@ -143,6 +150,7 @@ class HybridAgent(Agent):
         self._budget = self._config.token_budget
         self._trades_proposed: int = 0
         self._last_trade_turn: int = -999
+        self._net_worth_history: list[tuple[int, int]] = []  # (turn, net_worth)
 
     def choose_action(
         self,
@@ -175,22 +183,115 @@ class HybridAgent(Agent):
             self._generate_and_verify_trade(game)
 
     def _should_attempt_trade(self, game: MonopolyGame) -> bool:
-        """Check if trade timing strategy says we should try trading.
+        """Determine if now is a good time to propose a trade.
 
-        Stub implementation for C2; full heuristics added in C3.
+        Checks (in order):
+        1. Budget: have we exceeded max_trades_per_game or token budget?
+        2. Cooldown: has ``trade_check_interval`` turns passed?
+        3. Monopoly gap: are we exactly 1 property away from any monopoly?
+        4. Blocking: does an opponent need exactly 1 more, and we hold it?
+        5. Stagnation: has our net worth been flat for N turns?
+        6. Periodic: is ``turn_number % trade_check_interval == 0``?
+
+        Returns True if any trigger (3-6) fires and budget/cooldown allow.
         """
-        # Budget checks
+        # 1. Budget checks
         if not self._budget.budget_remaining:
             return False
         if self._trades_proposed >= self._config.max_trades_per_game:
             return False
 
-        # Basic interval check
+        # 2. Cooldown: minimum turns between trade attempts
         turn = game.state.turn_number
         if turn - self._last_trade_turn < self._config.trade_check_interval:
             return False
 
-        return True
+        # Track net worth for stagnation detection
+        self._record_net_worth(game)
+
+        # 3. Monopoly gap: 1 property away from completing a monopoly
+        if self._config.trade_on_monopoly_gap and self._has_monopoly_gap(game):
+            return True
+
+        # 4. Blocking: opponent is 1 away and we hold the blocker
+        if self._config.trade_to_block and self._can_block_opponent(game):
+            return True
+
+        # 5. Stagnation: net worth unchanged for N turns
+        if self._config.trade_on_stagnation and self._is_stagnating():
+            return True
+
+        # 6. Periodic check
+        if turn > 0 and turn % self._config.trade_check_interval == 0:
+            return True
+
+        return False
+
+    # ------------------------------------------------------------------
+    # Trade timing helpers
+    # ------------------------------------------------------------------
+
+    def _has_monopoly_gap(self, game: MonopolyGame) -> bool:
+        """Check if we're exactly 1 property away from any monopoly."""
+        pm = game.property_manager
+        proximity = monopoly_proximity(self.player_id, pm)
+
+        for color, frac in proximity.items():
+            if color in (PropertyColor.RAILROAD, PropertyColor.UTILITY):
+                continue
+            group_size = len(PROPERTY_GROUPS.get(color, ()))
+            if group_size == 0:
+                continue
+            owned = round(frac * group_size)
+            if owned == group_size - 1:
+                return True
+        return False
+
+    def _can_block_opponent(self, game: MonopolyGame) -> bool:
+        """Check if any opponent needs exactly 1 more property and we hold it."""
+        pm = game.property_manager
+
+        for pid in range(len(game.players)):
+            if pid == self.player_id or game.players[pid].bankrupt:
+                continue
+            proximity = monopoly_proximity(pid, pm)
+
+            for color, frac in proximity.items():
+                if color in (PropertyColor.RAILROAD, PropertyColor.UTILITY):
+                    continue
+                positions = PROPERTY_GROUPS.get(color, ())
+                group_size = len(positions)
+                if group_size == 0:
+                    continue
+                owned = round(frac * group_size)
+                if owned != group_size - 1:
+                    continue
+
+                # Opponent needs exactly 1 more — do we hold it?
+                for pos in positions:
+                    prop = pm.properties.get(pos)
+                    if prop is not None and prop.owner == self.player_id:
+                        return True
+        return False
+
+    def _is_stagnating(self) -> bool:
+        """Check if net worth has been flat for the stagnation threshold."""
+        threshold = self._config.stagnation_threshold
+        if len(self._net_worth_history) < threshold:
+            return False
+
+        recent = self._net_worth_history[-threshold:]
+        return recent[0][1] == recent[-1][1]
+
+    def _record_net_worth(self, game: MonopolyGame) -> None:
+        """Record current net worth for stagnation tracking."""
+        turn = game.state.turn_number
+        # Avoid recording multiple times for the same turn
+        if self._net_worth_history and self._net_worth_history[-1][0] == turn:
+            return
+        player = game.players[self.player_id]
+        nw = calculate_net_worth(player, game.property_manager)
+        self._net_worth_history.append((turn, nw))
 
     def _generate_and_verify_trade(self, game: MonopolyGame) -> bool:
         """Generate a trade via LLM, verify via MCTS, execute if approved.
@@ -335,6 +436,7 @@ class HybridAgent(Agent):
         self._negotiation_mgr.reset()
         self._trades_proposed = 0
         self._last_trade_turn = -999
+        self._net_worth_history.clear()
 
     @property
     def negotiation_manager(self) -> NegotiationManager:
