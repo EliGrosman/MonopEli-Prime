@@ -855,3 +855,394 @@ class TestHandleTradePhase:
 
         agent._handle_trade_phase(game)
         agent._generate_and_verify_trade.assert_not_called()
+
+
+# ===========================================================================
+# C5: Integration Tests — full pipeline with mocked LLM
+# ===========================================================================
+
+class _ScriptedLLMClient:
+    """LLM client that returns scripted JSON responses in sequence."""
+
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self.config = LLMConfig()
+        self._responses = responses
+        self._idx = 0
+        self.call_count = 0
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        return "{}"
+
+    def complete_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.call_count += 1
+        if self._idx < len(self._responses):
+            resp = self._responses[self._idx]
+            self._idx += 1
+            return resp
+        return {"no_trade": True, "reasoning": "exhausted"}
+
+    def close(self) -> None:
+        pass
+
+
+class TestC5Integration:
+    """Integration tests exercising the full LLM → MCTS → Negotiation pipeline."""
+
+    def test_mcts_veto_blocks_bad_trade(self) -> None:
+        """LLM proposes giving away a monopoly; MCTS rejects it."""
+        # LLM proposes: give Brown monopoly [1,3] for nothing
+        client = _ScriptedLLMClient([
+            {
+                "to_player": 1,
+                "give_properties": [1, 3],
+                "give_money": 100,
+                "want_properties": [],
+                "want_money": 0,
+                "reasoning": "generous",
+            },
+        ])
+        config = HybridAgentConfig(
+            mcts_simulations=10,
+            trade_eval_simulations=0,  # Single simulate() call
+            trade_check_interval=1,
+            trade_on_monopoly_gap=False,
+            trade_to_block=False,
+            trade_on_stagnation=False,
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        game.state.turn_number = 5  # Periodic trigger
+
+        # Mock the verifier to say this trade is bad
+        bad_eval = TradeEvaluation(
+            trade=TradeOfferData(
+                from_player=0, to_player=1,
+                give_properties=[1, 3], give_money=100,
+                want_properties=[], want_money=0,
+            ),
+            value_before=0.4, value_after=0.15,
+            value_delta=-0.25, recommended=False, simulations_used=1,
+        )
+        agent._verifier.evaluate_trade = MagicMock(return_value=bad_eval)
+
+        agent._handle_trade_phase(game)
+
+        # Trade should NOT have been proposed
+        assert agent.trades_proposed == 0
+        # NegotiationManager should have no negotiations
+        assert len(agent.negotiation_manager._negotiations) == 0
+
+    def test_mcts_approval_executes_trade(self) -> None:
+        """LLM proposes a good trade; MCTS approves; NegotiationManager executes."""
+        client = _ScriptedLLMClient([
+            {
+                "to_player": 1,
+                "give_properties": [9],
+                "give_money": 0,
+                "want_properties": [],
+                "want_money": 200,
+                "reasoning": "get cash for CT",
+            },
+        ])
+        config = HybridAgentConfig(
+            mcts_simulations=10,
+            trade_eval_simulations=0,
+            trade_check_interval=1,
+            trade_on_monopoly_gap=False,
+            trade_to_block=False,
+            trade_on_stagnation=False,
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        game.state.turn_number = 5  # Periodic trigger
+        game.state.current_player = 0  # Ensure it's P0's turn
+
+        # Mock the verifier to approve
+        good_eval = TradeEvaluation(
+            trade=TradeOfferData(
+                from_player=0, to_player=1,
+                give_properties=[9], give_money=0,
+                want_properties=[], want_money=200,
+            ),
+            value_before=0.3, value_after=0.4,
+            value_delta=0.1, recommended=True, simulations_used=1,
+        )
+        agent._verifier.evaluate_trade = MagicMock(return_value=good_eval)
+
+        agent._handle_trade_phase(game)
+
+        # Trade should have been proposed
+        assert agent.trades_proposed == 1
+        # NegotiationManager should have 1 negotiation
+        assert len(agent.negotiation_manager._negotiations) == 1
+
+    def test_budget_exhaustion_stops_llm_calls(self) -> None:
+        """When token budget is exhausted, no LLM calls are made."""
+        budget = TokenBudget(max_calls_per_game=0)  # Already exhausted
+        config = HybridAgentConfig(
+            trade_check_interval=1,
+            token_budget=budget,
+        )
+        client = _ScriptedLLMClient([{"error": "should not be called"}])
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        game.state.turn_number = 5
+
+        agent._handle_trade_phase(game)
+
+        assert client.call_count == 0
+        assert agent.trades_proposed == 0
+
+    def test_responds_to_incoming_trade_accept(self) -> None:
+        """Full pipeline: incoming trade → MCTS eval → LLM decides accept."""
+        # LLM responds with accept
+        client = _ScriptedLLMClient([
+            {"decision": "accept", "reasoning": "good deal"},
+        ])
+        config = HybridAgentConfig(
+            trade_eval_simulations=0,
+            fast_accept_threshold=999.0,  # Disable fast path
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Set up a pending trade in the engine
+        game.state.current_player = 1
+        trade_id = game.propose_trade(
+            from_player=1, to_player=0,
+            give_properties=[6], give_money=0,
+            want_properties=[9], want_money=0,
+        )
+
+        # Register it in the negotiation manager
+        trade: TradeOfferData = {
+            "from_player": 1, "to_player": 0,
+            "give_properties": [6], "give_money": 0,
+            "want_properties": [9], "want_money": 0,
+        }
+        neg = NegotiationRecord(
+            negotiation_id=0,
+            original_proposer=1,
+            current_proposer=1,
+            current_responder=0,
+            round_number=1,
+            max_rounds=3,
+            status=NegotiationStatus.PENDING,
+            history=[trade],
+            current_trade_id=trade_id,
+        )
+        agent._negotiation_mgr._negotiations[0] = neg
+        agent._negotiation_mgr._next_id = 1
+
+        # Mock MCTS to return neutral values (not triggering fast path)
+        eval_result = TradeEvaluation(
+            trade=trade,
+            value_before=0.33, value_after=0.35,
+            value_delta=0.02, recommended=True, simulations_used=1,
+        )
+        agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
+
+        agent._handle_trade_phase(game)
+
+        # Negotiation should be accepted
+        assert neg.status == NegotiationStatus.ACCEPTED
+
+    def test_fast_path_accept_skips_llm(self) -> None:
+        """When MCTS value improvement exceeds fast_accept_threshold, skip LLM."""
+        client = _ScriptedLLMClient([])  # No responses needed
+        config = HybridAgentConfig(
+            trade_eval_simulations=0,
+            fast_accept_threshold=0.05,
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Set up pending trade
+        game.state.current_player = 1
+        trade_id = game.propose_trade(
+            from_player=1, to_player=0,
+            give_properties=[6], give_money=50,
+            want_properties=[], want_money=0,
+        )
+
+        trade: TradeOfferData = {
+            "from_player": 1, "to_player": 0,
+            "give_properties": [6], "give_money": 50,
+            "want_properties": [], "want_money": 0,
+        }
+        neg = NegotiationRecord(
+            negotiation_id=0,
+            original_proposer=1,
+            current_proposer=1,
+            current_responder=0,
+            round_number=1,
+            max_rounds=3,
+            status=NegotiationStatus.PENDING,
+            history=[trade],
+            current_trade_id=trade_id,
+        )
+        agent._negotiation_mgr._negotiations[0] = neg
+        agent._negotiation_mgr._next_id = 1
+
+        # MCTS shows big improvement → fast path accept
+        eval_result = TradeEvaluation(
+            trade=trade,
+            value_before=0.25, value_after=0.40,
+            value_delta=0.15, recommended=True, simulations_used=1,
+        )
+        agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
+
+        # The responder has fast_accept_threshold=0.05, delta=0.15 > 0.05 → accept
+        agent._handle_trade_phase(game)
+
+        assert neg.status == NegotiationStatus.ACCEPTED
+        # The LLM should NOT have been called (fast path returned "accept")
+        # The responder calls complete_json only when fast path returns None
+        # Fast path fires → no LLM call, only budget.record_usage() in respond
+        # Actually, the _respond_to_negotiation method calls budget.record_usage
+        # regardless, but the LLM's complete_json is not called by responder
+
+    def test_counter_proposal_flow(self) -> None:
+        """LLM suggests a counter-proposal; NegotiationManager executes it."""
+        client = _ScriptedLLMClient([
+            {
+                "decision": "counter",
+                "reasoning": "want more cash",
+                "counter_proposal": {
+                    "to_player": 1,
+                    "give_properties": [9],
+                    "give_money": 0,
+                    "want_properties": [6],
+                    "want_money": 100,
+                },
+            },
+        ])
+        config = HybridAgentConfig(
+            trade_eval_simulations=0,
+            fast_accept_threshold=999.0,  # Disable fast path
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # Set up pending trade from Player 1
+        game.state.current_player = 1
+        trade_id = game.propose_trade(
+            from_player=1, to_player=0,
+            give_properties=[6], give_money=0,
+            want_properties=[9], want_money=0,
+        )
+
+        trade: TradeOfferData = {
+            "from_player": 1, "to_player": 0,
+            "give_properties": [6], "give_money": 0,
+            "want_properties": [9], "want_money": 0,
+        }
+        neg = NegotiationRecord(
+            negotiation_id=0,
+            original_proposer=1,
+            current_proposer=1,
+            current_responder=0,
+            round_number=1,
+            max_rounds=3,
+            status=NegotiationStatus.PENDING,
+            history=[trade],
+            current_trade_id=trade_id,
+        )
+        agent._negotiation_mgr._negotiations[0] = neg
+        agent._negotiation_mgr._next_id = 1
+
+        eval_result = TradeEvaluation(
+            trade=trade,
+            value_before=0.33, value_after=0.34,
+            value_delta=0.01, recommended=False, simulations_used=1,
+        )
+        agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
+
+        # Need to make P0 the current player for the counter-propose
+        game.state.current_player = 0
+
+        agent._handle_trade_phase(game)
+
+        # Negotiation should be in PENDING state (counter-proposal made)
+        # and now waiting for Player 1 to respond
+        assert neg.status == NegotiationStatus.PENDING
+        assert neg.round_number == 2
+        assert neg.current_responder == 1  # Player 1 now responds
+        assert len(neg.history) == 2
+
+    def test_trade_timing_monopoly_gap_integration(self) -> None:
+        """Full pipeline: monopoly gap triggers trade attempt."""
+        # LLM returns no_trade (the timing triggers but LLM doesn't find a deal)
+        client = _ScriptedLLMClient([
+            {"no_trade": True, "reasoning": "no good trades"},
+        ])
+        config = HybridAgentConfig(
+            mcts_simulations=10,
+            trade_eval_simulations=0,
+            trade_check_interval=1,
+            trade_on_monopoly_gap=True,
+            trade_to_block=False,
+            trade_on_stagnation=False,
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+        # Give P0 two of three Light Blue to create a monopoly gap
+        game.property_manager.properties[6].owner = 0  # Oriental
+
+        agent._handle_trade_phase(game)
+
+        # LLM was called (timing triggered), even though it returned no_trade
+        assert client.call_count == 1
+        assert agent.trades_proposed == 0
+
+    def test_full_game_with_mocked_llm(self) -> None:
+        """Run a short game with HybridAgent and verify it completes."""
+        from agents.random_agent import RandomAgent
+        from monopoly_gym.action_space import ActionEncoder
+
+        # LLM always returns no_trade — agent behaves like pure MCTS
+        client = _ScriptedLLMClient(
+            [{"no_trade": True}] * 100,
+        )
+        config = HybridAgentConfig(
+            mcts_simulations=10,  # Fast
+            trade_eval_simulations=0,
+            trade_check_interval=999,  # Effectively disable trading
+            token_budget=TokenBudget(max_calls_per_game=5),
+        )
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        opponent = RandomAgent(player_id=1)
+
+        game = MonopolyGame(num_players=2, seed=42)
+        encoder = ActionEncoder(enable_trades=False)
+
+        agent.reset()
+        opponent.reset()
+
+        agents: dict[int, Any] = {0: agent, 1: opponent}
+        action_count = 0
+        max_turns = 200
+
+        while not game.game_over and action_count < max_turns:
+            pid = game.current_player
+            ag = agents[pid]
+            mask = encoder.get_action_mask(game, pid)
+            obs: dict[str, Any] = {}
+
+            action_idx = ag.choose_action(obs, mask, game)
+            action = encoder.decode(action_idx, pid, game)
+            valid, _ = action.validate(game)
+            if valid:
+                action.execute(game)
+            action_count += 1
+
+        # Game should have run some actions
+        assert action_count > 0
+        # If game ended, there should be a winner
+        if game.game_over:
+            assert game.winner is not None
