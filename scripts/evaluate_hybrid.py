@@ -7,7 +7,7 @@ and reports win rate, trade metrics, game length, and token usage.
 Usage:
     uv run python scripts/evaluate_hybrid.py --games 10
     uv run python scripts/evaluate_hybrid.py --opponents random rule_based --games 50
-    uv run python scripts/evaluate_hybrid.py --opponent-type mcts --games 20
+    uv run python scripts/evaluate_hybrid.py --llm ollama --llm-model gemma3:4b --games 10
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from agents.mcts_agent import MCTSAgent
 from agents.random_agent import RandomAgent
 from agents.rule_based import AggressiveAgent, ConservativeAgent, RuleBasedAgent
 from mcts.llm.budget import TokenBudget
-from mcts.llm.client import LLMClient, LLMConfig
+from mcts.llm.client import LLMClient, LLMConfig, create_client
 from mcts.negotiation import NegotiationManager, NegotiationStatus
 from monopoly_engine.game import MonopolyGame
 from monopoly_gym.action_space import ActionEncoder
@@ -70,6 +70,56 @@ class _EvalLLMClient(LLMClient):
 
     def close(self) -> None:
         pass
+
+
+class _TrackingLLMClient(LLMClient):
+    """Wraps a real LLM client and tracks call count / approximate tokens."""
+
+    def __init__(self, inner: LLMClient) -> None:
+        super().__init__(inner.config)
+        self._inner = inner
+        self.call_count = 0
+        self.total_tokens = 0
+
+    def complete(self, system_prompt: str, user_prompt: str) -> str:
+        self.call_count += 1
+        result = self._inner.complete(system_prompt, user_prompt)
+        # Approximate token count from character length
+        self.total_tokens += (len(system_prompt) + len(user_prompt) + len(result)) // 4
+        return result
+
+    def complete_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.call_count += 1
+        result = self._inner.complete_json(system_prompt, user_prompt, schema)
+        self.total_tokens += (len(system_prompt) + len(user_prompt)) // 4 + 50
+        return result
+
+    def close(self) -> None:
+        self._inner.close()
+
+
+def _make_llm_client(
+    llm_provider: str | None,
+    llm_model: str | None,
+) -> _EvalLLMClient | _TrackingLLMClient:
+    """Create an LLM client based on CLI args."""
+    if llm_provider is None:
+        return _EvalLLMClient()
+
+    config = LLMConfig(
+        provider=llm_provider,
+        model=llm_model or ("gemma3:4b" if llm_provider == "ollama" else ""),
+        temperature=0.3,
+        max_tokens=512,
+        timeout_seconds=30.0,
+    )
+    inner = create_client(config)
+    return _TrackingLLMClient(inner)
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +223,7 @@ def _create_opponent(opp_type: str, player_id: int) -> Agent:
 def play_eval_game(
     hybrid_agent: HybridAgent,
     opponents: list[Agent],
-    llm_client: _EvalLLMClient,
+    llm_client: _EvalLLMClient | _TrackingLLMClient,
     max_turns: int = 500,
     seed: int | None = None,
 ) -> GameResult:
@@ -244,6 +294,8 @@ def run_evaluation(
     max_turns: int = 500,
     seed: int = 42,
     verbose: bool = True,
+    llm_provider: str | None = None,
+    llm_model: str | None = None,
 ) -> EvalResults:
     """Run evaluation of HybridAgent against a specific opponent type."""
     results = EvalResults(
@@ -255,7 +307,7 @@ def run_evaluation(
         game_seed = seed + game_idx
 
         # Create fresh agents for each game
-        llm_client = _EvalLLMClient()
+        llm_client = _make_llm_client(llm_provider, llm_model)
         config = HybridAgentConfig(
             mcts_simulations=mcts_simulations,
             trade_eval_simulations=10,  # Faster for eval
@@ -378,11 +430,22 @@ def parse_args() -> argparse.Namespace:
         "--quiet", action="store_true",
         help="Suppress per-game output",
     )
+    parser.add_argument(
+        "--llm", type=str, default=None,
+        choices=["ollama", "claude", "openai"],
+        help="LLM provider for trade generation (default: fake/no-op client)",
+    )
+    parser.add_argument(
+        "--llm-model", type=str, default=None,
+        help="LLM model name (default: gemma3:4b for ollama)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    llm_label = f"{args.llm} ({args.llm_model or 'default'})" if args.llm else "fake (no-op)"
 
     print("=" * 60)
     print("HybridAgent (MCTS + LLM) Evaluation")
@@ -391,6 +454,7 @@ def main() -> None:
     print(f"Opponents: {', '.join(args.opponents)}")
     print(f"Players: {args.num_players}")
     print(f"MCTS simulations: {args.mcts_sims}")
+    print(f"LLM: {llm_label}")
     print(f"Max turns: {args.max_turns}")
     print()
 
@@ -406,6 +470,8 @@ def main() -> None:
             max_turns=args.max_turns,
             seed=args.seed,
             verbose=not args.quiet,
+            llm_provider=args.llm,
+            llm_model=args.llm_model,
         )
         all_results.append(result)
 

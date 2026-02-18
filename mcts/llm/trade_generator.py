@@ -7,6 +7,7 @@ in the prompt, helping the LLM focus on the most promising trades.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -19,6 +20,43 @@ from .prompts import SYSTEM_PROMPT, build_propose_prompt
 from .state_prompt import serialize_game_state
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_int_list(value: Any) -> list[int]:
+    """Parse a list of ints from LLM output, handling common quirks.
+
+    Small models sometimes return:
+    - ``"[1, 3]"`` (a string) instead of ``[1, 3]``
+    - ``["[1]", "[3]"]`` (list of stringified lists)
+    - ``[1, 3]`` (correct)
+    This helper normalizes all forms.
+    """
+    import re
+
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value == "[]":
+            return []
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, list):
+                return [int(x) for x in parsed]
+            return [int(parsed)]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+        return [int(x) for x in re.findall(r"\d+", value)]
+    if isinstance(value, (list, tuple)):
+        # Flatten: each element might be int, str-wrapped int, or str-wrapped list
+        result: list[int] = []
+        for item in value:
+            if isinstance(item, (int, float)):
+                result.append(int(item))
+            elif isinstance(item, str):
+                result.extend(int(x) for x in re.findall(r"\d+", item))
+        return result
+    if isinstance(value, (int, float)):
+        return [int(value)]
+    return []
 
 
 class TradeGenerator:
@@ -98,9 +136,9 @@ class TradeGenerator:
         """
         try:
             to_player = int(response["to_player"])
-            give_properties = [int(p) for p in response.get("give_properties", [])]
+            give_properties = _parse_int_list(response.get("give_properties", []))
             give_money = int(response.get("give_money", 0))
-            want_properties = [int(p) for p in response.get("want_properties", [])]
+            want_properties = _parse_int_list(response.get("want_properties", []))
             want_money = int(response.get("want_money", 0))
         except (KeyError, TypeError, ValueError) as exc:
             logger.warning("Failed to parse LLM proposal: %s", exc)

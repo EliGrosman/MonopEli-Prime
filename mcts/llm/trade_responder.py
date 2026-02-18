@@ -17,6 +17,7 @@ from ..trade_utils import trade_impact
 from .client import LLMClient
 from .prompts import SYSTEM_PROMPT, build_counter_prompt, build_evaluate_prompt
 from .state_prompt import serialize_game_state, serialize_trade_proposal
+from .trade_generator import _parse_int_list
 
 logger = logging.getLogger(__name__)
 
@@ -240,13 +241,13 @@ class TradeResponder:
                 result["to_player"] = int(cp["to_player"])
             elif player_id is not None:
                 result["to_player"] = player_id
-            result["give_properties"] = [
-                int(p) for p in cp.get("give_properties", [])
-            ]
+            result["give_properties"] = _parse_int_list(
+                cp.get("give_properties", []),
+            )
             result["give_money"] = int(cp.get("give_money", 0))
-            result["want_properties"] = [
-                int(p) for p in cp.get("want_properties", [])
-            ]
+            result["want_properties"] = _parse_int_list(
+                cp.get("want_properties", []),
+            )
             result["want_money"] = int(cp.get("want_money", 0))
         except (TypeError, ValueError) as exc:
             logger.warning("Failed to normalize counter-proposal: %s", exc)
