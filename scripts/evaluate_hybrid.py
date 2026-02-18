@@ -107,6 +107,7 @@ class _TrackingLLMClient(LLMClient):
 def _make_llm_client(
     llm_provider: str | None,
     llm_model: str | None,
+    llm_base_url: str | None = None,
 ) -> _EvalLLMClient | _TrackingLLMClient:
     """Create an LLM client based on CLI args."""
     if llm_provider is None:
@@ -115,6 +116,7 @@ def _make_llm_client(
     config = LLMConfig(
         provider=llm_provider,
         model=llm_model or ("gemma3:4b" if llm_provider == "ollama" else ""),
+        base_url=llm_base_url or "",
         temperature=0.3,
         max_tokens=512,
         timeout_seconds=30.0,
@@ -298,6 +300,7 @@ def run_evaluation(
     verbose: bool = True,
     llm_provider: str | None = None,
     llm_model: str | None = None,
+    llm_base_url: str | None = None,
     enable_trades: bool = False,
 ) -> EvalResults:
     """Run evaluation of HybridAgent against a specific opponent type."""
@@ -310,7 +313,7 @@ def run_evaluation(
         game_seed = seed + game_idx
 
         # Create fresh agents for each game
-        llm_client = _make_llm_client(llm_provider, llm_model)
+        llm_client = _make_llm_client(llm_provider, llm_model, llm_base_url)
         config = HybridAgentConfig(
             mcts_simulations=mcts_simulations,
             trade_eval_simulations=10,  # Faster for eval
@@ -444,6 +447,10 @@ def parse_args() -> argparse.Namespace:
         help="LLM model name (default: gemma3:4b for ollama)",
     )
     parser.add_argument(
+        "--llm-base-url", type=str, default=None,
+        help="Custom base URL for LLM API (e.g. https://openrouter.ai/api)",
+    )
+    parser.add_argument(
         "--enable-trades", action="store_true",
         help="Enable 1-for-1 property trading for heuristic agents",
     )
@@ -502,6 +509,7 @@ def main() -> None:
             verbose=not args.quiet,
             llm_provider=args.llm,
             llm_model=args.llm_model,
+            llm_base_url=args.llm_base_url,
             enable_trades=args.enable_trades,
         )
         all_results.append(result)
