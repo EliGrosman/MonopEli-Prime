@@ -139,6 +139,25 @@ Include "counter_proposal" only if action is "counter"."""
 
 
 # ---------------------------------------------------------------------------
+# Propose trade choice template (multiple-choice variant)
+# ---------------------------------------------------------------------------
+
+PROPOSE_TRADE_CHOICE_TEMPLATE: str = """\
+Given the current game state, select the BEST trade from the options below, \
+or choose "none".
+
+{game_state}
+
+TRADE OPTIONS:
+{trade_options}
+
+Pick the option number of the best trade. If none are worthwhile, pick 0.
+
+Respond with JSON:
+{{"choice": <option_number_or_0>, "reasoning": "<1-2 sentences>"}}"""
+
+
+# ---------------------------------------------------------------------------
 # JSON output schemas (for providers that support structured output)
 # ---------------------------------------------------------------------------
 
@@ -218,6 +237,15 @@ COUNTER_PROPOSE_SCHEMA: dict[str, Any] = {
     "required": ["action", "reasoning"],
 }
 
+PROPOSE_TRADE_CHOICE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "choice": {"type": "integer", "minimum": 0},
+        "reasoning": {"type": "string"},
+    },
+    "required": ["choice", "reasoning"],
+}
+
 
 # ---------------------------------------------------------------------------
 # Builder functions
@@ -268,4 +296,20 @@ def build_counter_prompt(
         game_state=game_state_text,
         previous_trade=trade_text,
         reason=reason,
+    )
+
+
+def build_propose_choice_prompt(
+    game_state_text: str, trade_options_text: str,
+) -> str:
+    """Build the user prompt for choosing from pre-computed trade candidates.
+
+    Args:
+        game_state_text: Output of ``serialize_game_state()``.
+        trade_options_text: Numbered list of candidate trades, e.g.
+            ``"1. Give [Baltic Ave] to Player 2 for $200\\n2. ..."``.
+    """
+    return PROPOSE_TRADE_CHOICE_TEMPLATE.format(
+        game_state=game_state_text,
+        trade_options=trade_options_text,
     )
