@@ -1,4 +1,4 @@
-"""Tests for MCTS search engine (A1-A3, A7)."""
+"""Tests for MCTS search engine (A1-A8)."""
 
 from __future__ import annotations
 
@@ -1022,3 +1022,499 @@ class TestBackpropagate:
         assert root.visit_count == 1
         assert root.total_value[0] == 0.5
         assert root.total_value[1] == -0.5
+
+
+# ===========================================================================
+# A6: Opponent Modeling tests
+# ===========================================================================
+
+
+class TestOpponentModeling:
+    """Test MCTSSearch._get_opponent_action() method."""
+
+    def test_opponent_random_returns_valid_action(self) -> None:
+        """Random opponent policy should return a valid action index."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(opponent_policy="random")
+        search = MCTSSearch(config)
+        encoder = ActionEncoder(enable_trades=False)
+
+        mask = encoder.get_action_mask(game, 0)
+        action = search._get_opponent_action(game, 0)
+
+        assert mask[action], f"Action {action} is not valid"
+
+    def test_opponent_rule_based_returns_valid_action(self) -> None:
+        """Rule-based opponent policy should return a valid action index."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(opponent_policy="rule_based")
+        search = MCTSSearch(config)
+        encoder = ActionEncoder(enable_trades=False)
+
+        mask = encoder.get_action_mask(game, 0)
+        action = search._get_opponent_action(game, 0)
+
+        assert mask[action], f"Action {action} is not valid"
+
+    def test_opponent_network_returns_valid_action(self) -> None:
+        """Network opponent policy (placeholder) should return a valid action."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(opponent_policy="network")
+        search = MCTSSearch(config)
+        encoder = ActionEncoder(enable_trades=False)
+
+        mask = encoder.get_action_mask(game, 0)
+        action = search._get_opponent_action(game, 0)
+
+        assert mask[action], f"Action {action} is not valid"
+
+    def test_opponent_policy_config_respected(self) -> None:
+        """Different policies should be usable via config."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        for policy in ("random", "rule_based", "network"):
+            config = MCTSConfig(opponent_policy=policy)
+            search = MCTSSearch(config)
+            action = search._get_opponent_action(game, 0)
+            # All should return a valid int action
+            assert isinstance(action, int)
+            assert 0 <= action < 149
+
+    def test_opponent_rule_based_caches_agents(self) -> None:
+        """Rule-based agents should be cached per player_id."""
+        game = MonopolyGame(num_players=4, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        config = MCTSConfig(opponent_policy="rule_based")
+        search = MCTSSearch(config)
+
+        search._get_opponent_action(game, 0)
+        search._get_opponent_action(game, 0)
+
+        # Should have created exactly one agent for player 0
+        assert 0 in search._opponent_agents
+        assert len(search._opponent_agents) == 1
+
+    def test_rollout_uses_opponent_policy(self) -> None:
+        """The rollout should use the configured opponent policy (smoke test)."""
+        game = MonopolyGame(num_players=2, seed=42)
+        roll = RollDice(player_id=0)
+        roll.execute(game)
+
+        # Run rollout with rule_based policy - should complete without error
+        config = MCTSConfig(opponent_policy="rule_based", max_rollout_depth=50)
+        search = MCTSSearch(config)
+        clone = clone_game_state(game, new_seed=42)
+        values = search._random_rollout(clone, max_depth=50)
+
+        assert len(values) == 2
+        for v in values.values():
+            assert -1.0 <= v <= 1.0
+
+
+# ===========================================================================
+# A8: Action Selection and Main Search Loop tests
+# ===========================================================================
+
+
+class TestSearch:
+    """Test MCTSSearch.search() main entry point."""
+
+    def test_search_returns_visit_counts(self) -> None:
+        """search() should return a non-empty dict with valid action keys."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(
+            num_simulations=10,
+            max_rollout_depth=20,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,  # Disable noise for determinism
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+
+        assert len(visit_counts) > 0
+        # All keys should be valid action indices
+        encoder = ActionEncoder(enable_trades=False)
+        mask = encoder.get_action_mask(game, game.current_player)
+        for action_idx in visit_counts:
+            assert mask[action_idx], f"Action {action_idx} is not valid"
+
+    def test_search_visit_counts_sum(self) -> None:
+        """Total visit counts should equal num_simulations."""
+        game = _make_game_after_roll()
+        num_sims = 15
+        config = MCTSConfig(
+            num_simulations=num_sims,
+            max_rollout_depth=20,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+        total = sum(visit_counts.values())
+
+        assert total == num_sims
+
+    def test_search_does_not_mutate_input_game(self) -> None:
+        """search() should not modify the input game state."""
+        game = _make_game_after_roll()
+        original_dict = game.to_dict()
+
+        config = MCTSConfig(
+            num_simulations=5,
+            max_rollout_depth=20,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+        search.search(game, player_id=0)
+
+        assert game.to_dict() == original_dict
+
+    def test_search_empty_for_terminal_game(self) -> None:
+        """search() on a terminal game should return empty visit counts."""
+        game = MonopolyGame(num_players=2, seed=42)
+        game.state.game_over = True
+        game.state.winner = 0
+
+        config = MCTSConfig(num_simulations=10, dirichlet_alpha=0.0)
+        search = MCTSSearch(config)
+
+        # After expansion the root will have no children (terminal)
+        visit_counts = search.search(game, player_id=0)
+        assert visit_counts == {}
+
+    def test_search_with_dirichlet_noise(self) -> None:
+        """search() with Dirichlet noise should still complete correctly."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(
+            num_simulations=10,
+            max_rollout_depth=20,
+            opponent_policy="random",
+            dirichlet_alpha=0.3,
+            dirichlet_epsilon=0.25,
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+        assert len(visit_counts) > 0
+        assert sum(visit_counts.values()) == 10
+
+
+class TestSelect:
+    """Test MCTSSearch.select() tree traversal."""
+
+    def test_select_returns_leaf(self) -> None:
+        """select() should return a leaf node."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(dirichlet_alpha=0.0)
+        search = MCTSSearch(config)
+
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+        )
+        search.expand(root, game)
+
+        # With all children unvisited (inf score), select should pick one
+        leaf, leaf_game = search.select(root)
+        assert leaf.is_leaf()
+        assert leaf_game is not None
+
+    def test_select_returns_root_if_leaf(self) -> None:
+        """If root is a leaf, select() should return the root itself."""
+        game = MonopolyGame(num_players=2, seed=42)
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+        )
+        # Don't expand -- root is a leaf
+
+        leaf, leaf_game = search.select(root)
+        assert leaf is root
+
+    def test_select_traverses_to_depth(self) -> None:
+        """After visiting children, select should go deeper into the tree."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(
+            num_simulations=5,
+            max_rollout_depth=20,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+
+        # Run a few simulations to build up the tree
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+        )
+        search.expand(root, game)
+
+        # Manually visit some children to test deeper selection
+        for child in root.children.values():
+            child_game = MonopolyGame.from_dict(child.state_dict)
+            child_game.rng = __import__("random").Random()
+            search.expand(child, child_game)
+            child.visit_count = 1
+            child.total_value = {0: 0.5}
+            break
+
+        root.visit_count = 1
+
+        # Now select should go deeper (into grandchildren)
+        leaf, _ = search.select(root)
+        # Leaf should be a grandchild (depth 2)
+        assert leaf.parent is not None
+        # It should be a leaf (no children yet)
+        assert leaf.is_leaf()
+
+
+class TestSelectAction:
+    """Test MCTSSearch.select_action() method."""
+
+    def test_select_action_deterministic(self) -> None:
+        """temperature=0 should always pick the most visited action."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {5: 100, 10: 50, 15: 200, 20: 75}
+
+        # Should always pick action 15 (200 visits)
+        for _ in range(10):
+            action = search.select_action(visit_counts, temperature=0)
+            assert action == 15
+
+    def test_select_action_stochastic(self) -> None:
+        """temperature>0 should produce varied selections over many calls."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {5: 40, 10: 30, 15: 20, 20: 10}
+
+        actions_seen: set[int] = set()
+        for _ in range(100):
+            action = search.select_action(visit_counts, temperature=1.0)
+            actions_seen.add(action)
+
+        # With temperature=1 and 100 samples, should see multiple actions
+        assert len(actions_seen) > 1
+
+    def test_select_action_empty_raises(self) -> None:
+        """Empty visit counts should raise ValueError."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        with pytest.raises(ValueError, match="empty"):
+            search.select_action({}, temperature=0)
+
+    def test_select_action_single_action(self) -> None:
+        """With one action, it should always be selected."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        action = search.select_action({42: 10}, temperature=0)
+        assert action == 42
+
+        action = search.select_action({42: 10}, temperature=1.0)
+        assert action == 42
+
+    def test_select_action_high_temperature_more_uniform(self) -> None:
+        """Very high temperature should make selection more uniform."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {0: 100, 1: 1}
+
+        # With very high temperature, even the low-count action should appear
+        action_1_count = 0
+        trials = 500
+        for _ in range(trials):
+            action = search.select_action(visit_counts, temperature=10.0)
+            if action == 1:
+                action_1_count += 1
+
+        # Action 1 should appear at least a few times with high temperature
+        assert action_1_count > 0
+
+
+class TestPolicyDistribution:
+    """Test MCTSSearch.get_policy_distribution() method."""
+
+    def test_policy_distribution_sums_to_one(self) -> None:
+        """Policy should be a valid probability distribution summing to 1."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {5: 10, 10: 20, 15: 30}
+        policy = search.get_policy_distribution(visit_counts)
+
+        assert policy.shape == (149,)
+        assert abs(float(policy.sum()) - 1.0) < 1e-6
+
+    def test_policy_distribution_proportional(self) -> None:
+        """Policy probabilities should be proportional to visit counts."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {0: 10, 1: 30, 2: 60}
+        policy = search.get_policy_distribution(visit_counts)
+
+        assert abs(policy[0] - 0.1) < 1e-6
+        assert abs(policy[1] - 0.3) < 1e-6
+        assert abs(policy[2] - 0.6) < 1e-6
+
+    def test_policy_distribution_zeros_for_unvisited(self) -> None:
+        """Actions not in visit_counts should have zero probability."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {5: 10}
+        policy = search.get_policy_distribution(visit_counts)
+
+        assert policy[5] > 0
+        assert policy[0] == 0.0
+        assert policy[148] == 0.0
+
+    def test_policy_distribution_empty_visit_counts(self) -> None:
+        """Empty visit counts should return all-zero policy."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        policy = search.get_policy_distribution({})
+        assert policy.shape == (149,)
+        assert float(policy.sum()) == 0.0
+
+    def test_policy_distribution_shape(self) -> None:
+        """Policy should be float32 array of shape (149,)."""
+        config = MCTSConfig()
+        search = MCTSSearch(config)
+
+        visit_counts = {10: 5, 20: 15}
+        policy = search.get_policy_distribution(visit_counts)
+
+        assert policy.dtype == np.float32
+        assert policy.shape == (149,)
+
+
+class TestDirichletNoise:
+    """Test MCTSSearch._add_dirichlet_noise() method."""
+
+    def test_dirichlet_noise_modifies_priors(self) -> None:
+        """After adding noise, priors should differ from their original values."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(dirichlet_alpha=0.3, dirichlet_epsilon=0.25)
+        search = MCTSSearch(config)
+
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+        )
+        search.expand(root, game)
+
+        # Record original priors
+        original_priors = {a: c.prior for a, c in root.children.items()}
+
+        search._add_dirichlet_noise(root)
+
+        # At least some priors should have changed
+        changed = sum(
+            1 for a, c in root.children.items()
+            if abs(c.prior - original_priors[a]) > 1e-10
+        )
+        assert changed > 0
+
+    def test_dirichlet_noise_priors_positive(self) -> None:
+        """All priors should remain positive after adding noise."""
+        game = _make_game_after_roll()
+        config = MCTSConfig(dirichlet_alpha=0.3, dirichlet_epsilon=0.25)
+        search = MCTSSearch(config)
+
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+        )
+        search.expand(root, game)
+        search._add_dirichlet_noise(root)
+
+        for child in root.children.values():
+            assert child.prior > 0
+
+    def test_dirichlet_noise_no_children_no_error(self) -> None:
+        """Adding noise to a node with no children should not error."""
+        config = MCTSConfig(dirichlet_alpha=0.3, dirichlet_epsilon=0.25)
+        search = MCTSSearch(config)
+
+        root = MCTSNode(state_dict={}, is_terminal=True)
+        search._add_dirichlet_noise(root)  # Should not raise
+
+
+class TestFullSearchIntegration:
+    """Integration tests for the complete MCTS search loop."""
+
+    def test_full_search_returns_valid_action(self) -> None:
+        """Full search on a real game should return a valid action."""
+        game = _make_game_after_roll(seed=123)
+        config = MCTSConfig(
+            num_simulations=20,
+            max_rollout_depth=30,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+        action = search.select_action(visit_counts, temperature=0)
+
+        encoder = ActionEncoder(enable_trades=False)
+        mask = encoder.get_action_mask(game, game.current_player)
+        assert mask[action], f"Selected action {action} is not valid"
+
+    def test_full_search_policy_distribution(self) -> None:
+        """search + get_policy_distribution should produce valid policy."""
+        game = _make_game_after_roll(seed=456)
+        config = MCTSConfig(
+            num_simulations=15,
+            max_rollout_depth=30,
+            opponent_policy="random",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+        policy = search.get_policy_distribution(visit_counts)
+
+        assert policy.shape == (149,)
+        assert abs(float(policy.sum()) - 1.0) < 1e-6
+
+    def test_full_search_with_rule_based_rollouts(self) -> None:
+        """Search with rule-based opponent policy should complete."""
+        game = _make_game_after_roll(seed=789)
+        config = MCTSConfig(
+            num_simulations=5,
+            max_rollout_depth=30,
+            opponent_policy="rule_based",
+            dirichlet_alpha=0.0,
+        )
+        search = MCTSSearch(config)
+
+        visit_counts = search.search(game, player_id=0)
+        assert len(visit_counts) > 0
+        assert sum(visit_counts.values()) == 5

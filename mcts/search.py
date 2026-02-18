@@ -1,8 +1,8 @@
 """MCTS search engine for Monopoly.
 
-Contains the core MCTS data structures, expansion, simulation, and state
-cloning utilities. Backpropagation and the main search loop are added in
-subsequent tasks (A5-A8).
+Contains the core MCTS data structures, tree search, expansion, simulation,
+backpropagation, and action selection. This is the complete MCTS engine
+for Workstream A (tasks A1-A8).
 """
 
 from __future__ import annotations
@@ -283,6 +283,7 @@ class MCTSSearch:
         self.config = config
         self.value_network = value_network
         self._encoder = ActionEncoder(enable_trades=False)
+        self._opponent_agents: dict[int, Any] = {}
 
     def expand(
         self,
@@ -396,8 +397,6 @@ class MCTSSearch:
             Per-player values: +1 for winner, -1 for losers.
             If truncated, uses net worth ranking to assign fractional values.
         """
-        rng = np.random.RandomState()  # noqa: NPY002
-
         for _ in range(max_depth):
             if game.game_over:
                 break
@@ -415,21 +414,7 @@ class MCTSSearch:
                     _auto_roll_dice(game)
                 continue
 
-            mask = self._encoder.get_action_mask(game, current)
-            valid_indices = np.where(mask)[0]
-
-            if len(valid_indices) == 0:
-                # No valid actions -- force end turn
-                from monopoly_engine.actions import EndTurn
-
-                end = EndTurn(player_id=current)
-                valid, _ = end.validate(game)
-                if valid:
-                    end.execute(game)
-                    _auto_roll_dice(game)
-                continue
-
-            chosen = int(rng.choice(valid_indices))
+            chosen = self._get_opponent_action(game, current)
             action = self._encoder.decode(chosen, current, game)
             action.execute(game)
 
@@ -481,3 +466,220 @@ class MCTSSearch:
                     current.total_value.get(player_id, 0.0) + value
                 )
             current = current.parent
+
+    def search(self, game: MonopolyGame, player_id: int) -> dict[int, int]:
+        """Run MCTS search and return visit count distribution.
+
+        This is the main entry point. Creates a root node from the current
+        game state, runs N simulations, and returns the visit counts for
+        each child of the root.
+
+        Each simulation: select a leaf via UCB1, expand it, evaluate via
+        rollout or value network, then backpropagate values to the root.
+
+        Args:
+            game: The current game state (not modified).
+            player_id: The player to search for.
+
+        Returns:
+            Dict mapping action_idx -> visit_count for root's children.
+        """
+        # 1. Create root node
+        root = MCTSNode(
+            state_dict=game.to_dict(),
+            player_to_move=game.current_player,
+            is_terminal=game.game_over,
+        )
+
+        # 2. Expand root
+        root_game = clone_game_state(game)
+        self.expand(root, root_game)
+
+        if not root.children:
+            return {}
+
+        # 3. Add Dirichlet noise to root priors (for exploration)
+        if self.config.dirichlet_alpha > 0:
+            self._add_dirichlet_noise(root)
+
+        # 4. Run simulations
+        for _ in range(self.config.num_simulations):
+            # a. Select leaf
+            leaf, leaf_game = self.select(root)
+
+            # b. If terminal, use terminal values directly
+            if leaf.is_terminal:
+                values = _terminal_values(leaf_game)
+            else:
+                # c. Expand leaf (if it's a leaf with no children)
+                if leaf.is_leaf():
+                    self.expand(leaf, leaf_game)
+
+                # d. Simulate (value network or rollout)
+                sim_game = clone_game_state(leaf_game)
+                values = self.simulate(sim_game, player_id)
+
+            # e. Backpropagate
+            self.backpropagate(leaf, values)
+
+        # 5. Return visit counts
+        return {a: child.visit_count for a, child in root.children.items()}
+
+    def select(self, node: MCTSNode) -> tuple[MCTSNode, MonopolyGame]:
+        """Select a leaf node by traversing the tree with UCB1.
+
+        Walks from the given node toward a leaf, choosing children by UCB1
+        score at each step. Uses the perspective of the node's player_to_move
+        for UCB1 computation (each player maximizes their own value).
+
+        At the selected leaf, reconstructs the game state from state_dict.
+
+        Args:
+            node: The root node to start selection from.
+
+        Returns:
+            Tuple of (leaf_node, game_state_at_leaf).
+        """
+        current = node
+        while not current.is_leaf() and not current.is_terminal:
+            # Select best child from perspective of the player choosing
+            current = current.best_child(
+                self.config.exploration_constant,
+                current.player_to_move,
+            )
+
+        leaf_game = MonopolyGame.from_dict(current.state_dict)
+        leaf_game.rng = random.Random()
+        return current, leaf_game
+
+    def select_action(
+        self,
+        visit_counts: dict[int, int],
+        temperature: float,
+    ) -> int:
+        """Select an action from root visit counts.
+
+        Args:
+            visit_counts: Dict mapping action_idx -> visit_count.
+            temperature: Controls randomness. 0 = argmax (most visited),
+                        1 = proportional to visits, >1 = more uniform.
+
+        Returns:
+            Selected action index.
+
+        Raises:
+            ValueError: If visit_counts is empty.
+        """
+        if not visit_counts:
+            raise ValueError("Cannot select action from empty visit counts.")
+
+        actions = list(visit_counts.keys())
+        counts = np.array([visit_counts[a] for a in actions], dtype=np.float64)
+
+        if temperature == 0:
+            # Deterministic: most visited
+            return actions[int(np.argmax(counts))]
+
+        # Temperature-scaled probabilities
+        counts_scaled = counts ** (1.0 / temperature)
+        total = counts_scaled.sum()
+        if total == 0:
+            # All zero counts -- pick uniformly
+            return int(np.random.choice(actions))
+        probs = counts_scaled / total
+        return int(np.random.choice(actions, p=probs))
+
+    def get_policy_distribution(
+        self,
+        visit_counts: dict[int, int],
+    ) -> NDArray[np.float32]:
+        """Convert visit counts to a probability distribution over actions.
+
+        Used for training data generation. Returns a 149-dim array where
+        policy[a] = visit_count[a] / total_visits.
+
+        Args:
+            visit_counts: Dict mapping action_idx -> visit_count.
+
+        Returns:
+            Normalized probability distribution of shape (149,).
+        """
+        action_size = self._encoder.action_space_size
+        policy = np.zeros(action_size, dtype=np.float32)
+
+        total = sum(visit_counts.values())
+        if total == 0:
+            return policy
+
+        for action_idx, count in visit_counts.items():
+            policy[action_idx] = count / total
+
+        return policy
+
+    def _add_dirichlet_noise(self, root: MCTSNode) -> None:
+        """Add Dirichlet noise to root node priors for exploration.
+
+        Follows the AlphaZero approach: replace a fraction (epsilon) of
+        each child's prior with Dirichlet noise. This encourages the
+        search to explore moves it might not otherwise consider.
+
+        Formula: prior = (1 - eps) * prior + eps * noise[i]
+
+        Args:
+            root: The root node whose children's priors will be modified.
+        """
+        if not root.children:
+            return
+
+        num_children = len(root.children)
+        noise = np.random.dirichlet(
+            [self.config.dirichlet_alpha] * num_children
+        )
+
+        eps = self.config.dirichlet_epsilon
+        for i, child in enumerate(root.children.values()):
+            child.prior = (1 - eps) * child.prior + eps * float(noise[i])
+
+    def _get_opponent_action(
+        self,
+        game: MonopolyGame,
+        player_id: int,
+    ) -> int:
+        """Get an action for a player during simulation/rollout.
+
+        The policy is determined by config.opponent_policy:
+        - "rule_based": Use RuleBasedAgent.choose_action()
+        - "random": Uniform random over valid actions
+        - "network": Use value network's policy head (placeholder)
+
+        Args:
+            game: Current game state.
+            player_id: The player's ID.
+
+        Returns:
+            Action index chosen by the policy.
+        """
+        mask = self._encoder.get_action_mask(game, player_id)
+        valid_indices = np.where(mask)[0]
+
+        if len(valid_indices) == 0:
+            # Fallback: end turn
+            from monopoly_gym.action_space import OFFSET_END_TURN
+
+            return OFFSET_END_TURN
+
+        policy = self.config.opponent_policy
+
+        if policy == "rule_based":
+            if player_id not in self._opponent_agents:
+                from agents.rule_based import RuleBasedAgent
+
+                self._opponent_agents[player_id] = RuleBasedAgent(player_id)
+            agent = self._opponent_agents[player_id]
+            return int(agent.choose_action({}, mask, game))
+
+        if policy == "random":
+            return int(np.random.choice(valid_indices))
+
+        # "network" mode -- placeholder until Workstream B
+        return int(np.random.choice(valid_indices))
