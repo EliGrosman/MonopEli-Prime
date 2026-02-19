@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
 from monopoly_gym.action_space import ActionEncoder
 
@@ -148,6 +149,14 @@ def play_evaluation_game(
 
     while not game.game_over and action_count < max_turns:
         pid = game.current_player
+
+        # Roll dice first (not part of the action space)
+        roll = RollDice(player_id=pid)
+        if roll.validate(game)[0]:
+            roll.execute(game)
+        if game.game_over:
+            break
+
         agent = agents[pid]
         mask = encoder.get_action_mask(game, pid)
         obs: dict[str, Any] = {}
