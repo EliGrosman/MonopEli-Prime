@@ -152,13 +152,15 @@ class TestPlayEvaluationGame:
         opponents = [RandomAgent(player_id=i + 1) for i in range(3)]
 
         play_evaluation_game(mcts, opponents, max_turns=10, seed=1)
-        stats_after_first = mcts.search_stats.total_searches
+        assert mcts.search_stats.total_searches > 0
+
+        # Artificially inflate stats to prove reset clears them
+        mcts.search_stats.total_searches = 9999
 
         play_evaluation_game(mcts, opponents, max_turns=10, seed=2)
-        stats_after_second = mcts.search_stats.total_searches
-
-        # Second game resets stats, so second game's count should equal first
-        assert stats_after_second == stats_after_first
+        # If reset works, stats reflect only game 2 (not 9999 + game2)
+        assert mcts.search_stats.total_searches > 0
+        assert mcts.search_stats.total_searches < 100  # well below 9999
 
     def test_two_player_game(self) -> None:
         """Should work with 2-player game (MCTS vs 1 opponent)."""
