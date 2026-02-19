@@ -481,7 +481,8 @@ class TestGenerateAndVerifyTrade:
             player_id=0, to_player=1,
             give_properties=[9], want_money=100,
         )
-        agent._generator.generate_proposal = MagicMock(return_value=proposal)
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=proposal)
+        agent._generator.last_call_used_llm = True
 
         # Mock the verifier to approve
         eval_result = TradeEvaluation(
@@ -505,7 +506,8 @@ class TestGenerateAndVerifyTrade:
         agent = HybridAgent(player_id=0, llm_client=client)
         game = _make_game()
 
-        agent._generator.generate_proposal = MagicMock(return_value=None)
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=None)
+        agent._generator.last_call_used_llm = False
 
         result = agent._generate_and_verify_trade(game)
         assert result is False
@@ -521,7 +523,8 @@ class TestGenerateAndVerifyTrade:
             player_id=0, to_player=1,
             give_properties=[1, 3], want_money=0,
         )
-        agent._generator.generate_proposal = MagicMock(return_value=proposal)
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=proposal)
+        agent._generator.last_call_used_llm = True
 
         eval_result = TradeEvaluation(
             trade=TradeOfferData(
@@ -548,7 +551,8 @@ class TestGenerateAndVerifyTrade:
             player_id=0, to_player=1,
             give_properties=[9], want_money=100,
         )
-        agent._generator.generate_proposal = MagicMock(return_value=proposal)
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=proposal)
+        agent._generator.last_call_used_llm = True
 
         eval_result = TradeEvaluation(
             trade=TradeOfferData(
@@ -571,17 +575,34 @@ class TestGenerateAndVerifyTrade:
         assert agent.trades_proposed == 0
 
     def test_records_budget_usage(self) -> None:
-        """Budget usage is recorded even when LLM returns None."""
+        """Budget usage is recorded when LLM was called, even if proposal is None."""
         budget = TokenBudget(max_calls_per_game=10)
         config = HybridAgentConfig(token_budget=budget)
         client = _FakeLLMClient()
         agent = HybridAgent(player_id=0, config=config, llm_client=client)
         game = _make_game()
 
-        agent._generator.generate_proposal = MagicMock(return_value=None)
+        # LLM was called (candidates existed) but returned None (parse failure)
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=None)
+        agent._generator.last_call_used_llm = True
 
         agent._generate_and_verify_trade(game)
         assert budget.calls_used == 1
+
+    def test_no_budget_usage_without_llm_call(self) -> None:
+        """Budget is NOT recorded when no candidates exist (LLM not called)."""
+        budget = TokenBudget(max_calls_per_game=10)
+        config = HybridAgentConfig(token_budget=budget)
+        client = _FakeLLMClient()
+        agent = HybridAgent(player_id=0, config=config, llm_client=client)
+        game = _make_game()
+
+        # No candidates → LLM not called
+        agent._generator.generate_proposal_from_candidates = MagicMock(return_value=None)
+        agent._generator.last_call_used_llm = False
+
+        agent._generate_and_verify_trade(game)
+        assert budget.calls_used == 0
 
 
 # ---------------------------------------------------------------------------
@@ -884,7 +905,7 @@ class _ScriptedLLMClient:
             resp = self._responses[self._idx]
             self._idx += 1
             return resp
-        return {"no_trade": True, "reasoning": "exhausted"}
+        return {"choice": 0, "reasoning": "exhausted"}
 
     def close(self) -> None:
         pass
@@ -894,17 +915,10 @@ class TestC5Integration:
     """Integration tests exercising the full LLM → MCTS → Negotiation pipeline."""
 
     def test_mcts_veto_blocks_bad_trade(self) -> None:
-        """LLM proposes giving away a monopoly; MCTS rejects it."""
-        # LLM proposes: give Brown monopoly [1,3] for nothing
+        """LLM picks a candidate; MCTS rejects it."""
+        # LLM picks the first candidate (whatever it may be)
         client = _ScriptedLLMClient([
-            {
-                "to_player": 1,
-                "give_properties": [1, 3],
-                "give_money": 100,
-                "want_properties": [],
-                "want_money": 0,
-                "reasoning": "generous",
-            },
+            {"choice": 1, "reasoning": "generous"},
         ])
         config = HybridAgentConfig(
             mcts_simulations=10,
@@ -938,16 +952,9 @@ class TestC5Integration:
         assert len(agent.negotiation_manager._negotiations) == 0
 
     def test_mcts_approval_executes_trade(self) -> None:
-        """LLM proposes a good trade; MCTS approves; NegotiationManager executes."""
+        """LLM picks a candidate; MCTS approves; NegotiationManager executes."""
         client = _ScriptedLLMClient([
-            {
-                "to_player": 1,
-                "give_properties": [9],
-                "give_money": 0,
-                "want_properties": [],
-                "want_money": 200,
-                "reasoning": "get cash for CT",
-            },
+            {"choice": 1, "reasoning": "complete light blue"},
         ])
         config = HybridAgentConfig(
             mcts_simulations=10,
@@ -958,16 +965,22 @@ class TestC5Integration:
             trade_on_stagnation=False,
         )
         agent = HybridAgent(player_id=0, config=config, llm_client=client)
-        game = _make_game()
-        game.state.turn_number = 5  # Periodic trigger
-        game.state.current_player = 0  # Ensure it's P0's turn
+        # Custom game: P0 has 2/3 Light Blue + 1 non-critical property
+        game = MonopolyGame(num_players=3, seed=42)
+        pm = game.property_manager
+        pm.properties[6].owner = 0   # Oriental (Light Blue)
+        pm.properties[8].owner = 0   # Vermont (Light Blue)
+        pm.properties[9].owner = 1   # Connecticut (Light Blue) - P1 holds missing piece
+        pm.properties[11].owner = 0  # St. Charles (Magenta, 1/3 = non-critical)
+        game.state.turn_number = 5   # Periodic trigger
+        game.state.current_player = 0
 
         # Mock the verifier to approve
         good_eval = TradeEvaluation(
             trade=TradeOfferData(
                 from_player=0, to_player=1,
-                give_properties=[9], give_money=0,
-                want_properties=[], want_money=200,
+                give_properties=[11], give_money=0,
+                want_properties=[9], want_money=0,
             ),
             value_before=0.3, value_after=0.4,
             value_delta=0.1, recommended=True, simulations_used=1,
@@ -1177,9 +1190,9 @@ class TestC5Integration:
 
     def test_trade_timing_monopoly_gap_integration(self) -> None:
         """Full pipeline: monopoly gap triggers trade attempt."""
-        # LLM returns no_trade (the timing triggers but LLM doesn't find a deal)
+        # LLM picks "none" (choice 0) — the timing triggers but LLM declines
         client = _ScriptedLLMClient([
-            {"no_trade": True, "reasoning": "no good trades"},
+            {"choice": 0, "reasoning": "no good trades"},
         ])
         config = HybridAgentConfig(
             mcts_simulations=10,
@@ -1190,13 +1203,17 @@ class TestC5Integration:
             trade_on_stagnation=False,
         )
         agent = HybridAgent(player_id=0, config=config, llm_client=client)
-        game = _make_game()
-        # Give P0 two of three Light Blue to create a monopoly gap
-        game.property_manager.properties[6].owner = 0  # Oriental
+        # Custom game: P0 has 2/3 Light Blue + 1 non-critical property
+        game = MonopolyGame(num_players=3, seed=42)
+        pm = game.property_manager
+        pm.properties[6].owner = 0   # Oriental (Light Blue)
+        pm.properties[8].owner = 0   # Vermont (Light Blue)
+        pm.properties[9].owner = 1   # Connecticut (Light Blue) - P1 holds it
+        pm.properties[11].owner = 0  # St. Charles (Magenta, 1/3 = non-critical)
 
         agent._handle_trade_phase(game)
 
-        # LLM was called (timing triggered), even though it returned no_trade
+        # LLM was called (timing triggered), even though it chose "none"
         assert client.call_count == 1
         assert agent.trades_proposed == 0
 
@@ -1205,9 +1222,9 @@ class TestC5Integration:
         from agents.random_agent import RandomAgent
         from monopoly_gym.action_space import ActionEncoder
 
-        # LLM always returns no_trade — agent behaves like pure MCTS
+        # LLM always picks "none" — agent behaves like pure MCTS
         client = _ScriptedLLMClient(
-            [{"no_trade": True}] * 100,
+            [{"choice": 0, "reasoning": "no trade"}] * 100,
         )
         config = HybridAgentConfig(
             mcts_simulations=10,  # Fast
