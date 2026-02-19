@@ -20,6 +20,8 @@ GAMES=50
 MAX_TURNS=2000
 SEED=42
 OPPONENTS="rule_based"
+SIMS=50
+LLM_BUDGET=200
 
 mkdir -p "$RESULTS_DIR"
 
@@ -50,6 +52,7 @@ run mcts_2p_trades \
     --num-players 2 \
     --max-turns $MAX_TURNS \
     --seed $SEED \
+    --simulations $SIMS \
     --enable-trades \
     --json "$RESULTS_DIR/mcts_2p_trades.json" \
     --quiet
@@ -62,6 +65,7 @@ run mcts_4p_trades \
     --num-players 4 \
     --max-turns $MAX_TURNS \
     --seed $SEED \
+    --simulations $SIMS \
     --enable-trades \
     --json "$RESULTS_DIR/mcts_4p_trades.json" \
     --quiet
@@ -74,11 +78,12 @@ run mcts_2p_notrades \
     --num-players 2 \
     --max-turns $MAX_TURNS \
     --seed $SEED \
+    --simulations $SIMS \
     --json "$RESULTS_DIR/mcts_2p_notrades.json" \
     --quiet
 
-# Run 4: Hybrid + DeepSeek V3 (via OpenRouter) with trading, 2p, 2000 turns
-run hybrid_2p_deepseek \
+# Run 4: Hybrid + local Ollama gemma3:4b with trading, 2p, 2000 turns
+run hybrid_2p_ollama \
     "$SCRIPT_DIR/evaluate_hybrid.py" \
     --opponents $OPPONENTS \
     --games $GAMES \
@@ -86,9 +91,9 @@ run hybrid_2p_deepseek \
     --max-turns $MAX_TURNS \
     --seed $SEED \
     --enable-trades \
-    --llm openai --llm-model deepseek/deepseek-v3-0324 \
-    --llm-base-url https://openrouter.ai/api \
-    --json "$RESULTS_DIR/hybrid_2p_deepseek.json" \
+    --llm ollama --llm-model gemma3:4b \
+    --llm-budget $LLM_BUDGET \
+    --json "$RESULTS_DIR/hybrid_2p_ollama.json" \
     --quiet
 
 # Run 5: Hybrid + fake LLM with trading, 2p, 2000 turns (control)
@@ -100,6 +105,7 @@ run hybrid_2p_fake \
     --max-turns $MAX_TURNS \
     --seed $SEED \
     --enable-trades \
+    --llm-budget $LLM_BUDGET \
     --json "$RESULTS_DIR/hybrid_2p_fake.json" \
     --quiet
 

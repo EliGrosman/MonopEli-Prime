@@ -64,7 +64,10 @@ class _EvalLLMClient(LLMClient):
     ) -> dict[str, Any]:
         self.call_count += 1
         self.total_tokens += 50
-        # For trade proposals: suggest a simple trade if possible
+        # Multiple-choice trade prompt (generate_proposal_from_candidates)
+        if "pick the option number" in user_prompt.lower():
+            return {"choice": 0, "reasoning": "eval mode"}
+        # Free-form trade proposals
         if "propose" in user_prompt.lower() or "suggest" in user_prompt.lower():
             return {"no_trade": True, "reasoning": "eval mode"}
         # For trade evaluation: reject to be conservative
@@ -321,6 +324,7 @@ def run_evaluation(
     llm_model: str | None = None,
     llm_base_url: str | None = None,
     enable_trades: bool = False,
+    llm_budget: int = 50,
 ) -> EvalResults:
     """Run evaluation of HybridAgent against a specific opponent type."""
     results = EvalResults(
@@ -337,7 +341,7 @@ def run_evaluation(
             mcts_simulations=mcts_simulations,
             trade_eval_simulations=10,  # Faster for eval
             trade_check_interval=3,
-            token_budget=TokenBudget(max_calls_per_game=10),
+            token_budget=TokenBudget(max_calls_per_game=llm_budget),
         )
         negotiation_mgr = NegotiationManager(max_rounds=3)
         hybrid_agent = HybridAgent(
@@ -474,6 +478,10 @@ def parse_args() -> argparse.Namespace:
         help="Enable 1-for-1 property trading for heuristic agents",
     )
     parser.add_argument(
+        "--llm-budget", type=int, default=200,
+        help="Max LLM calls per game (default: 200)",
+    )
+    parser.add_argument(
         "--json", type=str, default=None,
         metavar="FILE",
         help="Write results to JSON file for later analysis",
@@ -530,6 +538,7 @@ def main() -> None:
             llm_model=args.llm_model,
             llm_base_url=args.llm_base_url,
             enable_trades=args.enable_trades,
+            llm_budget=args.llm_budget,
         )
         all_results.append(result)
 

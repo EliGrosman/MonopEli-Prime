@@ -70,6 +70,7 @@ class TradeGenerator:
 
     def __init__(self, client: LLMClient) -> None:
         self.client = client
+        self.last_call_used_llm: bool = False
 
     def generate_proposal(
         self,
@@ -175,12 +176,14 @@ class TradeGenerator:
             exist, the LLM picks "none", or validation fails.
         """
         # 1. Get heuristic candidates
+        self.last_call_used_llm = False
         candidates = suggest_valuable_trades(game, player_id, max_candidates)
         if not candidates:
             logger.info("No trade candidates for player %d", player_id)
             return None
 
-        # 2. Build prompt
+        # 2. Build prompt (LLM will be called)
+        self.last_call_used_llm = True
         state_text = serialize_game_state(game, player_id)
         options_text = _format_trade_options(candidates)
         user_prompt = build_propose_choice_prompt(state_text, options_text)

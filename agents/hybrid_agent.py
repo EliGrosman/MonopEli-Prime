@@ -299,9 +299,14 @@ class HybridAgent(Agent):
         Returns:
             True if a trade was proposed, False otherwise.
         """
-        # Generate proposal via LLM
+        # Always update cooldown when attempting trade generation
+        self._last_trade_turn = game.state.turn_number
+
         proposal = self._generator.generate_proposal_from_candidates(game, self.player_id)
-        self._budget.record_usage()
+
+        # Count against budget when LLM was actually called (candidates existed)
+        if self._generator.last_call_used_llm:
+            self._budget.record_usage()
 
         if proposal is None:
             return False
