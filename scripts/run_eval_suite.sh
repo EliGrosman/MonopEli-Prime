@@ -77,8 +77,8 @@ run mcts_2p_notrades \
     --json "$RESULTS_DIR/mcts_2p_notrades.json" \
     --quiet
 
-# Run 4: Hybrid + Ollama with trading, 2p, 2000 turns
-run hybrid_2p_ollama \
+# Run 4: Hybrid + DeepSeek V3 (via OpenRouter) with trading, 2p, 2000 turns
+run hybrid_2p_deepseek \
     "$SCRIPT_DIR/evaluate_hybrid.py" \
     --opponents $OPPONENTS \
     --games $GAMES \
@@ -86,8 +86,9 @@ run hybrid_2p_ollama \
     --max-turns $MAX_TURNS \
     --seed $SEED \
     --enable-trades \
-    --llm ollama --llm-model gemma3:4b \
-    --json "$RESULTS_DIR/hybrid_2p_ollama.json" \
+    --llm openai --llm-model deepseek/deepseek-v3-0324 \
+    --llm-base-url https://openrouter.ai/api \
+    --json "$RESULTS_DIR/hybrid_2p_deepseek.json" \
     --quiet
 
 # Run 5: Hybrid + fake LLM with trading, 2p, 2000 turns (control)
