@@ -157,9 +157,19 @@ def play_evaluation_game(
         if game.game_over:
             break
 
+        # Player may have gone bankrupt from rent after landing
+        if game.players[pid].bankrupt:
+            action_count += 1
+            continue
+
         agent = agents[pid]
         mask = encoder.get_action_mask(game, pid)
         obs: dict[str, Any] = {}
+
+        # Skip if no valid actions (safety check)
+        if not mask.any():
+            action_count += 1
+            continue
 
         action_idx = agent.choose_action(obs, mask, game)
         action = encoder.decode(action_idx, pid, game)
