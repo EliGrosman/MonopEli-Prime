@@ -66,3 +66,10 @@ errors or stalls, >=95% completion in EACH matchup, browser debt/jail flows, loc
 and verified branch/artifact recovery. A failing completion gate must remain visible. Changes
 in horizon/rules require development diagnosis and a new protocol/version before certification.
 No substantive model training, search certification or branch retirement precedes these gates.
+
+## Diagnostic follow-up (Milestone 1b)
+
+[The economic diagnosis](economic-diagnosis.md) preserves this ruleset and its production horizon.
+The ordinary mortgage rules require clearing every mortgage in a color group before building;
+`02a5e73` misses this check for sibling properties. A strict regression reproduces the defect;
+repair is a Milestone 1c prerequisite, not a newly approved variant. Readiness stays blocked.

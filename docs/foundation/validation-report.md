@@ -11,6 +11,16 @@ the headless runner use `apply_action`. Sparse terminal rewards, fresh observati
 independent episode streams and explicit incompatible-mode/checkpoint rejection replace the
 old training shortcuts. Search remains experimental; learned search and hybrid trading reject.
 
+## Milestone 1b follow-up
+
+[The economic diagnosis](economic-diagnosis.md) adds development-only accounting, controlled
+longer-horizon experiments and a concrete Milestone 1c recommendation. It confirms persistent
+split ownership as the largest sampled cutoff pattern, distinguishes some genuinely slow games,
+and reproduces a group-wide mortgage/build legality defect missed by the original invariants.
+The old measurements below remain historical candidate evidence, not a correctness certification.
+Readiness remains blocked by both the completion gate and that unrepaired defect. Rules, the
+1,000-turn production horizon, the 95% gate and pending branch cleanup remain unchanged.
+
 ## Tournament evidence
 
 Two runs each executed 12,000 games, including all seat rotations for 500 two-player or 250
