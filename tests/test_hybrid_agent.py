@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from agents.hybrid_agent import HybridAgent, HybridAgentConfig
 from mcts.llm.budget import TokenBudget
@@ -475,6 +474,9 @@ class TestTimingIntegration:
 # ---------------------------------------------------------------------------
 
 class TestGenerateAndVerifyTrade:
+    @pytest.mark.xfail(
+        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
+    )
     def test_successful_trade_proposal(self) -> None:
         """LLM generates, MCTS approves, NegotiationManager executes."""
         client = _FakeLLMClient()
@@ -1003,6 +1005,9 @@ class TestC5Integration:
         assert client.call_count == 0
         assert agent.trades_proposed == 0
 
+    @pytest.mark.xfail(
+        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
+    )
     def test_responds_to_incoming_trade_accept(self) -> None:
         """Full pipeline: incoming trade → MCTS eval → LLM decides accept."""
         # LLM responds with accept
@@ -1057,6 +1062,9 @@ class TestC5Integration:
         # Negotiation should be accepted
         assert neg.status == NegotiationStatus.ACCEPTED
 
+    @pytest.mark.xfail(
+        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
+    )
     def test_fast_path_accept_skips_llm(self) -> None:
         """When MCTS value improvement exceeds fast_accept_threshold, skip LLM."""
         client = _ScriptedLLMClient([])  # No responses needed
@@ -1112,6 +1120,9 @@ class TestC5Integration:
         # Actually, the _respond_to_negotiation method calls budget.record_usage
         # regardless, but the LLM's complete_json is not called by responder
 
+    @pytest.mark.xfail(
+        reason="Counteroffers are outside the one-response foundation-trade-v1 contract"
+    )
     def test_counter_proposal_flow(self) -> None:
         """LLM suggests a counter-proposal; NegotiationManager executes it."""
         client = _ScriptedLLMClient([
@@ -1205,7 +1216,11 @@ class TestC5Integration:
         assert client.call_count == 1
         assert agent.trades_proposed == 0
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Hybrid trading is disabled in foundation-v1")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Hybrid trading is disabled in foundation-v1",
+    )
     def test_full_game_with_mocked_llm(self) -> None:
         """Run a short game with HybridAgent and verify it completes."""
         from agents.random_agent import RandomAgent

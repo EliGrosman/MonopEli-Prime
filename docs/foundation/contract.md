@@ -69,6 +69,8 @@ No substantive model training, search certification or branch retirement precede
 
 The opt-in headless trading experiment is specified separately in
 [foundation-trade-v1](trading-contract.md). It does not change this certified no-trade contract.
+Its measured development and fresh-validation results are in the
+[Milestone 1c report](trading-results.md).
 
 ## Diagnostic follow-up (Milestone 1b)
 

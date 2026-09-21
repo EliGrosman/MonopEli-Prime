@@ -18,8 +18,21 @@ longer-horizon experiments and a concrete Milestone 1c recommendation. It confir
 split ownership as the largest sampled cutoff pattern, distinguishes some genuinely slow games,
 and reproduces a group-wide mortgage/build legality defect missed by the original invariants.
 The old measurements below remain historical candidate evidence, not a correctness certification.
-Readiness remains blocked by both the completion gate and that unrepaired defect. Rules, the
-1,000-turn production horizon, the 95% gate and pending branch cleanup remain unchanged.
+At the close of 1b, readiness remained blocked by both the completion gate and that then-unrepaired
+defect. Rules, the 1,000-turn production horizon, the 95% gate and pending branch cleanup remained
+unchanged.
+
+## Milestone 1c follow-up
+
+The mortgage/build defect is repaired in `ad6c632`; an exact 1,200-game rerun changed 157 traces
+but no outcome classification. The opt-in headless `foundation-trade-v1` experiment in `f7c7a2c`
+completed all 1,800 fresh validation games, reduced split-set cutoffs to zero, and passed replay,
+accounting, legality, and repeatability checks. See the [full comparative report](trading-results.md).
+
+This result supports proceeding to shared environment/API integration. It does not retroactively
+certify `foundation-v1`, and it is not a full foundation certification: Gym/API/browser trading is
+still deliberately disabled. The unchanged 95% per-matchup gate therefore remains blocked until
+those consumers share the contract and a fresh certification tournament passes.
 
 ## Tournament evidence
 
