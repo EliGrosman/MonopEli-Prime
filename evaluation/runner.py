@@ -13,6 +13,7 @@ import numpy as np
 from agents import AggressiveAgent, ConservativeAgent, RandomAgent, RuleBasedAgent
 from monopoly_engine import MonopolyGame
 from monopoly_engine.progress import ProgressGuard
+from monopoly_engine.types import PROPERTY_GROUPS
 from monopoly_gym.action_space import ActionEncoder
 
 POLICIES = {
@@ -32,6 +33,9 @@ def invariant(game: MonopolyGame) -> None:
     assert all(p.owner is None or not game.players[p.owner].bankrupt for p in props)
     assert all(p.money >= 0 for p in game.players)
     assert all(not p.mortgaged or p.houses == 0 for p in props)
+    for positions in PROPERTY_GROUPS.values():
+        group = [game.property_manager.properties[pos] for pos in positions]
+        assert not any(p.mortgaged for p in group) or not any(p.houses for p in group)
     if game.game_over:
         assert [p.id for p in game.players if not p.bankrupt] == [game.winner]
     else:

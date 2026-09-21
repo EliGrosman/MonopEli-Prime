@@ -139,8 +139,7 @@ class PropertyManager:
         if not group:
             return False
         return all(
-            self.properties.get(pos) is not None
-            and self.properties[pos].owner == player_id
+            self.properties.get(pos) is not None and self.properties[pos].owner == player_id
             for pos in group
         )
 
@@ -153,8 +152,7 @@ class PropertyManager:
         return sum(
             1
             for pos in PROPERTY_GROUPS[PropertyColor.RAILROAD]
-            if self.properties.get(pos) is not None
-            and self.properties[pos].owner == player_id
+            if self.properties.get(pos) is not None and self.properties[pos].owner == player_id
         )
 
     def count_utilities_owned(self, player_id: int) -> int:
@@ -162,8 +160,7 @@ class PropertyManager:
         return sum(
             1
             for pos in PROPERTY_GROUPS[PropertyColor.UTILITY]
-            if self.properties.get(pos) is not None
-            and self.properties[pos].owner == player_id
+            if self.properties.get(pos) is not None and self.properties[pos].owner == player_id
         )
 
     def count_houses_in_group(self, player_id: int, color: PropertyColor) -> int:
@@ -197,9 +194,7 @@ class PropertyManager:
     def count_total_hotels(self, player_id: int) -> int:
         """Count total hotels owned by player."""
         return sum(
-            1
-            for prop in self.properties.values()
-            if prop.owner == player_id and prop.houses == 5
+            1 for prop in self.properties.values() if prop.owner == player_id and prop.houses == 5
         )
 
     def get_min_houses_in_group(self, color: PropertyColor) -> int:
@@ -207,18 +202,14 @@ class PropertyManager:
         group = PROPERTY_GROUPS.get(color, ())
         if not group:
             return 0
-        return min(
-            self.properties[pos].houses for pos in group if pos in self.properties
-        )
+        return min(self.properties[pos].houses for pos in group if pos in self.properties)
 
     def get_max_houses_in_group(self, color: PropertyColor) -> int:
         """Get maximum number of houses on any property in a group."""
         group = PROPERTY_GROUPS.get(color, ())
         if not group:
             return 0
-        return max(
-            self.properties[pos].houses for pos in group if pos in self.properties
-        )
+        return max(self.properties[pos].houses for pos in group if pos in self.properties)
 
     def can_build_house_on(self, player_id: int, position: int) -> bool:
         """Check if a house can be built on a property (basic check).
@@ -252,6 +243,10 @@ class PropertyManager:
 
         # Must have monopoly
         if not self.has_monopoly(player_id, color):
+            return False
+
+        # The whole color group must be clear before any construction.
+        if any(self.properties[pos].mortgaged for pos in PROPERTY_GROUPS[color]):
             return False
 
         # Must build evenly - can only build if at min or tied for min

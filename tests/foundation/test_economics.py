@@ -7,7 +7,7 @@ import pytest
 from agents import AggressiveAgent, ConservativeAgent, RuleBasedAgent
 from evaluation.economics import EconomicObserver, diagnose_game
 from evaluation.runner import invariant, play_game
-from monopoly_engine import MonopolyGame, MortgageProperty, RollDice, foundation
+from monopoly_engine import MonopolyGame, MortgageProperty, RollDice, UnmortgageProperty, foundation
 from monopoly_engine.actions import BuildHouse
 from monopoly_gym.action_space import ActionEncoder
 
@@ -129,9 +129,6 @@ def test_build_threshold_decline_is_observed_at_end_turn():
         assert observer.declines == [{"turn": 0, "player": 0, "cash": 200, "positions": [1, 3]}]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="1b confirmed defect: mortgage on sibling must block building"
-)
 def test_mortgaged_sibling_must_block_engine_and_mask_build():
     game = MonopolyGame(2, seed=12)
     for pos in (1, 3):
@@ -145,6 +142,21 @@ def test_mortgaged_sibling_must_block_engine_and_mask_build():
     with pytest.raises(ValueError):
         game.apply_action(0, action)
     assert game.to_dict() == before
+
+    game.apply_action(0, UnmortgageProperty(0, 3))
+    assert action.validate(game)[0]
+    assert encoder.get_action_mask(game, 0)[2]
+
+
+def test_mortgaged_sibling_preserves_unimproved_monopoly_rent():
+    game = MonopolyGame(2, seed=12)
+    for pos in (1, 3):
+        game.property_manager.properties[pos].owner = 0
+    game.property_manager.properties[3].mortgaged = True
+    game.players[1].position = 1
+    foundation.property_landing(game, 1)
+    foundation.settle(game)
+    assert [p.money for p in game.players] == [1504, 1496]
 
 
 def test_bank_bankruptcy_does_not_invent_salvage_cash_flows():
