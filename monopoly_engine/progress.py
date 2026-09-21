@@ -17,6 +17,10 @@ def semantic_state(game: MonopolyGame) -> str:
             s.last_roll,
             s.obligations,
             s.continuation,
+            s.pending_trades,
+            s.next_trade_id,
+            s.trade_targets_this_turn,
+            s.trade_resume_phase,
             [
                 (p.money, p.position, p.in_jail, p.jail_turns, p.jail_cards, p.bankrupt)
                 for p in game.players

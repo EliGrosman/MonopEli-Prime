@@ -476,55 +476,18 @@ class ProposeTrade(Action):
         phase_valid, phase_error = game.validate_phase(self)
         if not phase_valid:
             return False, phase_error
-        if game.current_player != self.player_id:
-            return False, "Not your turn"
+        from .trading import validate_proposal
 
-        from_player = game.players[self.player_id]
-        if from_player.bankrupt:
-            return False, "Player is bankrupt"
-
-        if self.to_player == self.player_id:
-            return False, "Cannot trade with yourself"
-
-        if self.to_player < 0 or self.to_player >= len(game.players):
-            return False, "Invalid player ID"
-
-        to_player = game.players[self.to_player]
-        if to_player.bankrupt:
-            return False, "Cannot trade with bankrupt player"
-
-        # Validate the trade using rules
-        from .rules import validate_trade
-
-        is_valid, reason = validate_trade(
-            from_player,
-            to_player,
-            game.property_manager,
-            self.give_properties,
-            self.give_money,
-            self.want_properties,
-            self.want_money,
-        )
-        if not is_valid:
-            return False, reason
-
-        return True, ""
+        return validate_proposal(game, self)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Create a pending trade offer.
 
         The trade is stored in game state for the other player to accept/reject.
         """
-        # Store the pending trade in game state
-        # This will be implemented when game.py is created
-        game._add_pending_trade(
-            from_player=self.player_id,
-            to_player=self.to_player,
-            give_properties=self.give_properties,
-            give_money=self.give_money,
-            want_properties=self.want_properties,
-            want_money=self.want_money,
-        )
+        from .trading import propose
+
+        propose(game, self)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with all trade parameters."""
@@ -548,68 +511,15 @@ class AcceptTrade(Action):
         phase_valid, phase_error = game.validate_phase(self)
         if not phase_valid:
             return False, phase_error
-        player = game.players[self.player_id]
-        if player.bankrupt:
-            return False, "Player is bankrupt"
+        from .trading import validate_response
 
-        # Check if trade exists and is directed to this player
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return False, "Trade does not exist"
-
-        if trade["to_player"] != self.player_id:
-            return False, "Trade is not for you"
-
-        # Re-validate the trade (money/properties may have changed)
-        from .rules import validate_trade
-
-        from_player = game.players[trade["from_player"]]
-        to_player = game.players[trade["to_player"]]
-
-        is_valid, reason = validate_trade(
-            from_player,
-            to_player,
-            game.property_manager,
-            trade["give_properties"],
-            trade["give_money"],
-            trade["want_properties"],
-            trade["want_money"],
-        )
-        if not is_valid:
-            return False, f"Trade no longer valid: {reason}"
-
-        return True, ""
+        return validate_response(game, self.player_id, self.trade_id, accepting=True)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Execute the trade, transferring properties and money."""
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return
+        from .trading import accept
 
-        from_player = game.players[trade["from_player"]]
-        to_player = game.players[trade["to_player"]]
-
-        # Transfer properties from from_player to to_player
-        for pos in trade["give_properties"]:
-            prop = game.property_manager.properties[pos]
-            prop.owner = to_player.id
-
-        # Transfer properties from to_player to from_player
-        for pos in trade["want_properties"]:
-            prop = game.property_manager.properties[pos]
-            prop.owner = from_player.id
-
-        # Transfer money
-        if trade["give_money"] > 0:
-            from_player.remove_money(trade["give_money"])
-            to_player.add_money(trade["give_money"])
-
-        if trade["want_money"] > 0:
-            to_player.remove_money(trade["want_money"])
-            from_player.add_money(trade["want_money"])
-
-        # Remove the trade from pending
-        game._remove_pending_trade(self.trade_id)
+        accept(game, self.player_id, self.trade_id)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with trade_id."""
@@ -629,23 +539,15 @@ class RejectTrade(Action):
         phase_valid, phase_error = game.validate_phase(self)
         if not phase_valid:
             return False, phase_error
-        player = game.players[self.player_id]
-        if player.bankrupt:
-            return False, "Player is bankrupt"
+        from .trading import validate_response
 
-        # Check if trade exists and is directed to this player
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return False, "Trade does not exist"
-
-        if trade["to_player"] != self.player_id:
-            return False, "Trade is not for you"
-
-        return True, ""
+        return validate_response(game, self.player_id, self.trade_id, accepting=False)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Remove the trade from pending offers."""
-        game._remove_pending_trade(self.trade_id)
+        from .trading import reject
+
+        reject(game, self.player_id, self.trade_id)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with trade_id."""

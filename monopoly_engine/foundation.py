@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from .property import Property
 
 RULES_ID = "foundation-v1"
+TRADE_RULES_ID = "foundation-trade-v1"
+RULES_IDS = (RULES_ID, TRADE_RULES_ID)
 PHASES = (
     "pre_roll",
     "jail_decision",
@@ -46,6 +48,7 @@ class TransitionResult:
     revision: int
     eliminations: tuple[int, ...]
     winner: int | None
+    structured_events: tuple[dict[str, Any], ...] = ()
 
 
 def tuples(value: Any) -> Any:
@@ -80,8 +83,16 @@ def validate_phase(game: MonopolyGame, action: Action) -> tuple[bool, str]:
     if pid != s.decision_player or game.players[pid].bankrupt:
         return False, "Not your turn: another player owns this decision"
     name = type(action).__name__
-    if name in ("ProposeTrade", "AcceptTrade", "RejectTrade"):
-        return False, "Trading is disabled in foundation-v1"
+    if name == "ProposeTrade":
+        return (
+            game.rules_id == TRADE_RULES_ID
+            and s.phase == "asset_management"
+            and not s.roll_owed
+            and pid == game.current_player,
+            "Trade proposals require the turn owner's asset-management phase",
+        )
+    if name in ("AcceptTrade", "RejectTrade"):
+        return (s.phase == "trade_response", "No trade response is pending")
     selling = ("SellHouse", "SellHotel", "SellBuildingGroup", "MortgageProperty")
     if name in ("SellHouse", "SellHotel"):
         prop = game.property_manager.get(getattr(action, "property_id", -1))
@@ -123,6 +134,7 @@ def apply_action(game: MonopolyGame, pid: int, action: Action) -> TransitionResu
     if not valid:
         raise ValueError(reason)
     before_events = len(game.state.event_log)
+    before_structured = len(game.state.structured_event_log)
     before_eliminations = len(game.state.elimination_order)
     action.execute(game)
     name = type(action).__name__
@@ -142,6 +154,7 @@ def apply_action(game: MonopolyGame, pid: int, action: Action) -> TransitionResu
         s.revision,
         tuple(s.elimination_order[before_eliminations:]),
         game.winner,
+        tuple(s.structured_event_log[before_structured:]),
     )
 
 
@@ -153,6 +166,7 @@ def end_turn(game: MonopolyGame) -> None:
     s.turn_number += 1
     s.last_roll = None
     s.doubles_count = 0
+    s.trade_targets_this_turn.clear()
     s.roll_owed = True
     s.decision_player = game.current_player
     s.phase = "jail_decision" if game.players[game.current_player].in_jail else "pre_roll"
@@ -204,7 +218,7 @@ def settle(game: MonopolyGame) -> None:
             continue
         if game.players[game.current_player].bankrupt:
             end_turn(game)
-        else:
+        elif s.phase != "trade_response":
             s.decision_player = game.current_player
             if s.phase == "debt_resolution":
                 s.phase = "asset_management"
@@ -372,6 +386,7 @@ def execute_card(game: MonopolyGame, pid: int, card: Card) -> None:
 def legal_actions(game: MonopolyGame, pid: int) -> list[Action]:
     """Engine-owned legal decisions, independent of any RL index representation."""
     from .actions import (
+        AcceptTrade,
         BuildHotel,
         BuildHouse,
         BuyProperty,
@@ -379,6 +394,7 @@ def legal_actions(game: MonopolyGame, pid: int) -> list[Action]:
         MortgageProperty,
         PassBuy,
         PayJailFine,
+        RejectTrade,
         RollDice,
         SellBuildingGroup,
         SellHotel,
@@ -389,6 +405,10 @@ def legal_actions(game: MonopolyGame, pid: int) -> list[Action]:
 
     if game.game_over or pid != game.decision_player or game.players[pid].bankrupt:
         return []
+    if game.state.phase == "trade_response":
+        trade_id = next(iter(game.state.pending_trades), -1)
+        response_candidates: list[Action] = [AcceptTrade(pid, trade_id), RejectTrade(pid, trade_id)]
+        return [action for action in response_candidates if action.validate(game)[0]]
     candidates: list[Action] = [
         RollDice(pid),
         BuyProperty(pid, game.players[pid].position),

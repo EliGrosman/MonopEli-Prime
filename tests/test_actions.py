@@ -4,34 +4,32 @@ These tests verify that all action classes properly validate and execute
 their respective game operations. Phase orchestration is tested separately in tests/foundation.
 """
 
-import pytest
-from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 from monopoly_engine import (
-    MonopolyGame,
-    Player,
-    PropertyManager,
-    Property,
-    PropertyColor,
-    PROPERTY_GROUPS,
     JAIL_FINE,
-    Action,
-    RollDice,
-    BuyProperty,
-    BuildHouse,
-    BuildHotel,
-    SellHouse,
-    SellHotel,
-    MortgageProperty,
-    UnmortgageProperty,
-    ProposeTrade,
+    PROPERTY_GROUPS,
     AcceptTrade,
-    RejectTrade,
-    PayJailFine,
-    UseJailCard,
+    BuildHotel,
+    BuildHouse,
+    BuyProperty,
     DeclareBankruptcy,
     EndTurn,
+    MonopolyGame,
+    MortgageProperty,
+    PayJailFine,
+    Player,
+    PropertyColor,
+    PropertyManager,
+    ProposeTrade,
+    RejectTrade,
+    RollDice,
+    SellHotel,
+    SellHouse,
+    UnmortgageProperty,
+    UseJailCard,
 )
 
 
@@ -39,8 +37,10 @@ class MockGame(MonopolyGame):
     """Action-mechanics fixture; foundation tests exercise authoritative phases."""
 
     def __init__(self, players, property_manager):
-        super().__init__(len(players), seed=1)
-        self.pending_trades = {}
+        super().__init__(len(players), seed=1, rules_id="foundation-trade-v1")
+        self.state.phase = "asset_management"
+        self.state.roll_owed = False
+        self.pending_trades = self.state.pending_trades
         self.next_trade_id = 0
         self.players = self.state.players = players
         self.property_manager = self.state.property_manager = property_manager
@@ -597,7 +597,7 @@ class TestProposeTrade:
             give_properties=[1],
             give_money=100,
             want_properties=[3],
-            want_money=50,
+            want_money=0,
         )
         valid, error = action.validate(mock_game)
         assert valid
@@ -671,7 +671,7 @@ class TestProposeTrade:
             give_properties=[1],
             give_money=100,
             want_properties=[3],
-            want_money=50,
+            want_money=0,
         )
         action.execute(mock_game)
 
@@ -712,8 +712,9 @@ class TestAcceptTrade:
             "give_properties": [1],
             "give_money": 100,
             "want_properties": [3],
-            "want_money": 50,
+            "want_money": 0,
         }
+        mock_game.state.phase = "trade_response"
         action = AcceptTrade(player_id=1, trade_id=0)
         valid, error = action.validate(mock_game)
         assert valid
@@ -724,7 +725,7 @@ class TestAcceptTrade:
         action = AcceptTrade(player_id=1, trade_id=99)
         valid, error = action.validate(mock_game)
         assert not valid
-        assert "not exist" in error.lower()
+        assert "pending" in error.lower()
 
     def test_validate_trade_not_for_you(self, mock_game: MockGame) -> None:
         """Cannot accept trade not directed to you."""
@@ -736,10 +737,11 @@ class TestAcceptTrade:
             "want_properties": [],
             "want_money": 0,
         }
+        mock_game.state.phase = "trade_response"
         action = AcceptTrade(player_id=0, trade_id=0)
         valid, error = action.validate(mock_game)
         assert not valid
-        assert "not for you" in error.lower()
+        assert "another recipient" in error.lower()
 
     def test_execute_accept_trade(self, mock_game: MockGame) -> None:
         """Execute should transfer properties and money."""
@@ -751,8 +753,9 @@ class TestAcceptTrade:
             "give_properties": [1],
             "give_money": 100,
             "want_properties": [3],
-            "want_money": 50,
+            "want_money": 0,
         }
+        mock_game.state.phase = "trade_response"
 
         p0_money = mock_game.players[0].money
         p1_money = mock_game.players[1].money
@@ -765,8 +768,8 @@ class TestAcceptTrade:
         assert mock_game.property_manager.properties[3].owner == 0
 
         # Money transferred
-        assert mock_game.players[0].money == p0_money - 100 + 50
-        assert mock_game.players[1].money == p1_money + 100 - 50
+        assert mock_game.players[0].money == p0_money - 100
+        assert mock_game.players[1].money == p1_money + 100
 
         # Trade removed
         assert 0 not in mock_game.pending_trades
@@ -785,6 +788,7 @@ class TestRejectTrade:
             "want_properties": [],
             "want_money": 0,
         }
+        mock_game.state.phase = "trade_response"
         action = RejectTrade(player_id=1, trade_id=0)
         valid, error = action.validate(mock_game)
         assert valid
@@ -795,7 +799,7 @@ class TestRejectTrade:
         action = RejectTrade(player_id=1, trade_id=99)
         valid, error = action.validate(mock_game)
         assert not valid
-        assert "not exist" in error.lower()
+        assert "pending" in error.lower()
 
     def test_execute_reject_trade(self, mock_game: MockGame) -> None:
         """Execute should remove the trade."""
@@ -807,6 +811,7 @@ class TestRejectTrade:
             "want_properties": [],
             "want_money": 0,
         }
+        mock_game.state.phase = "trade_response"
         action = RejectTrade(player_id=1, trade_id=0)
         action.execute(mock_game)
 
@@ -946,9 +951,7 @@ class TestDeclareBankruptcy:
         assert mock_game.game_over
         assert mock_game.winner == 1
 
-    def test_execute_bankruptcy_returns_jail_cards(
-        self, mock_game: MockGame
-    ) -> None:
+    def test_execute_bankruptcy_returns_jail_cards(self, mock_game: MockGame) -> None:
         """Execute should return jail cards to deck."""
         mock_game.players[0].jail_cards = 2
         mock_game.state.jail_card_sources[0] = ["chance", "chest"]
@@ -990,9 +993,7 @@ class TestEndTurn:
         assert mock_game.doubles_count == 0
         assert mock_game.last_roll is None
 
-    def test_execute_skip_bankrupt_players(
-        self, mock_game_four_players: MockGame
-    ) -> None:
+    def test_execute_skip_bankrupt_players(self, mock_game_four_players: MockGame) -> None:
         """Execute should skip bankrupt players."""
         mock_game_four_players.players[1].bankrupt = True
         mock_game_four_players.players[2].bankrupt = True

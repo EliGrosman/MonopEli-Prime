@@ -53,6 +53,9 @@ class GameState:
     continuation: list[dict[str, Any]] = field(default_factory=list, init=False)
     jail_card_sources: dict[int, list[str]] = field(default_factory=dict, init=False)
     elimination_order: list[int] = field(default_factory=list, init=False)
+    next_trade_id: int = field(default=0, init=False)
+    trade_targets_this_turn: list[int] = field(default_factory=list, init=False)
+    trade_resume_phase: str | None = field(default=None, init=False)
     players: list[Player]
     property_manager: PropertyManager
     current_player: int = 0
@@ -66,6 +69,7 @@ class GameState:
     game_over: bool = False
     winner: int | None = None
     event_log: list[str] = field(default_factory=list)
+    structured_event_log: list[dict[str, Any]] = field(default_factory=list)
     pending_trades: dict[int, TradeOfferData] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,6 +94,9 @@ class GameState:
                 "continuation": self.continuation,
                 "jail_card_sources": self.jail_card_sources,
                 "elimination_order": self.elimination_order,
+                "next_trade_id": self.next_trade_id,
+                "trade_targets_this_turn": self.trade_targets_this_turn,
+                "trade_resume_phase": self.trade_resume_phase,
             },
             "players": [p.to_dict() for p in self.players],
             "properties": self.property_manager.to_dict(),
@@ -104,6 +111,7 @@ class GameState:
             "game_over": self.game_over,
             "winner": self.winner,
             "event_log": self.event_log[-50:],  # Last 50 events only
+            "structured_event_log": self.structured_event_log[-50:],
             "pending_trades": {
                 str(trade_id): trade_data for trade_id, trade_data in self.pending_trades.items()
             },
@@ -167,6 +175,7 @@ class GameState:
             game_over=data.get("game_over", False),
             winner=data.get("winner"),
             event_log=data.get("event_log", []),
+            structured_event_log=data.get("structured_event_log", []),
             pending_trades=pending_trades,
         )
 

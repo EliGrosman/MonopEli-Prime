@@ -67,6 +67,9 @@ and verified branch/artifact recovery. A failing completion gate must remain vis
 in horizon/rules require development diagnosis and a new protocol/version before certification.
 No substantive model training, search certification or branch retirement precedes these gates.
 
+The opt-in headless trading experiment is specified separately in
+[foundation-trade-v1](trading-contract.md). It does not change this certified no-trade contract.
+
 ## Diagnostic follow-up (Milestone 1b)
 
 [The economic diagnosis](economic-diagnosis.md) preserves this ruleset and its production horizon.

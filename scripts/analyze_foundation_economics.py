@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from evaluation.native_actions import decode_native_action
 from evaluation.runner import invariant
 from monopoly_engine import MonopolyGame
 from monopoly_gym.action_space import ActionEncoder
@@ -148,10 +149,14 @@ def verify_replays(path, records):
         game = MonopolyGame.from_dict(saved["replay"]["initial"])
         digest = hashlib.sha256()
         for item in saved["replay"]["trace"]:
-            result = game.apply_action(
-                item["actor"], encoder.decode(item["action"], item["actor"], game)
+            action = (
+                decode_native_action(item["native_action"])
+                if "native_action" in item
+                else encoder.decode(item["action"], item["actor"], game)
             )
+            result = game.apply_action(item["actor"], action)
             assert result.events == tuple(item["events"])
+            assert result.structured_events == tuple(item.get("structured_events", ()))
             assert result.revision == item["revision"]
             digest.update(json.dumps(item, sort_keys=True).encode())
             invariant(game)

@@ -36,6 +36,13 @@ def invariant(game: MonopolyGame) -> None:
     for positions in PROPERTY_GROUPS.values():
         group = [game.property_manager.properties[pos] for pos in positions]
         assert not any(p.mortgaged for p in group) or not any(p.houses for p in group)
+    assert len(game.state.pending_trades) <= 1
+    if game.state.phase == "trade_response":
+        assert game.rules_id == "foundation-trade-v1"
+        assert len(game.state.pending_trades) == 1
+        assert next(iter(game.state.pending_trades.values()))["to_player"] == game.decision_player
+    else:
+        assert not game.state.pending_trades
     if game.game_over:
         assert [p.id for p in game.players if not p.bankrupt] == [game.winner]
     else:
@@ -50,11 +57,13 @@ def play_game(
     max_turns: int = 1000,
     capture: bool = False,
     policy_instances: list[Any] | None = None,
+    rules_id: str = "foundation-v1",
+    trading: str | None = None,
 ) -> dict[str, Any]:
     n = len(policies)
     stream = np.random.SeedSequence(seed).spawn(n + 1)
     derived = [int(s.generate_state(1)[0]) for s in stream]
-    game = MonopolyGame(n, seed=derived[0])
+    game = MonopolyGame(n, seed=derived[0], rules_id=rules_id)
     if policy_instances is None:
         agents = [
             POLICIES[name](i, seed=derived[i + 1]) if name == "random" else POLICIES[name](i)
@@ -64,41 +73,72 @@ def play_game(
         agents = policy_instances
         if any(type(a).__name__ == "HybridAgent" for a in agents):
             raise ValueError("Hybrid side effects are disabled in foundation-v1")
+    if trading is not None:
+        from agents.trading_agent import TradingAgent
+
+        agents = [TradingAgent(agent, response=trading) for agent in agents]
     for agent in agents:
         agent.reset()
     encoder = ActionEncoder()
     guard = ProgressGuard()
     trace = []
     digest = hashlib.sha256()
+    gameplay_digest = hashlib.sha256()
     decisions, inference = 0, 0.0
     initial = game.to_dict()
     start = time.monotonic()
     status, error = "cutoff", None
     try:
         while not game.game_over:
-            if game.turn_number >= max_turns and (
+            # Resolve an offered trade before applying the soft focal boundary.
+            # This keeps a proposal/response pair atomic for horizon accounting
+            # and makes an always-rejecting control preserve ordinary gameplay.
+            if game.state.phase != "trade_response" and game.turn_number >= max_turns and (
                 game.decision_player == focal_seat or game.players[focal_seat].bankrupt
             ):
                 break
             guard.check(game)
             invariant(game)
             pid = game.decision_player
-            mask = encoder.get_action_mask(game, pid)
-            if not mask.any():
-                raise RuntimeError("Live decision has no legal actions")
             t = time.monotonic()
-            action = int(agents[pid].choose_action(None, mask, game))
+            if hasattr(agents[pid], "choose_native_action"):
+                decoded = agents[pid].choose_native_action(game, encoder)
+                try:
+                    action = encoder.encode(decoded)
+                except ValueError:
+                    action = None
+            else:
+                mask = encoder.get_action_mask(game, pid)
+                if not mask.any():
+                    raise RuntimeError("Live decision has no legal actions")
+                action = int(agents[pid].choose_action(None, mask, game))
+                if not 0 <= action < len(mask) or not mask[action]:
+                    raise ValueError(f"Illegal policy action: {action}")
+                decoded = encoder.decode(action, pid, game)
             inference += time.monotonic() - t
-            if not 0 <= action < len(mask) or not mask[action]:
-                raise ValueError(f"Illegal policy action: {action}")
-            result = game.apply_action(pid, encoder.decode(action, pid, game))
+            valid, reason = decoded.validate(game)
+            if not valid:
+                raise ValueError(f"Illegal policy action: {reason}")
+            result = game.apply_action(pid, decoded)
             item = {
                 "actor": pid,
-                "action": action,
                 "events": result.events,
                 "revision": result.revision,
             }
+            if action is None:
+                item["native_action"] = decoded.to_dict()
+            else:
+                item["action"] = action
+            if result.structured_events:
+                item["structured_events"] = result.structured_events
             digest.update(json.dumps(item, sort_keys=True).encode())
+            if action is not None:
+                gameplay_digest.update(
+                    json.dumps(
+                        {"actor": pid, "action": action, "events": result.events},
+                        sort_keys=True,
+                    ).encode()
+                )
             trace.append(item)
             decisions += 1
             invariant(game)
@@ -116,11 +156,15 @@ def play_game(
         "policy_configurations": [
             {
                 "class": type(a).__module__ + "." + type(a).__name__,
+                "base_class": type(getattr(a, "base", a)).__module__
+                + "."
+                + type(getattr(a, "base", a)).__name__,
                 "player_id": i,
-                "buy_threshold": getattr(a, "buy_threshold", None),
-                "build_threshold": getattr(a, "build_threshold", None),
+                "buy_threshold": getattr(getattr(a, "base", a), "buy_threshold", None),
+                "build_threshold": getattr(getattr(a, "base", a), "build_threshold", None),
                 "seed": derived[i + 1],
                 "mode": "direct",
+                "trading": trading,
             }
             for i, a in enumerate(agents)
         ],
@@ -140,13 +184,16 @@ def play_game(
         "overshoot": max(0, game.turn_number - max_turns),
         "error": error,
         "trace_sha256": digest.hexdigest(),
+        "gameplay_trace_sha256": gameplay_digest.hexdigest(),
         "runtime_seconds": time.monotonic() - start,
         "inference_seconds": inference,
-        "rules_id": "foundation-v1",
+        "rules_id": rules_id,
         "action_version": "action-v2",
         "observation_version": "observation-v2",
         "reward_version": "terminal-v1",
         "evaluator_version": EVALUATOR_VERSION,
+        "native_action_version": "native-action-v1" if trading else None,
+        "trading_diagnostics": [dict(getattr(a, "stats", {})) for a in agents],
     }
     if capture or status in ("error", "stalled"):
         result["replay"] = {"initial": initial, "trace": trace}

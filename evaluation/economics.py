@@ -26,7 +26,7 @@ from monopoly_engine.rules import (
 )
 from monopoly_engine.types import GO_SALARY, JAIL_FINE, PROPERTY_GROUPS, CardType, PropertyColor
 
-VERSION = "economic-diagnostics-v1"
+VERSION = "economic-diagnostics-v2"
 COLORS = [c for c in PROPERTY_GROUPS if c not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)]
 
 
@@ -95,6 +95,8 @@ class EconomicObserver:
         self.last_sample = -50
         self.ledger_checks = 0
         self.peak_buildings = 0
+        self.first_build_turn = None
+        self.first_complete_group_turn = None
 
     def transfer(self, source, target, amount, cause):
         if not amount:
@@ -175,6 +177,13 @@ class EconomicObserver:
                 self.peak_buildings,
                 sum(p.houses for p in game.property_manager.properties.values()),
             )
+            if self.first_complete_group_turn is None and type(action).__name__ in (
+                "AcceptTrade",
+                "BuyProperty",
+                "DeclareBankruptcy",
+            ):
+                if snapshot(game)["complete_groups"]:
+                    self.first_complete_group_turn = game.turn_number
             if game.turn_number - self.last_sample >= 50:
                 self.sample()
             return result
@@ -202,6 +211,8 @@ class EconomicObserver:
         if name == "BuyProperty":
             self.transfer(pid, None, get_property_cost(pos), "purchase")
         elif name in ("BuildHouse", "BuildHotel"):
+            if self.first_build_turn is None:
+                self.first_build_turn = game.turn_number
             self.transfer(pid, None, get_building_cost(pos), "build")
             if pos in self.sold:
                 self.rebuilds.append({"turn": game.turn_number, "player": pid, "position": pos})
@@ -238,6 +249,10 @@ class EconomicObserver:
                 self.mortgaged.remove(pos)
         elif name == "PayJailFine":
             self.transfer(pid, None, JAIL_FINE, "jail_fine")
+        elif name == "AcceptTrade":
+            offer = game.state.pending_trades[action.trade_id]
+            self.transfer(offer["from_player"], offer["to_player"], offer["give_money"], "trade")
+            self.transfer(offer["to_player"], offer["from_player"], offer["want_money"], "trade")
         elif name == "EndTurn":
             builds = [
                 a.property_id
@@ -288,6 +303,8 @@ class EconomicObserver:
             "labels": labels,
             "final": final,
             "peak_building_units": self.peak_buildings,
+            "first_build_turn": self.first_build_turn,
+            "first_complete_group_turn": self.first_complete_group_turn,
             "actions": dict(self.actions),
             "flows": dict(self.flows),
             "player_flows": dict(self.player_flows),

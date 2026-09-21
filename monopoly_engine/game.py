@@ -54,6 +54,7 @@ class MonopolyGame:
         num_players: int = 2,
         player_names: list[str] | None = None,
         seed: int | None = None,
+        rules_id: str = "foundation-v1",
     ) -> None:
         """Initialize a new Monopoly game.
 
@@ -65,6 +66,11 @@ class MonopolyGame:
         Raises:
             ValueError: If num_players is invalid or player_names length doesn't match
         """
+        from .foundation import RULES_IDS
+
+        if rules_id not in RULES_IDS:
+            raise ValueError(f"Unknown rules ID: {rules_id}")
+        self.rules_id = rules_id
         if not 2 <= num_players <= 8:
             raise ValueError("Number of players must be between 2 and 8")
 
@@ -506,111 +512,34 @@ class MonopolyGame:
         want_properties: list[int],
         want_money: int,
     ) -> int:
-        """Propose a trade between players.
+        """Submit a proposal through the authoritative transition boundary."""
+        from .actions import ProposeTrade
 
-        Creates a TradeOfferData and stores it in state.pending_trades.
-
-        Args:
-            from_player: Player initiating the trade
-            to_player: Player receiving the trade offer
-            give_properties: Properties the initiator is offering
-            give_money: Money the initiator is offering
-            want_properties: Properties the initiator wants
-            want_money: Money the initiator wants
-
-        Returns:
-            The trade ID
-
-        Raises:
-            InvalidPlayerError: If player IDs are invalid
-        """
-        # Validate players
-        from_p = self._get_player(from_player)
-        to_p = self._get_player(to_player)
-
-        # Generate unique trade ID
-        trade_id = len(self.state.pending_trades)
-
-        # Create trade offer
-        trade_offer: TradeOfferData = {
-            "from_player": from_player,
-            "to_player": to_player,
-            "give_properties": give_properties,
-            "give_money": give_money,
-            "want_properties": want_properties,
-            "want_money": want_money,
-        }
-
-        self.state.pending_trades[trade_id] = trade_offer
-
-        self.log_event(f"{from_p.name} proposed trade #{trade_id} to {to_p.name}")
-
+        trade_id = self.state.next_trade_id
+        self.apply_action(
+            from_player,
+            ProposeTrade(
+                from_player,
+                to_player,
+                give_properties,
+                give_money,
+                want_properties,
+                want_money,
+            ),
+        )
         return trade_id
 
     def accept_trade(self, trade_id: int) -> None:
-        """Accept and execute a trade.
+        """Accept a pending offer through the authoritative transition boundary."""
+        from .actions import AcceptTrade
 
-        Transfers properties and money, then removes trade from pending.
-
-        Args:
-            trade_id: The trade ID
-
-        Raises:
-            ValueError: If trade_id is invalid or trade cannot be executed
-        """
-        if trade_id not in self.state.pending_trades:
-            raise ValueError(f"Trade {trade_id} not found")
-
-        trade = self.state.pending_trades[trade_id]
-
-        from_player = self._get_player(trade["from_player"])
-        to_player = self._get_player(trade["to_player"])
-
-        # Validate funds
-        if from_player.money < trade["give_money"]:
-            raise ValueError(f"{from_player.name} doesn't have ${trade['give_money']}")
-        if to_player.money < trade["want_money"]:
-            raise ValueError(f"{to_player.name} doesn't have ${trade['want_money']}")
-
-        # Transfer money
-        if trade["give_money"] > 0:
-            from_player.remove_money(trade["give_money"])
-            to_player.add_money(trade["give_money"])
-
-        if trade["want_money"] > 0:
-            to_player.remove_money(trade["want_money"])
-            from_player.add_money(trade["want_money"])
-
-        # Transfer properties
-        for prop_id in trade["give_properties"]:
-            self.transfer_property(prop_id, trade["from_player"], trade["to_player"])
-
-        for prop_id in trade["want_properties"]:
-            self.transfer_property(prop_id, trade["to_player"], trade["from_player"])
-
-        # Remove from pending
-        del self.state.pending_trades[trade_id]
-
-        self.log_event(f"Trade #{trade_id} executed: {from_player.name} <-> {to_player.name}")
+        self.apply_action(self.decision_player, AcceptTrade(self.decision_player, trade_id))
 
     def reject_trade(self, trade_id: int) -> None:
-        """Reject a trade offer.
+        """Reject a pending offer through the authoritative transition boundary."""
+        from .actions import RejectTrade
 
-        Args:
-            trade_id: The trade ID
-
-        Raises:
-            ValueError: If trade_id is invalid
-        """
-        if trade_id not in self.state.pending_trades:
-            raise ValueError(f"Trade {trade_id} not found")
-
-        trade = self.state.pending_trades[trade_id]
-        to_player = self._get_player(trade["to_player"])
-
-        del self.state.pending_trades[trade_id]
-
-        self.log_event(f"Trade #{trade_id} rejected by {to_player.name}")
+        self.apply_action(self.decision_player, RejectTrade(self.decision_player, trade_id))
 
     def get_pending_trade(self, trade_id: int) -> TradeOfferData | None:
         """Get a pending trade offer.
@@ -802,7 +731,7 @@ class MonopolyGame:
         from copy import deepcopy
 
         result = self.state.to_dict()
-        result["rules_id"] = "foundation-v1"
+        result["rules_id"] = self.rules_id
         result["rng_states"] = [
             self.rng.getstate(),
             self.state.chance_deck._rng.getstate(),
@@ -822,6 +751,11 @@ class MonopolyGame:
         """
         # Create game with minimal initialization
         game = cls.__new__(cls)
+        from .foundation import RULES_IDS
+
+        game.rules_id = data.get("rules_id", "foundation-v1")
+        if game.rules_id not in RULES_IDS:
+            raise ValueError(f"Unknown rules ID: {game.rules_id}")
 
         # Reconstruct state
         game.state = GameState.from_dict(data)
@@ -853,6 +787,10 @@ class MonopolyGame:
         """
         self.state.log_event(message)
 
+    def log_structured_event(self, event: dict[str, Any]) -> None:
+        """Append a deterministic public event without changing game state."""
+        self.state.structured_event_log.append(event)
+
     # Helper methods for actions.py compatibility
     # TODO: Refactor actions.py to use public orchestration methods directly
 
@@ -865,24 +803,16 @@ class MonopolyGame:
         want_properties: list[int],
         want_money: int,
     ) -> int:
-        """Add a pending trade (compatibility method for actions.py)."""
-        return self.propose_trade(
-            from_player,
-            to_player,
-            give_properties,
-            give_money,
-            want_properties,
-            want_money,
-        )
+        """Reject mutation outside the authoritative action boundary."""
+        raise RuntimeError("Use ProposeTrade through apply_action")
 
     def _get_pending_trade(self, trade_id: int) -> TradeOfferData | None:
         """Get a pending trade (compatibility method for actions.py)."""
         return self.get_pending_trade(trade_id)
 
     def _remove_pending_trade(self, trade_id: int) -> None:
-        """Remove a pending trade (compatibility method for actions.py)."""
-        if trade_id in self.state.pending_trades:
-            del self.state.pending_trades[trade_id]
+        """Reject mutation outside the authoritative action boundary."""
+        raise RuntimeError("Use AcceptTrade or RejectTrade through apply_action")
 
     def _return_jail_card(self, player_id: int | None = None) -> None:
         from .foundation import return_jail_card
