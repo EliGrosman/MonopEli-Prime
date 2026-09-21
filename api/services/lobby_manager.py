@@ -565,16 +565,21 @@ class LobbyManager:
                         # Mark the slot as AI
                         if game_player_id in active_game.player_slots:
                             active_game.player_slots[game_player_id].is_ai = True
-                            active_game.player_slots[game_player_id].ai_type = (
-                                player.ai_type
-                            )
+                            active_game.player_slots[game_player_id].ai_type = player.ai_type
 
                         # Create AI agent
                         if self._ai_manager is not None:
+                            import hashlib
+
+                            seed_material = f"{active_game.root_seed}:opponent:{game_player_id}"
+                            opponent_seed = int.from_bytes(
+                                hashlib.sha256(seed_material.encode()).digest()[:8], "big"
+                            )
                             self._ai_manager.create_agent(
                                 game_id=game_id,
                                 player_id=game_player_id,
                                 ai_type=player.ai_type or "rule_based",
+                                seed=opponent_seed,
                             )
                     else:
                         # Claim slot for human player
@@ -606,9 +611,7 @@ class LobbyManager:
                 if self._ai_manager.is_ai_player(game_id, first_player):
                     # Schedule AI turn processing (don't await, let it run)
                     asyncio.create_task(
-                        self._ai_manager.process_ai_turns_for_game(
-                            self._game_manager, game_id
-                        )
+                        self._ai_manager.process_ai_turns_for_game(self._game_manager, game_id)
                     )
 
             return True, "", game_id
@@ -701,5 +704,3 @@ class LobbyManager:
             f"lobby:{lobby_id}",
             {"type": event_type.value, "data": data},
         )
-
-

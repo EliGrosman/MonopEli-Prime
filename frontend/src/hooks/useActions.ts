@@ -26,27 +26,16 @@ export function useActions({ send }: UseActionsOptions) {
     [gameState?.players, playerId]
   );
 
-  // Computed states for UI
-  const isMyTurn = gameState?.currentPlayer === playerId;
+  const isMyTurn = gameState?.decision_player === playerId;
   const isInJail = currentPlayer?.inJail ?? false;
   const doublesCount = gameState?.doublesCount ?? 0;
-
-  // Can roll if: it's my turn, not in jail, AND either:
-  // - In pre_roll phase (haven't rolled yet), OR
-  // - In post_roll phase but rolled doubles (doublesCount > 0), so must roll again
-  const canRollDice =
-    isMyTurn &&
-    !isInJail &&
-    (gameState?.gamePhase === 'pre_roll' ||
-      (gameState?.gamePhase === 'post_roll' && doublesCount > 0));
-
-  // Can roll in jail: try for doubles to escape
-  const canRollInJail = isMyTurn && isInJail && gameState?.gamePhase === 'pre_roll';
-
-  // Can end turn if: it's my turn, we've rolled (post_roll), and we didn't roll doubles
-  const canEndTurn = isMyTurn && gameState?.gamePhase === 'post_roll' && doublesCount === 0;
-  const canPayJailFine = isMyTurn && isInJail && (currentPlayer?.money ?? 0) >= 50;
-  const canUseJailCard = isMyTurn && isInJail && (currentPlayer?.jailCards ?? 0) > 0;
+  const legal = (type: string) =>
+    isMyTurn && (gameState?.legal_actions ?? []).some((action) => action.type === type);
+  const canRollDice = !isInJail && legal('RollDice');
+  const canRollInJail = isInJail && legal('RollDice');
+  const canEndTurn = legal('EndTurn');
+  const canPayJailFine = legal('PayJailFine');
+  const canUseJailCard = legal('UseJailCard');
 
   const sendAction = useCallback(
     (actionType: string, data: Record<string, unknown> = {}) => {
@@ -99,7 +88,7 @@ export function useActions({ send }: UseActionsOptions) {
     ),
 
     // Pass on buying just ends the turn (no specific action needed)
-    passBuy: useCallback(() => sendAction('end_turn'), [sendAction]),
+    passBuy: useCallback(() => sendAction('pass_buy'), [sendAction]),
 
     // Building
     buildHouse: useCallback(

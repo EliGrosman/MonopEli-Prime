@@ -1,0 +1,129 @@
+[
+  {
+    "ref": "origin/feature/mcts_engine",
+    "head": "f5320108407bc14d3020e182675c2d3e2b704395",
+    "merge_base": "f5320108407bc14d3020e182675c2d3e2b704395",
+    "unique_commits": [],
+    "unique_files": [],
+    "patch_equivalence": []
+  },
+  {
+    "ref": "origin/feature/llm_trading",
+    "head": "5cf25820903ab079038e7f6db6cf06de5c7ebc94",
+    "merge_base": "5cf25820903ab079038e7f6db6cf06de5c7ebc94",
+    "unique_commits": [],
+    "unique_files": [],
+    "patch_equivalence": []
+  },
+  {
+    "ref": "origin/feature/mcts_updates",
+    "head": "e20b14199840bfa26326d86bf1cd46a1eb5ecc99",
+    "merge_base": "b9d8f95b5becacffe982c7869b8b2c39313e560e",
+    "unique_commits": [
+      "e20b14199840bfa26326d86bf1cd46a1eb5ecc99 fix tests",
+      "687a2ae6986bf8d5b60abe3a25a03dbf7f51c850 Update tests",
+      "ce7d7920ca581feef95b4d822add74b1f43e43a9 llm budget fixes",
+      "2c5136f8050ac00418b42bb435c1d0451bf4037a Auto roll / bankrupt fix",
+      "ce94182fb3bb0f77f95bc6a06017e938b881f033 Auto roll dice in eval",
+      "24f19c6876d0ccb944b7424f0e22821f7dfe26f0 update eval script",
+      "94af8ece1b53683465395fa8e4d162439c7418b6 LLM api url",
+      "51989391bec64320b030573a9cfad6330003ca88 Eval suite script",
+      "0e156ec93b337fecd5ba4c9e6fc6fe735d788725 New comparison script",
+      "db9a1e8c51529f7c8245d1dae6a450e0cbdbee32 json output to hybrid eval",
+      "2bc5b5ae649758493f3fba0fabae4edb834e4084 Add trade proposal to agent",
+      "f340fe93d8e82311d98f149b505d30fd7d5ed68b Trade proposal generator for llm",
+      "79d9694ac7422bae320432795df85aaeb345dee3 Multiple choice prompt template",
+      "994c4015da424a68cb534e197aa4b717cd9f21f6 Rule-based trading heuristics"
+    ],
+    "unique_files": [
+      "agents/hybrid_agent.py",
+      "agents/rule_based.py",
+      "mcts/eval.py",
+      "mcts/llm/prompts.py",
+      "mcts/llm/trade_generator.py",
+      "scripts/compare_results.py",
+      "scripts/evaluate_hybrid.py",
+      "scripts/evaluate_mcts.py",
+      "scripts/run_eval_suite.sh",
+      "tests/test_agents.py",
+      "tests/test_hybrid_agent.py",
+      "tests/test_mcts_eval.py",
+      "tests/test_trade_generator.py"
+    ],
+    "patch_equivalence": [
+      "+ 994c4015da424a68cb534e197aa4b717cd9f21f6",
+      "+ 79d9694ac7422bae320432795df85aaeb345dee3",
+      "+ f340fe93d8e82311d98f149b505d30fd7d5ed68b",
+      "+ 2bc5b5ae649758493f3fba0fabae4edb834e4084",
+      "+ db9a1e8c51529f7c8245d1dae6a450e0cbdbee32",
+      "+ 0e156ec93b337fecd5ba4c9e6fc6fe735d788725",
+      "+ 51989391bec64320b030573a9cfad6330003ca88",
+      "+ 94af8ece1b53683465395fa8e4d162439c7418b6",
+      "+ 24f19c6876d0ccb944b7424f0e22821f7dfe26f0",
+      "+ ce94182fb3bb0f77f95bc6a06017e938b881f033",
+      "+ 2c5136f8050ac00418b42bb435c1d0451bf4037a",
+      "+ ce7d7920ca581feef95b4d822add74b1f43e43a9",
+      "+ 687a2ae6986bf8d5b60abe3a25a03dbf7f51c850",
+      "+ e20b14199840bfa26326d86bf1cd46a1eb5ecc99"
+    ]
+  },
+  {
+    "ref": "origin/feature/synthetic_data_generation",
+    "head": "189a6df25294cbb9f4cecaf6af690e69a692eeaa",
+    "merge_base": "323efedb4f020ad7bf03415d1aa013b1287958c4",
+    "unique_commits": [
+      "189a6df25294cbb9f4cecaf6af690e69a692eeaa synthetic data and cloning",
+      "f321246561d0a4d00407b64baf5d6aefcbbd5bd3 generate data from rule based agent"
+    ],
+    "unique_files": [
+      ".gitattributes",
+      ".gitignore",
+      "data/expert/test/stats.json",
+      "data/expert/test/train.h5",
+      "data/expert/test/val.h5",
+      "models/bc/a",
+      "models/bc/bc_model.zip",
+      "models/bc/tensorboard/events.out.tfevents.1770768885.Elis-MacBook-Pro.local.41238.0",
+      "monopoly_gym/env.py",
+      "pyproject.toml",
+      "scripts/generate_expert_data.py",
+      "scripts/train_bc.py",
+      "training/behavioral_cloning.py",
+      "training/pettingzoo_selfplay.py",
+      "uv.lock"
+    ],
+    "patch_equivalence": [
+      "+ f321246561d0a4d00407b64baf5d6aefcbbd5bd3",
+      "+ 189a6df25294cbb9f4cecaf6af690e69a692eeaa"
+    ]
+  },
+  {
+    "ref": "origin/feature/training_phase2",
+    "head": "9b210b45c2a8dd86920473ea52d6be58646ec474",
+    "merge_base": "001601fb3ab855fbbb577bf0975fec877b34ff01",
+    "unique_commits": [
+      "9b210b45c2a8dd86920473ea52d6be58646ec474 another loading error",
+      "0d3cd1afdd162b754e3f33acba957661058be387 ppg model",
+      "8fcbfdd8fd059d053d9d837d8be8f2e1130a8286 optimizer loading error",
+      "0d4f8cb7faf87a5608afead2c9ec09e7bfcc7615 rank based reward",
+      "fb17e13c39f51a8f680b515d6533624690e9ce49 VecNormalize + Separate value func lr",
+      "65f3363ba63cd2f7086c61f13ca6def1c5d806a9 tensorboard"
+    ],
+    "unique_files": [
+      "pyproject.toml",
+      "scripts/train_selfplay.py",
+      "training/callbacks.py",
+      "training/pettingzoo_selfplay.py",
+      "training/ppg_trainer.py",
+      "uv.lock"
+    ],
+    "patch_equivalence": [
+      "+ 65f3363ba63cd2f7086c61f13ca6def1c5d806a9",
+      "+ fb17e13c39f51a8f680b515d6533624690e9ce49",
+      "+ 0d4f8cb7faf87a5608afead2c9ec09e7bfcc7615",
+      "+ 8fcbfdd8fd059d053d9d837d8be8f2e1130a8286",
+      "+ 0d3cd1afdd162b754e3f33acba957661058be387",
+      "+ 9b210b45c2a8dd86920473ea52d6be58646ec474"
+    ]
+  }
+]

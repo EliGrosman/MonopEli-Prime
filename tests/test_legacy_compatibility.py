@@ -368,6 +368,7 @@ class TestJailMechanics:
         # Send player to jail and give them a card
         game.send_to_jail(0)
         game.state.players[0].jail_cards = 1
+        game.state.jail_card_sources[0] = ["chance"]
 
         # Use card
         action = UseJailCard(player_id=0)
@@ -385,11 +386,13 @@ class TestJailMechanics:
         game.send_to_jail(0)
 
         # Simulate 3 turns (jail_turns goes 0 -> 1 -> 2, then auto-release)
-        game.state.players[0].jail_turns = 3
+        game.state.players[0].jail_turns = 2
+        game.state.phase = "jail_decision"
+        game.roll_dice = lambda: (1, 2)
 
         # Roll dice should trigger auto-release
         action = RollDice(player_id=0)
-        action.execute(game)
+        game.apply_action(0, action)
 
         # Should be out of jail
         assert not game.state.players[0].in_jail, "Should be auto-released after 3 turns"

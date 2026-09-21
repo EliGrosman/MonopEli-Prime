@@ -100,6 +100,7 @@ class TestMakeOpponent:
 class TestPlayEvaluationGame:
     """Test single evaluation game runner."""
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_returns_three_tuple(self) -> None:
         """play_evaluation_game should return (winner, action_count, elapsed)."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -110,6 +111,7 @@ class TestPlayEvaluationGame:
 
         assert len(result) == 3
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_action_count_bounded(self) -> None:
         """Action count should not exceed max_turns."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -123,6 +125,7 @@ class TestPlayEvaluationGame:
 
         assert action_count <= max_turns
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_winner_is_valid_player_or_none(self) -> None:
         """Winner should be a player ID (0-3) or None."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -134,6 +137,7 @@ class TestPlayEvaluationGame:
 
         assert winner is None or 0 <= winner <= 3
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_elapsed_is_positive(self) -> None:
         """Elapsed time should be positive."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -146,6 +150,7 @@ class TestPlayEvaluationGame:
 
         assert elapsed > 0.0
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_resets_agent_between_calls(self) -> None:
         """Each game call should reset the MCTS agent stats."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -160,6 +165,7 @@ class TestPlayEvaluationGame:
         # Second game resets stats, so second game's count should equal first
         assert stats_after_second == stats_after_first
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_two_player_game(self) -> None:
         """Should work with 2-player game (MCTS vs 1 opponent)."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)
@@ -191,6 +197,7 @@ class TestEvaluateMCTSAgent:
             verbose=False,
         )
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_returns_dict(self) -> None:
         """evaluate_mcts_agent should return a dict."""
         result = evaluate_mcts_agent(
@@ -199,6 +206,7 @@ class TestEvaluateMCTSAgent:
         )
         assert isinstance(result, dict)
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_result_has_opponent_keys(self) -> None:
         """Result dict should have one key per opponent type."""
         result = evaluate_mcts_agent(
@@ -208,12 +216,14 @@ class TestEvaluateMCTSAgent:
         assert "random" in result
         assert "rule_based" in result
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_default_opponents(self) -> None:
         """Default opponents should be random and rule_based."""
         result = evaluate_mcts_agent(**self._fast_kwargs())
         assert "random" in result
         assert "rule_based" in result
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_each_result_has_metric_keys(self) -> None:
         """Each opponent dict should have expected numeric keys."""
         result = evaluate_mcts_agent(
@@ -224,6 +234,7 @@ class TestEvaluateMCTSAgent:
         for key in ("win_rate", "avg_game_length", "avg_time_sec", "num_games"):
             assert key in metrics, f"Missing key: {key}"
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_win_rate_in_valid_range(self) -> None:
         """win_rate should be in [0, 1]."""
         result = evaluate_mcts_agent(
@@ -233,6 +244,7 @@ class TestEvaluateMCTSAgent:
         wr = result["random"]["win_rate"]
         assert 0.0 <= wr <= 1.0
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_all_four_opponent_types(self) -> None:
         """Should work with all four supported opponent types."""
         result = evaluate_mcts_agent(
@@ -241,6 +253,7 @@ class TestEvaluateMCTSAgent:
         )
         assert len(result) == 4
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_evaluation_runs_to_completion(self) -> None:
         """Should run without errors for a complete eval."""
         # No assertion beyond "doesn't raise"
@@ -249,6 +262,7 @@ class TestEvaluateMCTSAgent:
             **self._fast_kwargs(),
         )
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_tensorboard_logging(self, tmp_path: pytest.TempPathFactory) -> None:
         """When tensorboard_dir is given, event files should be created."""
         tb_dir = tmp_path / "tb"  # type: ignore[operator]

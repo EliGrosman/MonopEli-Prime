@@ -95,8 +95,8 @@ Examples:
     parser.add_argument(
         "--max-turns",
         type=int,
-        default=500,
-        help="Maximum turns per game (default: 500)",
+        default=1000,
+        help="Completed-turn horizon (default: 1000)",
     )
     parser.add_argument(
         "--eval-freq",
@@ -107,8 +107,8 @@ Examples:
     parser.add_argument(
         "--eval-episodes",
         type=int,
-        default=50,
-        help="Episodes per evaluation (default: 50)",
+        default=200,
+        help="Episodes per evaluation (default: 200)",
     )
     parser.add_argument(
         "--save-freq",
@@ -193,8 +193,8 @@ Examples:
     parser.add_argument(
         "--worth-scale",
         type=float,
-        default=500.0,
-        help="Divisor for dense reward net worth delta (default: 500.0)",
+        default=None,
+        help="Unsupported in foundation-v1; retained only to reject legacy shaping configurations",
     )
     parser.add_argument(
         "--clip-range",
@@ -211,8 +211,9 @@ Examples:
     parser.add_argument(
         "--terminal-scale",
         type=float,
-        default=5.0,
-        help="Terminal reward magnitude for dense mode (+val win, -val loss) (default: 5.0)",
+        default=1.0,
+        choices=[1.0],
+        help="Fixed foundation terminal reward magnitude (+1 win, -1 elimination)",
     )
     parser.add_argument(
         "--load-model",
@@ -223,9 +224,9 @@ Examples:
     parser.add_argument(
         "--reward-type",
         type=str,
-        choices=["sparse", "dense"],
-        default="dense",
-        help="Reward type: sparse (win/loss only) or dense (per-step shaping) (default: dense)",
+        choices=["sparse"],
+        default="sparse",
+        help="Foundation terminal-only rewards",
     )
     parser.add_argument(
         "--min-win-rate",

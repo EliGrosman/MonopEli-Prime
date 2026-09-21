@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -154,9 +156,11 @@ class TestChooseAction:
         # Mock MCTSAgent to return a known action
         agent._mcts_agent.choose_action = MagicMock(return_value=42)
 
-        action = agent.choose_action(obs, mask, game)
-        assert action == 42
-        agent._mcts_agent.choose_action.assert_called_once_with(obs, mask, game)
+        before = game.to_dict()
+        with pytest.raises(NotImplementedError, match="disabled"):
+            agent.choose_action(obs, mask, game)
+        assert game.to_dict() == before
+        agent._mcts_agent.choose_action.assert_not_called()
 
     def test_handles_trade_before_mcts(self) -> None:
         """Trade phase runs before MCTS delegation."""
@@ -176,8 +180,9 @@ class TestChooseAction:
         agent._handle_trade_phase = mock_handle  # type: ignore[assignment]
         agent._mcts_agent.choose_action = MagicMock(return_value=0)
 
-        agent.choose_action(obs, mask, game)
-        assert trade_phase_called
+        with pytest.raises(NotImplementedError, match="disabled"):
+            agent.choose_action(obs, mask, game)
+        assert not trade_phase_called
 
 
 # ---------------------------------------------------------------------------
@@ -977,9 +982,9 @@ class TestC5Integration:
         agent._handle_trade_phase(game)
 
         # Trade should have been proposed
-        assert agent.trades_proposed == 1
+        assert agent.trades_proposed == 0
         # NegotiationManager should have 1 negotiation
-        assert len(agent.negotiation_manager._negotiations) == 1
+        assert len(agent.negotiation_manager._negotiations) == 0
 
     def test_budget_exhaustion_stops_llm_calls(self) -> None:
         """When token budget is exhausted, no LLM calls are made."""
@@ -1200,6 +1205,7 @@ class TestC5Integration:
         assert client.call_count == 1
         assert agent.trades_proposed == 0
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Hybrid trading is disabled in foundation-v1")
     def test_full_game_with_mocked_llm(self) -> None:
         """Run a short game with HybridAgent and verify it completes."""
         from agents.random_agent import RandomAgent

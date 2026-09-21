@@ -163,8 +163,7 @@ class HybridAgent(Agent):
         Handles trade logic as a side effect, then delegates to MCTSAgent
         for the normal gameplay action.
         """
-        self._handle_trade_phase(game)
-        return self._mcts_agent.choose_action(observation, action_mask, game)
+        raise NotImplementedError("Hybrid trading is disabled in foundation-v1")
 
     # ------------------------------------------------------------------
     # Trade orchestration

@@ -382,6 +382,7 @@ class CardDeck:
         deck = cls(
             cards=[card_map[card_id] for card_id in data.get("draw_pile", [])],
             discard=[card_map[card_id] for card_id in data.get("discard_pile", [])],
+            _auto_shuffle=False,
         )
         if seed is not None:
             deck._rng = random.Random(seed)

@@ -1,8 +1,7 @@
 """Tests for actions.py module.
 
 These tests verify that all action classes properly validate and execute
-their respective game operations. Since game.py doesn't exist yet, we create
-mock game objects for testing.
+their respective game operations. Phase orchestration is tested separately in tests/foundation.
 """
 
 import pytest
@@ -10,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from monopoly_engine import (
+    MonopolyGame,
     Player,
     PropertyManager,
     Property,
@@ -35,26 +35,22 @@ from monopoly_engine import (
 )
 
 
-# Mock game class for testing (since game.py doesn't exist yet)
-@dataclass
-class MockGame:
-    """Mock game object for testing actions."""
+class MockGame(MonopolyGame):
+    """Action-mechanics fixture; foundation tests exercise authoritative phases."""
 
-    players: list[Player]
-    property_manager: PropertyManager
-    current_player: int = 0
-    turn_number: int = 1
-    houses_remaining: int = 32
-    hotels_remaining: int = 12
-    doubles_count: int = 0
-    last_roll: tuple[int, int] | None = None
-    game_over: bool = False
-    winner: int | None = None
-    pending_trades: dict[int, dict[str, Any]] = field(default_factory=dict)
-    next_trade_id: int = 0
+    def __init__(self, players, property_manager):
+        super().__init__(len(players), seed=1)
+        self.pending_trades = {}
+        self.next_trade_id = 0
+        self.players = self.state.players = players
+        self.property_manager = self.state.property_manager = property_manager
 
-    def _handle_dice_roll(self, player_id: int) -> None:
-        """Mock dice roll handler."""
+    def validate_phase(self, action):
+        return True, ""
+
+    def _return_jail_card(self, player_id):
+        # These payload unit tests do not draw decks. Provenance is tested
+        # with real decks in tests/foundation.
         pass
 
     def _add_pending_trade(
@@ -85,14 +81,6 @@ class MockGame:
     def _remove_pending_trade(self, trade_id: int) -> None:
         """Mock remove pending trade."""
         self.pending_trades.pop(trade_id, None)
-
-    def _return_jail_card(self) -> None:
-        """Mock jail card return."""
-        pass
-
-    def _return_jail_cards(self, count: int) -> None:
-        """Mock multiple jail cards return."""
-        pass
 
 
 @pytest.fixture
@@ -912,6 +900,7 @@ class TestDeclareBankruptcy:
 
     def test_validate_success(self, mock_game: MockGame) -> None:
         """Can always declare bankruptcy."""
+        mock_game.state.obligations = [{"debtor": 0, "amount": 10000, "creditor": None}]
         action = DeclareBankruptcy(player_id=0)
         valid, error = action.validate(mock_game)
         assert valid
@@ -920,6 +909,7 @@ class TestDeclareBankruptcy:
     def test_validate_already_bankrupt(self, mock_game: MockGame) -> None:
         """Cannot declare bankruptcy twice."""
         mock_game.players[0].bankrupt = True
+        mock_game.state.obligations = [{"debtor": 0, "amount": 10000, "creditor": None}]
         action = DeclareBankruptcy(player_id=0)
         valid, error = action.validate(mock_game)
         assert not valid
@@ -932,6 +922,7 @@ class TestDeclareBankruptcy:
         mock_game.property_manager.properties[3].owner = 0
         mock_game.property_manager.properties[3].houses = 2
 
+        mock_game.state.obligations = [{"debtor": 0, "amount": 10000, "creditor": None}]
         action = DeclareBankruptcy(player_id=0)
         action.execute(mock_game)
 
@@ -948,6 +939,7 @@ class TestDeclareBankruptcy:
         mock_game.players[0].bankrupt = False
         mock_game.players[1].bankrupt = False
 
+        mock_game.state.obligations = [{"debtor": 0, "amount": 10000, "creditor": None}]
         action = DeclareBankruptcy(player_id=0)
         action.execute(mock_game)
 
@@ -959,6 +951,8 @@ class TestDeclareBankruptcy:
     ) -> None:
         """Execute should return jail cards to deck."""
         mock_game.players[0].jail_cards = 2
+        mock_game.state.jail_card_sources[0] = ["chance", "chest"]
+        mock_game.state.obligations = [{"debtor": 0, "amount": 10000, "creditor": None}]
         action = DeclareBankruptcy(player_id=0)
         action.execute(mock_game)
 

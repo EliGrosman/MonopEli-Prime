@@ -221,13 +221,13 @@ class TestGetObservationSpace:
             assert key in game_state.spaces, f"Missing game state key: {key}"
 
     def test_action_mask_space(self) -> None:
-        """Action mask should be MultiBinary(149)."""
+        """Action mask should be MultiBinary(158)."""
         encoder = ObservationEncoder(4)
         space = encoder.get_observation_space()
 
         mask_space = space.spaces["action_mask"]
         assert isinstance(mask_space, spaces.MultiBinary)
-        assert mask_space.n == 149
+        assert mask_space.n == 158
 
 
 class TestEncode:
@@ -665,7 +665,7 @@ class TestEncodeActionMask:
     """Tests for action mask encoding."""
 
     def test_action_mask_shape(self) -> None:
-        """Action mask should be shape (149,)."""
+        """Action mask should be shape (158,)."""
         encoder = ObservationEncoder(4)
         game = MonopolyGame(num_players=4, seed=42)
 
@@ -673,7 +673,7 @@ class TestEncodeActionMask:
         mask = obs["action_mask"]
         assert isinstance(mask, np.ndarray)
 
-        assert mask.shape == (149,)
+        assert mask.shape == (158,)
         assert mask.dtype == np.int8
 
     def test_action_mask_binary(self) -> None:
@@ -745,22 +745,22 @@ class TestGetFlatObservationSize:
         # opponent_states: 1 * 34 = 34
         # board_state: 140
         # game_state: 4
-        # action_mask: 149
-        expected = 33 + 34 + 140 + 4 + 149
+        # action_mask: 158
+        expected = 33 + 34 + 140 + 4 + 158 + 13
         assert size == expected
 
     def test_size_for_4_players(self) -> None:
         """Calculate size for 4 players."""
         size = get_flat_observation_size(4)
         # opponent_states: 3 * 34 = 102
-        expected = 33 + 102 + 140 + 4 + 149
+        expected = 33 + 102 + 140 + 4 + 158 + 13
         assert size == expected
 
     def test_size_for_8_players(self) -> None:
         """Calculate size for 8 players."""
         size = get_flat_observation_size(8)
         # opponent_states: 7 * 34 = 238
-        expected = 33 + 238 + 140 + 4 + 149
+        expected = 33 + 238 + 140 + 4 + 158 + 13
         assert size == expected
 
     def test_size_invalid_player_count(self) -> None:

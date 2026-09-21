@@ -109,6 +109,41 @@ export function GamePage() {
           {/* Player Panel */}
           <PlayerPanel />
 
+          <p className="text-sm text-gray-600">
+            Rules: {gameState?.rules_id ?? 'foundation-v1'} · No auctions or trading
+          </p>
+          {gameState?.debt && (
+            <section aria-label="Debt resolution" className="bg-amber-50 p-4 rounded">
+              <h2>
+                Player {gameState.debt.debtor + 1} owes ${gameState.debt.amount}
+              </h2>
+              <p>Sell buildings or mortgage properties to pay the obligation.</p>
+              {gameState.decision_player === playerId &&
+                (gameState.legal_actions ?? []).map((a) => {
+                  const names: Record<string, string> = {
+                    SellHouse: 'sell_house',
+                    SellHotel: 'sell_hotel',
+                    SellBuildingGroup: 'sell_building_group',
+                    MortgageProperty: 'mortgage_property',
+                  };
+                  const name = names[a.type];
+                  return name ? (
+                    <button
+                      key={`${a.type}-${a.property_id}`}
+                      className="block p-2 underline"
+                      onClick={() =>
+                        send({
+                          type: 'action',
+                          data: { action_type: name, property_position: a.property_id },
+                        })
+                      }
+                    >
+                      {a.type.replace(/([A-Z])/g, ' $1').trim()} · property {a.property_id}
+                    </button>
+                  ) : null;
+                })}
+            </section>
+          )}
           {/* Action Panel */}
           <ActionPanel send={send} />
 

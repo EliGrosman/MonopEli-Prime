@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import pytest
 from pathlib import Path
 
 # Ensure scripts/ is importable
@@ -108,6 +109,7 @@ class TestEvalResults:
 # ---------------------------------------------------------------------------
 
 class TestPlayEvalGame:
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_runs_single_game(self) -> None:
         """Verify a single game runs to completion."""
         llm_client = _EvalLLMClient()
@@ -134,6 +136,7 @@ class TestPlayEvalGame:
         assert result.action_count <= 200
         assert result.elapsed_sec >= 0
 
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_tracks_trade_metrics(self) -> None:
         """Verify trade metrics are captured."""
         llm_client = _EvalLLMClient()
@@ -165,6 +168,7 @@ class TestPlayEvalGame:
 # ---------------------------------------------------------------------------
 
 class TestRunEvaluation:
+    @pytest.mark.xfail(strict=True, raises=RuntimeError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_runs_multiple_games(self) -> None:
         """Verify evaluation runs multiple games and aggregates."""
         results = run_evaluation(

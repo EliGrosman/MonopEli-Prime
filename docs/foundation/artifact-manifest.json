@@ -1,0 +1,64 @@
+{
+  "artifacts": [
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "data/expert/test/stats.json",
+      "git_blob": "084b9bb5f49dc48cb8bbbe6cba3126e13933594a",
+      "git_bytes": 475,
+      "sha256": "49e5a041ffb5f418d521b10ca607815a996d74afe70a7051f97e37d6fc554bd4",
+      "kind": "available_git_blob",
+      "pointer": null
+    },
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "data/expert/test/train.h5",
+      "git_blob": "53f5727ad6fc2ecbef16e5f68ecfdb446cdf64a7",
+      "git_bytes": 134,
+      "sha256": "76cfc231043bdf9bbb7f288ef47fab0be95f2b46f1217d1f837521b280f6abdc",
+      "kind": "lfs_pointer",
+      "pointer": "version https://git-lfs.github.com/spec/v1\noid sha256:09a335acea17997424d53038f46068413f6425efe67e323538a48c534978831a\nsize 657602363\n"
+    },
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "data/expert/test/val.h5",
+      "git_blob": "fc975979cf12ae27cf87701c166a6404539622ec",
+      "git_bytes": 133,
+      "sha256": "ac8922f44c613923b65f9f84cb3685e3a447d63afce71756625481404ab4c62d",
+      "kind": "lfs_pointer",
+      "pointer": "version https://git-lfs.github.com/spec/v1\noid sha256:75ad86a4d1f4a75eadb5916a9c6e6e224659a69542529624cd0eafdf6b66ec11\nsize 83762111\n"
+    },
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "models/bc/a",
+      "git_blob": "822e7b627a9169c137277fc2e6d53d5c141c191d",
+      "git_bytes": 1535,
+      "sha256": "e5408bb93734979769444ff04d2ae02e6b722d893a58fae5b2293cff4b154f33",
+      "kind": "available_git_blob",
+      "pointer": null
+    },
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "models/bc/bc_model.zip",
+      "git_blob": "206fdd04e54ba07c49403b680a3caa7ddf1229cc",
+      "git_bytes": 1591161,
+      "sha256": "40121b99e9a5ed026814d1cbe2b576b6d5a1ca7487636e8de021c02edf66a4c3",
+      "kind": "available_git_blob",
+      "pointer": null
+    },
+    {
+      "ref": "origin/feature/synthetic_data_generation",
+      "path": "models/bc/tensorboard/events.out.tfevents.1770768885.Elis-MacBook-Pro.local.41238.0",
+      "git_blob": "23518322800ccdeae20b706ca30bbf2b2ec26d6c",
+      "git_bytes": 3874,
+      "sha256": "b3ff2119526425c9ebb2f71ac85b73ac2ae934e433d4c05b312faf1a8c467b06",
+      "kind": "available_git_blob",
+      "pointer": null
+    }
+  ],
+  "bundle": {
+    "path": "artifacts/recovery/milestone1.bundle",
+    "sha256": "8930f64a4d6680f8a3b8b7aeb0ef8fc9352a6994bac4dd633e33ebeb51eb616d",
+    "verified": true
+  },
+  "lfs_payloads": "absent locally; remote availability unknown"
+}

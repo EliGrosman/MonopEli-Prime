@@ -16,8 +16,10 @@ from monopoly_engine.actions import (
     DeclareBankruptcy,
     EndTurn,
     MortgageProperty,
+    PassBuy,
     PayJailFine,
     RollDice,
+    SellBuildingGroup,
     SellHotel,
     SellHouse,
     UnmortgageProperty,
@@ -51,6 +53,13 @@ class ActionRequest(BaseModel):
             ValueError: If action_type is unknown or required params missing
         """
         match self.action_type:
+            case "pass_buy":
+                return PassBuy(player_id)
+            case "sell_building_group":
+                if self.property_position is None:
+                    raise ValueError("property_position required")
+                return SellBuildingGroup(player_id, self.property_position)
+
             case "roll_dice":
                 return RollDice(player_id=player_id)
 
@@ -104,9 +113,7 @@ class ActionRequest(BaseModel):
 
             case "unmortgage_property":
                 if self.property_position is None:
-                    raise ValueError(
-                        "property_position required for unmortgage_property"
-                    )
+                    raise ValueError("property_position required for unmortgage_property")
                 return UnmortgageProperty(
                     player_id=player_id,
                     property_id=self.property_position,

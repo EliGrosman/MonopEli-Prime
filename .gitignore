@@ -25,3 +25,16 @@ training_log_*.txt
 models/*
 
 results/
+
+# Local recovery bundles (manifest is tracked)
+artifacts/recovery/*.bundle
+
+# Generated benchmark manifests, results, and replay traces
+/artifacts/**/*.json
+/artifacts/**/*.jsonl
+
+# Generated validation output (source reports live in docs/foundation)
+/artifacts/*.txt
+/artifacts/**/*.tar.gz
+/frontend/playwright-report/
+/frontend/test-results/

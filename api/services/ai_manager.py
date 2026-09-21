@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from agents.base import Agent
 from agents.random_agent import RandomAgent
 from agents.rule_based import AggressiveAgent, ConservativeAgent, RuleBasedAgent
+from monopoly_engine.progress import ProgressGuard
 from monopoly_gym.action_space import ActionEncoder
 
 from ..config import get_settings
@@ -54,6 +55,7 @@ class AIManager:
         # (game_id, player_id) -> Agent instance
         self._agents: dict[tuple[str, int], Agent] = {}
         self._encoder = ActionEncoder()
+        self._guards: dict[str, ProgressGuard] = {}
         self._processing: set[str] = set()  # Games currently being processed
 
     def create_agent(
@@ -61,6 +63,7 @@ class AIManager:
         game_id: str,
         player_id: int,
         ai_type: str = "rule_based",
+        seed: int | None = None,
     ) -> Agent:
         """Create an AI agent for a player slot.
 
@@ -77,12 +80,13 @@ class AIManager:
         """
         agent_cls = AI_TYPES.get(ai_type)
         if agent_cls is None:
-            raise ValueError(
-                f"Unknown AI type: {ai_type}. "
-                f"Valid types: {list(AI_TYPES.keys())}"
-            )
+            raise ValueError(f"Unknown AI type: {ai_type}. Valid types: {list(AI_TYPES.keys())}")
 
-        agent = agent_cls(player_id=player_id)
+        agent = (
+            agent_cls(player_id=player_id, seed=seed)
+            if agent_cls is RandomAgent
+            else agent_cls(player_id=player_id)
+        )
         self._agents[(game_id, player_id)] = agent
         return agent
 
@@ -123,6 +127,7 @@ class AIManager:
         Returns:
             Number of agents removed
         """
+        self._guards.pop(game_id, None)
         to_remove = [key for key in self._agents if key[0] == game_id]
         for key in to_remove:
             del self._agents[key]
@@ -175,7 +180,7 @@ class AIManager:
             game = active_game.game
 
             # Check if still this player's turn and game not over
-            if game.current_player != player_id or game.game_over:
+            if game.decision_player != player_id or game.game_over:
                 break
 
             # Artificial thinking delay for better UX
@@ -187,7 +192,8 @@ class AIManager:
 
             # Check if any actions are available
             if not mask.any():
-                break
+                raise RuntimeError("Live AI decision has no legal actions")
+            self._guards.setdefault(game_id, ProgressGuard()).check(game)
 
             # Get observation (simplified dict for agents)
             observation = self._get_observation(game, player_id)
@@ -199,25 +205,11 @@ class AIManager:
                 game=game,
             )
 
-            # Convert to engine action
-            try:
-                action = self._encoder.decode(action_idx, player_id, game)
-            except ValueError:
-                # Invalid action index - end turn
-                from monopoly_engine.actions import EndTurn
-
-                action = EndTurn(player_id=player_id)
-
-            # Execute the action
+            action = self._encoder.decode(action_idx, player_id, game)
             success, message = await game_manager.execute_action(game_id, action)
             actions_taken += 1
-
             if not success:
-                # Action failed - try to end turn
-                from monopoly_engine.actions import EndTurn
-
-                await game_manager.execute_action(game_id, EndTurn(player_id=player_id))
-                break
+                raise RuntimeError(f"AI action failed: {message}")
 
             # Refresh game reference after action
             active_game = await game_manager.get_game(game_id)
@@ -255,7 +247,7 @@ class AIManager:
                 if game.game_over:
                     break
 
-                current_player = game.current_player
+                current_player = game.decision_player
 
                 # Check if current player is AI
                 if not self.is_ai_player(game_id, current_player):
@@ -263,7 +255,9 @@ class AIManager:
                     break
 
                 # Process AI turn
-                await self.process_ai_turn(game_manager, game_id, current_player)
+                count = await self.process_ai_turn(game_manager, game_id, current_player)
+                if count == 0:
+                    raise RuntimeError("AI made no progress")
 
                 # Small delay between AI players for better UX
                 await asyncio.sleep(0.1)

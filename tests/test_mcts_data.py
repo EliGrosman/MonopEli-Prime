@@ -271,6 +271,7 @@ class TestComputeOutcomes:
 class TestGenerateTrainingData:
     """Test the full data generation pipeline."""
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_generates_nonempty_buffer(self) -> None:
         """Should produce at least some training examples."""
         buffer = generate_training_data(
@@ -285,6 +286,7 @@ class TestGenerateTrainingData:
 
         assert len(buffer) > 0
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_example_shapes(self) -> None:
         """Training examples should have correct array shapes."""
         buffer = generate_training_data(
@@ -305,6 +307,7 @@ class TestGenerateTrainingData:
         assert example.outcome.shape == (4,)
         assert example.player_id == 0
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_policy_is_distribution(self) -> None:
         """MCTS policy should sum to ~1.0 (probability distribution)."""
         buffer = generate_training_data(
@@ -323,6 +326,7 @@ class TestGenerateTrainingData:
         # Should be approximately 1.0 (visit count distribution)
         assert policy_sum == pytest.approx(1.0, abs=0.01)
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_outcomes_filled_in(self) -> None:
         """Outcomes should be non-zero (filled in after game)."""
         buffer = generate_training_data(
@@ -339,6 +343,7 @@ class TestGenerateTrainingData:
         # At least some outcome values should be non-zero
         assert np.any(example.outcome != 0)
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_multiple_games(self) -> None:
         """Running multiple games should produce more examples."""
         buf1 = generate_training_data(
@@ -362,6 +367,7 @@ class TestGenerateTrainingData:
 
         assert len(buf2) >= len(buf1)
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_different_seeds_produce_different_data(self) -> None:
         """Different seeds should generally produce different data."""
         buf1 = generate_training_data(
@@ -390,6 +396,7 @@ class TestGenerateTrainingData:
             ex2 = buf2.sample(1)[0]
             assert not np.allclose(ex1.features, ex2.features)
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_two_player_game(self) -> None:
         """Should work with 2-player games."""
         buffer = generate_training_data(

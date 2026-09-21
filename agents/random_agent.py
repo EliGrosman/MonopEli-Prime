@@ -49,8 +49,5 @@ class RandomAgent(Agent):
         """
         valid_actions = np.where(action_mask)[0]
         if len(valid_actions) == 0:
-            # Fallback: end turn (should not happen with correct mask)
-            from monopoly_gym.action_space import OFFSET_END_TURN
-
-            return OFFSET_END_TURN
+            raise RuntimeError("Live decision has no legal actions")
         return int(self.rng.choice(valid_actions))

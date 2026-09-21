@@ -35,7 +35,7 @@ class TestGetFeatureSize:
         from monopoly_gym.observation import get_flat_observation_size
 
         for n in (2, 3, 4):
-            assert get_feature_size(n) == get_flat_observation_size(n) - 149
+            assert get_feature_size(n) == get_flat_observation_size(n) - 158 - 13
 
 
 class TestExtractFeatures:

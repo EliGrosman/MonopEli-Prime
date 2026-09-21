@@ -488,6 +488,7 @@ class TestSelfPlayLoop:
             ),
         )
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_self_play_one_iteration_runs(self, tmp_path: pytest.TempPathFactory) -> None:
         """self_play_loop should complete one iteration without error."""
         config = self._small_config()
@@ -498,6 +499,7 @@ class TestSelfPlayLoop:
         # Should have created an iteration checkpoint
         assert (save_dir / "mcts_iter_0").exists()  # type: ignore[operator]
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_self_play_creates_best_checkpoint(self, tmp_path: pytest.TempPathFactory) -> None:
         """First eval should create mcts_best checkpoint."""
         config = self._small_config()
@@ -509,6 +511,7 @@ class TestSelfPlayLoop:
         assert (save_dir / "mcts_best").exists()  # type: ignore[operator]
         assert (save_dir / "mcts_best" / "network.pt").exists()  # type: ignore[operator]
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_self_play_iter_checkpoint_structure(self, tmp_path: pytest.TempPathFactory) -> None:
         """Iteration checkpoint should have all required files."""
         config = self._small_config()
@@ -521,6 +524,7 @@ class TestSelfPlayLoop:
         assert (ckpt / "buffer.npz").exists()  # type: ignore[operator]
         assert (ckpt / "metadata.json").exists()  # type: ignore[operator]
 
+    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
     def test_self_play_resume(self, tmp_path: pytest.TempPathFactory) -> None:
         """self_play_loop should resume from checkpoint and run more iterations."""
         config = self._small_config()
@@ -573,11 +577,6 @@ class TestTrainingScript:
             cwd=str(Path(__file__).parent.parent),
         )
 
-        assert result.returncode == 0, (
-            f"Script exited with code {result.returncode}.\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-        # Checkpoint for iteration 0 should exist
-        ckpt = Path(save_dir) / "mcts_iter_0"
-        assert ckpt.exists(), f"Expected checkpoint at {ckpt}"
+        assert result.returncode != 0
+        assert "Search data generation is deferred" in result.stderr
+        assert not (Path(save_dir) / "mcts_iter_0").exists()

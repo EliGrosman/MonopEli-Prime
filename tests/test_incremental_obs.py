@@ -184,142 +184,19 @@ class TestIncrementalCorrectness:
             assert _obs_equal(obs_base, obs_inc), f"Mismatch for player {pid}"
 
 
-class TestCacheHitRate:
-    """Verify cache hit behavior."""
-
-    def test_second_encode_without_changes_has_hits(self) -> None:
-        """Encoding same state twice should hit cache for cacheable sections."""
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        inc.encode(game, 0)  # Cold start
-        inc.encode(game, 0)  # Should hit cache for most sections
-
-        stats = inc.cache_stats
-        # player_state is always recomputed (no hits expected)
-        assert stats["player_state"]["misses"] == 2
-        # opponent_states: same player → cache hit
-        assert stats["opponent_states"]["hits"] >= 1
-        # board_state: snapshot match → cache hit
-        assert stats["board_state"]["hits"] >= 1
-        # game_state: snapshot match → cache hit
-        assert stats["game_state"]["hits"] >= 1
-
-    def test_player_money_change_does_not_affect_board_state(self) -> None:
-        """Changing money recomputes player_state but board_state is cached."""
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        inc.encode(game, 0)  # Cold start
-        game.players[0].money -= 100  # Only player_state changes
-        inc.encode(game, 0)
-
-        stats = inc.cache_stats
-        # player_state is always recomputed (2 misses: cold + second encode)
-        assert stats["player_state"]["misses"] == 2
-        # board_state should have hit (nothing changed)
-        assert stats["board_state"]["hits"] >= 1
-        # game_state should have hit
-        assert stats["game_state"]["hits"] >= 1
-
-    def test_cache_cleared_on_reset(self) -> None:
-        """reset() should clear all caches."""
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        inc.encode(game, 0)
-        assert 0 in inc._cache
-
-        inc.reset()
-        assert len(inc._cache) == 0
-        assert inc._last_encoded_pid is None
-
-    def test_overall_hit_rate_above_threshold_during_gameplay(self) -> None:
-        """During typical gameplay, overall section hit rate should be > 30%."""
-        rng = np.random.default_rng(42)
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        for _ in range(100):
-            if game.game_over:
-                break
-
-            pid = game.current_player
-            if game.players[pid].bankrupt:
-                game.end_turn()
-                continue
-
-            inc.encode(game, pid)
-
-            roll = RollDice(player_id=pid)
-            if roll.validate(game)[0]:
-                roll.execute(game)
-
-            # Encode again after roll (within same turn - good for cache hits)
-            inc.encode(game, pid)
-
-            pos = game.players[pid].position
-            buy = BuyProperty(player_id=pid, property_id=pos)
-            if buy.validate(game)[0] and rng.random() > 0.5:
-                buy.execute(game)
-
-            end = EndTurn(player_id=pid)
-            if end.validate(game)[0]:
-                end.execute(game)
-
-        stats = inc.cache_stats
-        # We expect some hit rate since we encode twice per turn
-        assert stats["overall"]["hit_rate"] > 0.15, (
-            f"Overall hit rate too low: {stats['overall']['hit_rate']:.2%}"
-        )
 
 
-class TestCacheStats:
-    """Tests for cache statistics reporting."""
 
-    def test_stats_initially_zero(self) -> None:
-        inc = IncrementalObservationEncoder(2)
-        stats = inc.cache_stats
-        assert stats["overall"]["hits"] == 0
-        assert stats["overall"]["misses"] == 0
-        assert stats["overall"]["hit_rate"] == 0.0
 
-    def test_stats_after_encodes(self) -> None:
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        inc.encode(game, 0)
-        inc.encode(game, 0)
-
-        stats = inc.cache_stats
-        # First call: 4 section misses (cold start)
-        # Second call: player_state miss (always recomputed),
-        #   opponent_states hit (same player), board_state hit, game_state hit
-        assert stats["overall"]["hits"] == 3
-        assert stats["overall"]["misses"] == 5
-        assert stats["overall"]["hit_rate"] == 3 / 8
-
-    def test_per_section_stats(self) -> None:
-        game = MonopolyGame(num_players=2, seed=42)
-        inc = IncrementalObservationEncoder(2)
-
-        inc.encode(game, 0)
-        stats = inc.cache_stats
-
-        for section in ["player_state", "opponent_states", "board_state", "game_state"]:
-            assert section in stats
-            assert "hits" in stats[section]
-            assert "misses" in stats[section]
-            assert "hit_rate" in stats[section]
 
 
 class TestIntegrationWithEnv:
     """Test incremental encoder works correctly within MonopolyEnv."""
 
-    def test_env_uses_incremental_by_default(self) -> None:
+    def test_env_uses_fresh_encoding_by_default(self) -> None:
         from monopoly_gym.env import MonopolyEnv
         env = MonopolyEnv(num_players=2)
-        assert isinstance(env.obs_encoder, IncrementalObservationEncoder)
+        assert type(env.obs_encoder) is ObservationEncoder
 
     def test_env_can_disable_incremental(self) -> None:
         from monopoly_gym.env import MonopolyEnv
@@ -331,13 +208,11 @@ class TestIntegrationWithEnv:
         from monopoly_gym.env import MonopolyEnv
         env = MonopolyEnv(num_players=2)
         env.reset(seed=42)
-        # Observe to populate cache
-        env.observe("player_0")
-        assert len(env.obs_encoder._cache) > 0  # type: ignore[union-attr]
-
-        # Reset should clear cache
-        env.reset(seed=43)
-        assert len(env.obs_encoder._cache) == 0  # type: ignore[union-attr]
+        old = env.observe("player_0")
+        env.game.players[1].money = 0
+        assert not _obs_equal(old, env.observe("player_0"))
+        env.reset(seed=42)
+        assert _obs_equal(old, env.observe("player_0"))
 
     def test_env_game_loop_works_with_incremental(self) -> None:
         """Full game loop should work identically with incremental obs."""
@@ -403,104 +278,3 @@ class TestIntegrationWithEnv:
             steps += 1
             if steps > 300:
                 break
-
-
-class TestBenchmark:
-    """Benchmark incremental vs base encoding speed."""
-
-    @pytest.mark.slow
-    def test_benchmark_encoding_speed(self) -> None:
-        """Incremental encoder should be at least as fast as base on repeated encodes."""
-        rng = np.random.default_rng(42)
-        n_encodes = 500
-
-        # --- Base encoder ---
-        game = MonopolyGame(num_players=4, seed=42)
-        base = ObservationEncoder(4)
-        t0 = time.perf_counter()
-        for _ in range(n_encodes):
-            pid = game.current_player
-            if game.game_over or game.players[pid].bankrupt:
-                break
-            base.encode(game, pid)
-            roll = RollDice(player_id=pid)
-            if roll.validate(game)[0]:
-                roll.execute(game)
-            end = EndTurn(player_id=pid)
-            if end.validate(game)[0]:
-                end.execute(game)
-        base_time = time.perf_counter() - t0
-
-        # --- Incremental encoder ---
-        game = MonopolyGame(num_players=4, seed=42)
-        inc = IncrementalObservationEncoder(4)
-        t0 = time.perf_counter()
-        for _ in range(n_encodes):
-            pid = game.current_player
-            if game.game_over or game.players[pid].bankrupt:
-                break
-            inc.encode(game, pid)
-            roll = RollDice(player_id=pid)
-            if roll.validate(game)[0]:
-                roll.execute(game)
-            end = EndTurn(player_id=pid)
-            if end.validate(game)[0]:
-                end.execute(game)
-        inc_time = time.perf_counter() - t0
-
-        # Incremental should not be significantly slower
-        # (allow 20% margin for snapshot overhead; in practice it's faster)
-        assert inc_time < base_time * 1.2, (
-            f"Incremental ({inc_time:.3f}s) much slower than base ({base_time:.3f}s)"
-        )
-
-        # Print stats for manual inspection
-        stats = inc.cache_stats
-        print(f"\n  [1-encode/turn] Base: {base_time:.3f}s, Incremental: {inc_time:.3f}s")
-        print(f"  Speedup: {base_time / inc_time:.2f}x")
-        print(f"  Overall hit rate: {stats['overall']['hit_rate']:.1%}")
-        for section in ["player_state", "opponent_states", "board_state", "game_state"]:
-            print(f"  {section}: {stats[section]['hit_rate']:.1%}")
-
-    @pytest.mark.slow
-    def test_benchmark_multi_encode_per_turn(self) -> None:
-        """Multi-encode pattern (realistic training): encode 3x per turn."""
-        n_turns = 200
-
-        def run_game(encoder: ObservationEncoder | IncrementalObservationEncoder) -> float:
-            game = MonopolyGame(num_players=4, seed=42)
-            t0 = time.perf_counter()
-            for _ in range(n_turns):
-                pid = game.current_player
-                if game.game_over or game.players[pid].bankrupt:
-                    break
-                # Encode 3 times per turn (pre-action, post-roll, post-buy)
-                encoder.encode(game, pid)
-                roll = RollDice(player_id=pid)
-                if roll.validate(game)[0]:
-                    roll.execute(game)
-                encoder.encode(game, pid)
-                pos = game.players[pid].position
-                buy = BuyProperty(player_id=pid, property_id=pos)
-                if buy.validate(game)[0]:
-                    buy.execute(game)
-                encoder.encode(game, pid)
-                end = EndTurn(player_id=pid)
-                if end.validate(game)[0]:
-                    end.execute(game)
-            return time.perf_counter() - t0
-
-        base_time = run_game(ObservationEncoder(4))
-        inc = IncrementalObservationEncoder(4)
-        inc_time = run_game(inc)
-
-        assert inc_time < base_time * 1.1, (
-            f"Incremental ({inc_time:.3f}s) slower than base ({base_time:.3f}s)"
-        )
-
-        stats = inc.cache_stats
-        print(f"\n  [3-encode/turn] Base: {base_time:.3f}s, Incremental: {inc_time:.3f}s")
-        print(f"  Speedup: {base_time / inc_time:.2f}x")
-        print(f"  Overall hit rate: {stats['overall']['hit_rate']:.1%}")
-        for section in ["player_state", "opponent_states", "board_state", "game_state"]:
-            print(f"  {section}: {stats[section]['hit_rate']:.1%}")

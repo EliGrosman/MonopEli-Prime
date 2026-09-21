@@ -225,6 +225,7 @@ class TestJailScenarios:
         game = MonopolyGame(num_players=2, seed=42)
         game.send_to_jail(0)
         game.state.players[0].jail_cards = 1
+        game.state.jail_card_sources[0] = ["chance"]
 
         UseJailCard(player_id=0).execute(game)
         assert not game.state.players[0].in_jail
@@ -233,9 +234,10 @@ class TestJailScenarios:
         # Test 3: Auto-release after 3 turns
         game = MonopolyGame(num_players=2, seed=42)
         game.send_to_jail(0)
-        game.state.players[0].jail_turns = 3
-
-        RollDice(player_id=0).execute(game)
+        game.state.players[0].jail_turns = 2
+        game.state.phase = "jail_decision"
+        game.roll_dice = lambda: (1, 2)
+        game.apply_action(0, RollDice(0))
         assert not game.state.players[0].in_jail
 
     def test_multiple_players_in_jail(self) -> None:

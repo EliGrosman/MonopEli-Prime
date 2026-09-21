@@ -124,7 +124,7 @@ def play_demo_game(
     mcts_moves = 0
 
     while not game.game_over and action_count < max_turns:
-        pid = game.current_player
+        pid = game.decision_player
         agent = agents[pid]
         mask = encoder.get_action_mask(game, pid)
         obs: dict[str, Any] = {}
@@ -189,7 +189,7 @@ def play_demo_game(
         action = encoder.decode(action_idx, pid, game)
         valid, _ = action.validate(game)
         if valid:
-            action.execute(game)
+            game.apply_action(action.player_id, action)
 
         action_count += 1
 

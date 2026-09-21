@@ -115,9 +115,12 @@ def create_vectorized_env(
     """
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
+    import numpy as np
+
     env_fns = []
+    streams = np.random.SeedSequence(seed).spawn(num_envs)
     for i in range(num_envs):
-        env_seed = seed + i if seed is not None else None
+        env_seed = int(streams[i].generate_state(1)[0])
         env_fns.append(make_env(env_config, env_seed))
 
     # Use SubprocVecEnv for true parallelism, DummyVecEnv for debugging

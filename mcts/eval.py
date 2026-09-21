@@ -106,60 +106,9 @@ def _make_opponent(opponent_type: str, player_id: int) -> Agent:
     )
 
 
-def play_evaluation_game(
-    mcts_agent: MCTSAgent,
-    opponents: list[Agent],
-    max_turns: int = 500,
-    seed: int | None = None,
-) -> tuple[int | None, int, float]:
-    """Play a single evaluation game between MCTSAgent and opponents.
-
-    MCTSAgent is always player 0. Opponents fill slots 1..N-1.
-    All agents choose actions via choose_action(); dice rolling is handled
-    as a normal action selected by the agent.
-
-    Args:
-        mcts_agent: The MCTSAgent under evaluation (player 0).
-        opponents: List of opponent agents (players 1..N-1).
-        max_turns: Maximum action steps before truncation.
-        seed: Random seed for game creation.
-
-    Returns:
-        Tuple of (winner_id, action_count, elapsed_seconds).
-        winner_id is None if the game was truncated.
-    """
-    num_players = 1 + len(opponents)
-    game = MonopolyGame(num_players=num_players, seed=seed)
-    encoder = ActionEncoder(enable_trades=False)
-
-    # Reset all agents for a fresh game
-    mcts_agent.reset()
-    for opp in opponents:
-        opp.reset()
-
-    agents: dict[int, Agent] = {0: mcts_agent}
-    for i, opp in enumerate(opponents):
-        agents[i + 1] = opp
-
-    action_count = 0
-    t0 = time.monotonic()
-
-    while not game.game_over and action_count < max_turns:
-        pid = game.current_player
-        agent = agents[pid]
-        mask = encoder.get_action_mask(game, pid)
-        obs: dict[str, Any] = {}
-
-        action_idx = agent.choose_action(obs, mask, game)
-        action = encoder.decode(action_idx, pid, game)
-        valid, _ = action.validate(game)
-        if valid:
-            action.execute(game)
-
-        action_count += 1
-
-    elapsed = time.monotonic() - t0
-    return game.winner, action_count, elapsed
+def play_evaluation_game(mcts_agent: MCTSAgent, opponents: list[Agent],
+                         max_turns: int = 1000, seed: int | None = None) -> tuple[int | None, int, float]:
+    raise RuntimeError("MCTS is experimental, not a certified baseline; use the foundation runner explicitly")
 
 
 def evaluate_mcts_agent(

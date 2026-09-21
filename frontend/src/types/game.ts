@@ -25,6 +25,10 @@ export interface GameState {
   // Backend snake_case fields (present from raw spread)
   game_id?: string;
   current_player?: number;
+  decision_player?: number;
+  rules_id?: string;
+  debt?: { debtor: number; amount: number; creditor: number | null } | null;
+  legal_actions?: { type: string; player_id: number; property_id?: number }[];
   turn_number?: number;
   last_roll?: [number, number] | null;
   doubles_count?: number;
@@ -37,7 +41,18 @@ export interface GameState {
   [key: string]: unknown;
 }
 
-export type GamePhase = 'waiting' | 'pre_roll' | 'post_roll' | 'in_jail' | 'bankrupt' | 'game_over';
+export type GamePhase =
+  | 'jail_decision'
+  | 'purchase_decision'
+  | 'asset_management'
+  | 'debt_resolution'
+  | 'terminal'
+  | 'waiting'
+  | 'pre_roll'
+  | 'post_roll'
+  | 'in_jail'
+  | 'bankrupt'
+  | 'game_over';
 
 export interface GameEvent {
   id: string;

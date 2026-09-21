@@ -231,6 +231,7 @@ def play_eval_game(
 
     HybridAgent is always player 0.
     """
+    raise NotImplementedError("Legacy search/trading data path is not certified for foundation-v1")
     num_players = 1 + len(opponents)
     game = MonopolyGame(num_players=num_players, seed=seed)
     encoder = ActionEncoder(enable_trades=False)

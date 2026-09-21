@@ -34,6 +34,8 @@ const mockRawState = {
   ],
   properties: {},
   current_player: 0,
+  decision_player: 0,
+  legal_actions: [{ type: 'RollDice', player_id: 0 }],
   turn_number: 1,
   last_roll: null as [number, number] | null,
   houses_remaining: 32,
@@ -99,7 +101,8 @@ describe('useActions', () => {
     const stateWithRoll = {
       ...mockRawState,
       last_roll: [3, 4] as [number, number],
-      game_phase: 'post_roll',
+      game_phase: 'asset_management',
+      legal_actions: [{ type: 'EndTurn', player_id: 0 }],
     };
 
     act(() => {
@@ -115,7 +118,8 @@ describe('useActions', () => {
     const stateWithRoll = {
       ...mockRawState,
       last_roll: [3, 4] as [number, number],
-      game_phase: 'post_roll',
+      game_phase: 'asset_management',
+      legal_actions: [{ type: 'EndTurn', player_id: 0 }],
     };
 
     act(() => {
@@ -132,6 +136,8 @@ describe('useActions', () => {
       useGameStore.getState().updateGameState({
         ...mockRawState,
         current_player: 1,
+        decision_player: 1,
+        legal_actions: [{ type: 'PayJailFine', player_id: 1 }],
       });
       useSessionStore.getState().setCurrentGame('test-game', 1);
     });
@@ -145,6 +151,8 @@ describe('useActions', () => {
       useGameStore.getState().updateGameState({
         ...mockRawState,
         current_player: 1,
+        decision_player: 1,
+        legal_actions: [{ type: 'PayJailFine', player_id: 1 }],
       });
       useSessionStore.getState().setCurrentGame('test-game', 1);
     });
@@ -159,6 +167,7 @@ describe('useActions', () => {
       useGameStore.getState().updateGameState({
         ...mockRawState,
         players: [{ ...mockRawState.players[0], in_jail: true }, mockRawState.players[1]],
+        legal_actions: [{ type: 'UseJailCard', player_id: 0 }],
       });
       useSessionStore.getState().setCurrentGame('test-game', 0);
     });

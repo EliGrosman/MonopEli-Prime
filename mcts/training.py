@@ -451,13 +451,13 @@ def _run_game_with_networks(
     _auto_roll_dice(game)
     turn = 0
     while not game.game_over and turn < config.max_turns_per_game:
-        pid = game.current_player
+        pid = game.decision_player
 
         if game.players[pid].bankrupt:
             end = EndTurn(player_id=pid)
             valid, _ = end.validate(game)
             if valid:
-                end.execute(game)
+                game.apply_action(end.player_id, end)
                 _auto_roll_dice(game)
             turn += 1
             continue
@@ -478,9 +478,9 @@ def _run_game_with_networks(
             action_idx = mcts_new._get_opponent_action(game, pid)
 
         action = encoder.decode(action_idx, pid, game)
-        action.execute(game)
+        game.apply_action(action.player_id, action)
 
-        if game.current_player != pid:
+        if game.decision_player != pid:
             _auto_roll_dice(game)
 
         turn += 1

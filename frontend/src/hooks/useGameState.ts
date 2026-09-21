@@ -48,15 +48,12 @@ export function useGameState() {
   });
 
   // Computed values
-  const currentPlayer = useMemo(() => getCurrentPlayer(), [getCurrentPlayer]);
+  const currentPlayer = getCurrentPlayer();
   const isMyTurn = useMemo(
-    () => gameState?.currentPlayer === playerId,
-    [gameState?.currentPlayer, playerId]
+    () => gameState?.decision_player === playerId,
+    [gameState?.decision_player, playerId]
   );
-  const myPlayer = useMemo(
-    () => (playerId !== null ? getPlayer(playerId) : null),
-    [playerId, getPlayer]
-  );
+  const myPlayer = playerId !== null ? getPlayer(playerId) : null;
 
   return {
     // State

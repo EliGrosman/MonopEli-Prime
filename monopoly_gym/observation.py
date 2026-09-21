@@ -23,6 +23,8 @@ if TYPE_CHECKING:
     from monopoly_engine.game import MonopolyGame
 
 # Constants for observation encoding
+OBSERVATION_VERSION = "observation-v2"
+
 MAX_MONEY: int = 10000  # Normalization cap for money values
 BOARD_SIZE: int = 40
 NUM_PROPERTIES: int = 28  # All buyable positions
@@ -35,27 +37,41 @@ MAX_DICE_SUM: int = 12
 
 # Property positions (all 28 buyable spaces) - must match action_space.py
 PROPERTY_POSITIONS: tuple[int, ...] = (
-    1, 3,  # Brown
-    6, 8, 9,  # Light Blue
-    11, 13, 14,  # Magenta
-    16, 18, 19,  # Orange
-    21, 23, 24,  # Red
-    26, 27, 29,  # Yellow
-    31, 32, 34,  # Green
-    37, 39,  # Dark Blue
-    5, 15, 25, 35,  # Railroads
-    12, 28,  # Utilities
+    1,
+    3,  # Brown
+    6,
+    8,
+    9,  # Light Blue
+    11,
+    13,
+    14,  # Magenta
+    16,
+    18,
+    19,  # Orange
+    21,
+    23,
+    24,  # Red
+    26,
+    27,
+    29,  # Yellow
+    31,
+    32,
+    34,  # Green
+    37,
+    39,  # Dark Blue
+    5,
+    15,
+    25,
+    35,  # Railroads
+    12,
+    28,  # Utilities
 )
 
 # Map from property position to index in observation (0-27)
-PROPERTY_POS_TO_IDX: dict[int, int] = {
-    pos: idx for idx, pos in enumerate(PROPERTY_POSITIONS)
-}
+PROPERTY_POS_TO_IDX: dict[int, int] = {pos: idx for idx, pos in enumerate(PROPERTY_POSITIONS)}
 
 # Inverse map: index to position
-PROPERTY_IDX_TO_POS: dict[int, int] = {
-    idx: pos for idx, pos in enumerate(PROPERTY_POSITIONS)
-}
+PROPERTY_IDX_TO_POS: dict[int, int] = {idx: pos for idx, pos in enumerate(PROPERTY_POSITIONS)}
 
 
 class ObservationEncoder:
@@ -109,27 +125,25 @@ class ObservationEncoder:
         # Import action space size
         from .action_space import ACTION_SPACE_SIZE, GAMEPLAY_ACTION_SPACE_SIZE
 
-        action_mask_size = (
-            ACTION_SPACE_SIZE if self.enable_trades else GAMEPLAY_ACTION_SPACE_SIZE
-        )
+        action_mask_size = ACTION_SPACE_SIZE if self.enable_trades else GAMEPLAY_ACTION_SPACE_SIZE
 
         obs_space: dict[str, spaces.Space[Any]] = {
-            "player_state": spaces.Dict({
-                # Money normalized to [0, 1] by dividing by MAX_MONEY
-                "money": spaces.Box(
-                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
-                ),
-                # Board position 0-39
-                "position": spaces.Discrete(BOARD_SIZE),
-                # Binary: in jail or not
-                "in_jail": spaces.Discrete(2),
-                # Jail turns 0-3
-                "jail_turns": spaces.Discrete(MAX_JAIL_TURNS + 1),
-                # Jail cards 0-2
-                "jail_cards": spaces.Discrete(MAX_JAIL_CARDS + 1),
-                # Binary vector: which of 28 properties are owned
-                "properties_owned": spaces.MultiBinary(NUM_PROPERTIES),
-            }),
+            "player_state": spaces.Dict(
+                {
+                    # Money normalized to [0, 1] by dividing by MAX_MONEY
+                    "money": spaces.Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32),
+                    # Board position 0-39
+                    "position": spaces.Discrete(BOARD_SIZE),
+                    # Binary: in jail or not
+                    "in_jail": spaces.Discrete(2),
+                    # Jail turns 0-3
+                    "jail_turns": spaces.Discrete(MAX_JAIL_TURNS + 1),
+                    # Jail cards 0-2
+                    "jail_cards": spaces.Discrete(MAX_JAIL_CARDS + 1),
+                    # Binary vector: which of 28 properties are owned
+                    "properties_owned": spaces.MultiBinary(NUM_PROPERTIES),
+                }
+            ),
             "opponent_states": spaces.Box(
                 low=0.0,
                 high=1.0,
@@ -143,39 +157,36 @@ class ObservationEncoder:
                 shape=(NUM_PROPERTIES, 5),
                 dtype=np.float32,
             ),
-            "game_state": spaces.Dict({
-                # Turn number normalized
-                "turn_number": spaces.Box(
-                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
-                ),
-                # Houses remaining normalized (0-32 -> 0-1)
-                "houses_remaining": spaces.Box(
-                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
-                ),
-                # Hotels remaining normalized (0-12 -> 0-1)
-                "hotels_remaining": spaces.Box(
-                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
-                ),
-                # Last dice roll normalized (0 if no roll, otherwise sum/12)
-                "last_roll": spaces.Box(
-                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
-                ),
-            }),
+            "game_state": spaces.Dict(
+                {
+                    # Turn number normalized
+                    "turn_number": spaces.Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32),
+                    # Houses remaining normalized (0-32 -> 0-1)
+                    "houses_remaining": spaces.Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32),
+                    # Hotels remaining normalized (0-12 -> 0-1)
+                    "hotels_remaining": spaces.Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32),
+                    # Last dice roll normalized (0 if no roll, otherwise sum/12)
+                    "last_roll": spaces.Box(low=0.0, high=1.0, shape=(1,), dtype=np.float32),
+                }
+            ),
+            "decision_state": spaces.Box(0.0, 1.0, shape=(13,), dtype=np.float32),
             "action_mask": spaces.MultiBinary(action_mask_size),
         }
 
         # Add trade context if trades are enabled (Phase 2.5a)
         if self.enable_trades:
-            obs_space["trade_context"] = spaces.Dict({
-                # Is there a pending trade I need to respond to?
-                "pending_trade": spaces.Discrete(2),  # 0 = no, 1 = yes
-                # Property index being offered to me (0-27, or 28 for none)
-                "offer_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
-                # Property index they want from me (0-27, or 28 for none)
-                "want_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
-                # Who proposed the trade (0-3, or 4 for none)
-                "proposer_id": spaces.Discrete(self.num_players + 1),
-            })
+            obs_space["trade_context"] = spaces.Dict(
+                {
+                    # Is there a pending trade I need to respond to?
+                    "pending_trade": spaces.Discrete(2),  # 0 = no, 1 = yes
+                    # Property index being offered to me (0-27, or 28 for none)
+                    "offer_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
+                    # Property index they want from me (0-27, or 28 for none)
+                    "want_property_idx": spaces.Discrete(NUM_PROPERTIES + 1),
+                    # Who proposed the trade (0-3, or 4 for none)
+                    "proposer_id": spaces.Discrete(self.num_players + 1),
+                }
+            )
 
         return spaces.Dict(obs_space)
 
@@ -203,6 +214,7 @@ class ObservationEncoder:
             raise ValueError(f"Invalid player_id: {player_id}")
 
         obs: dict[str, np.ndarray | dict[str, np.ndarray]] = {
+            "decision_state": self._encode_decision_state(game),
             "player_state": self._encode_player_state(game, player_id),
             "opponent_states": self._encode_opponent_states(game, player_id),
             "board_state": self._encode_board_state(game, player_id),
@@ -215,6 +227,27 @@ class ObservationEncoder:
             obs["trade_context"] = self._encode_trade_context(game, player_id)
 
         return obs
+
+    def _encode_decision_state(self, game: MonopolyGame) -> np.ndarray:
+        from monopoly_engine.foundation import PHASES
+
+        phase = [float(game.state.phase == item) for item in PHASES]
+        debt = game.state.obligations[0] if game.state.obligations else None
+        return np.asarray(
+            phase
+            + [
+                game.current_player / 7,
+                game.decision_player / 7,
+                float(game.state.roll_owed),
+                game.doubles_count / 3,
+                min((debt["amount"] if debt else 0) / MAX_MONEY, 1),
+                (debt["creditor"] + 1) / 8 if debt and debt["creditor"] is not None else 0,
+                (game.players[game.current_player].position + 1) / 40
+                if game.state.phase == "purchase_decision"
+                else 0,
+            ],
+            dtype=np.float32,
+        )
 
     def _encode_player_state(
         self,
@@ -478,18 +511,10 @@ def flatten_observation(
     player_state = obs["player_state"]
     if isinstance(player_state, dict):
         flat_parts.append(player_state["money"].flatten())
-        flat_parts.append(
-            np.array([player_state["position"]], dtype=np.float32) / (BOARD_SIZE - 1)
-        )
-        flat_parts.append(
-            np.array([player_state["in_jail"]], dtype=np.float32)
-        )
-        flat_parts.append(
-            np.array([player_state["jail_turns"]], dtype=np.float32) / MAX_JAIL_TURNS
-        )
-        flat_parts.append(
-            np.array([player_state["jail_cards"]], dtype=np.float32) / MAX_JAIL_CARDS
-        )
+        flat_parts.append(np.array([player_state["position"]], dtype=np.float32) / (BOARD_SIZE - 1))
+        flat_parts.append(np.array([player_state["in_jail"]], dtype=np.float32))
+        flat_parts.append(np.array([player_state["jail_turns"]], dtype=np.float32) / MAX_JAIL_TURNS)
+        flat_parts.append(np.array([player_state["jail_cards"]], dtype=np.float32) / MAX_JAIL_CARDS)
         flat_parts.append(player_state["properties_owned"].astype(np.float32))
 
     # Opponent states
@@ -515,6 +540,7 @@ def flatten_observation(
     if isinstance(action_mask, np.ndarray):
         flat_parts.append(action_mask.astype(np.float32))
 
+    flat_parts.append(np.asarray(obs["decision_state"], dtype=np.float32))
     return np.concatenate(flat_parts)
 
 
@@ -566,12 +592,16 @@ class IncrementalObservationEncoder:
 
         # Per-section hit/miss counters
         self._section_hits: dict[str, int] = {
-            "player_state": 0, "opponent_states": 0,
-            "board_state": 0, "game_state": 0,
+            "player_state": 0,
+            "opponent_states": 0,
+            "board_state": 0,
+            "game_state": 0,
         }
         self._section_misses: dict[str, int] = {
-            "player_state": 0, "opponent_states": 0,
-            "board_state": 0, "game_state": 0,
+            "player_state": 0,
+            "opponent_states": 0,
+            "board_state": 0,
+            "game_state": 0,
         }
 
     def get_observation_space(self) -> spaces.Dict:
@@ -586,79 +616,10 @@ class IncrementalObservationEncoder:
         self._last_encoded_pid = None
 
     def encode(
-        self,
-        game: MonopolyGame,
-        player_id: int,
-        pending_trade_response: bool = False,
-    ) -> dict[str, np.ndarray | dict[str, np.ndarray]]:
-        """Encode observation, reusing cached sections when unchanged.
-
-        Args:
-            game: The MonopolyGame instance to encode.
-            player_id: The player ID whose perspective to encode from.
-            pending_trade_response: If True, this player is responding to a trade.
-
-        Returns:
-            Dictionary matching the observation space structure.
-        """
-        same_player = (self._last_encoded_pid == player_id)
-
-        if player_id not in self._cache:
-            # Cold start: full computation
-            obs = self._base.encode(game, player_id, pending_trade_response)
-            self._cache[player_id] = obs
-            self._board_snap[player_id] = self._snap_board(game, player_id)
-            self._game_snap = self._snap_game(game)
-            self._last_encoded_pid = player_id
-            for key in self._section_misses:
-                self._section_misses[key] += 1
-            return obs
-
-        cached = self._cache[player_id]
-
-        # --- player_state: always recompute (money changes almost every step) ---
-        cached["player_state"] = self._base._encode_player_state(game, player_id)
-        self._section_misses["player_state"] += 1
-
-        # --- opponent_states: skip if same player (opponents haven't acted) ---
-        if same_player:
-            self._section_hits["opponent_states"] += 1
-        else:
-            cached["opponent_states"] = self._base._encode_opponent_states(
-                game, player_id
-            )
-            self._section_misses["opponent_states"] += 1
-
-        # --- board_state: use lightweight snapshot ---
-        bs = self._snap_board(game, player_id)
-        if bs != self._board_snap.get(player_id):
-            cached["board_state"] = self._base._encode_board_state(game, player_id)
-            self._board_snap[player_id] = bs
-            self._section_misses["board_state"] += 1
-        else:
-            self._section_hits["board_state"] += 1
-
-        # --- game_state: use lightweight snapshot ---
-        gs = self._snap_game(game)
-        if gs != self._game_snap:
-            cached["game_state"] = self._base._encode_game_state(game)
-            self._game_snap = gs
-            self._section_misses["game_state"] += 1
-        else:
-            self._section_hits["game_state"] += 1
-
-        # Action mask: always recompute (depends on full state, has own caching)
-        cached["action_mask"] = self._base._encode_action_mask(
-            game, player_id, pending_trade_response
-        )
-
-        if self.enable_trades:
-            cached["trade_context"] = self._base._encode_trade_context(
-                game, player_id
-            )
-
-        self._last_encoded_pid = player_id
-        return cached
+        self, game: MonopolyGame, player_id: int, pending_trade_response: bool = False
+    ) -> dict[str, Any]:
+        # Compatibility class: correctness reference, caching intentionally disabled.
+        return self._base.encode(game, player_id, pending_trade_response)
 
     def _snap_board(self, game: MonopolyGame, player_id: int) -> tuple[Any, ...]:
         """Snapshot fields that board_state encoding depends on.
@@ -677,8 +638,10 @@ class IncrementalObservationEncoder:
     def _snap_game(self, game: MonopolyGame) -> tuple[Any, ...]:
         """Snapshot fields that game_state encoding depends on."""
         return (
-            game.turn_number, game.houses_remaining,
-            game.hotels_remaining, game.last_roll,
+            game.turn_number,
+            game.houses_remaining,
+            game.hotels_remaining,
+            game.last_roll,
         )
 
     @property
@@ -694,9 +657,7 @@ class IncrementalObservationEncoder:
             stats[section] = {
                 "hits": self._section_hits[section],
                 "misses": self._section_misses[section],
-                "hit_rate": (
-                    self._section_hits[section] / total if total > 0 else 0.0
-                ),
+                "hit_rate": (self._section_hits[section] / total if total > 0 else 0.0),
             }
         total_hits = sum(self._section_hits.values())
         total_misses = sum(self._section_misses.values())
@@ -709,50 +670,13 @@ class IncrementalObservationEncoder:
         return stats
 
 
-def get_flat_observation_size(num_players: int) -> int:
-    """Calculate the size of a flattened observation.
+def get_flat_observation_size(num_players: int, enable_trades: bool = False) -> int:
+    from monopoly_engine import MonopolyGame
 
-    Args:
-        num_players: Total number of players (2-8).
-
-    Returns:
-        Total number of elements in a flattened observation.
-    """
-    if not 2 <= num_players <= 8:
-        raise ValueError(f"num_players must be between 2 and 8, got {num_players}")
-
-    max_opponents = num_players - 1
-    opponent_features = 6 + NUM_PROPERTIES  # 34 features per opponent
-
-    # Player state:
-    # - money: 1
-    # - position: 1
-    # - in_jail: 1
-    # - jail_turns: 1
-    # - jail_cards: 1
-    # - properties_owned: 28
-    player_state_size = 1 + 1 + 1 + 1 + 1 + NUM_PROPERTIES  # 33
-
-    # Opponent states: max_opponents * 34
-    opponent_states_size = max_opponents * opponent_features
-
-    # Board state: 28 properties * 5 features
-    board_state_size = NUM_PROPERTIES * 5  # 140
-
-    # Game state:
-    # - turn_number: 1
-    # - houses_remaining: 1
-    # - hotels_remaining: 1
-    # - last_roll: 1
-    game_state_size = 4
-
-    # Action mask: 149
-    action_mask_size = 149
-
-    return (
-        player_state_size
-        + opponent_states_size
-        + board_state_size
-        + game_state_size
-        + action_mask_size
+    return int(
+        flatten_observation(
+            ObservationEncoder(num_players, enable_trades).encode(
+                MonopolyGame(num_players, seed=0), 0
+            )
+        ).size
     )

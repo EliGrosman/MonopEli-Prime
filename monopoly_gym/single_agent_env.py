@@ -1,40 +1,20 @@
-"""Single-agent Gymnasium wrapper for Monopoly.
-
-This module provides a Gymnasium-compatible environment that wraps the
-multi-agent PettingZoo environment, allowing training with single-agent
-RL libraries like Stable-Baselines3.
-"""
+"""One learner decision through the next learner decision, shared by PPO/self-play."""
 
 from __future__ import annotations
 
-from typing import Any, SupportsFloat
+from typing import Any, Callable
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-from numpy.typing import NDArray
 
-from monopoly_gym import GAMEPLAY_ACTION_SPACE_SIZE, MonopolyEnv
-from monopoly_gym.observation import flatten_observation, get_flat_observation_size
+from .action_space import GAMEPLAY_ACTION_SPACE_SIZE
+from .env import MonopolyEnv
+from .observation import flatten_observation, get_flat_observation_size
 
 
-class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
-    """Single-agent Gymnasium wrapper for Monopoly.
-
-    This environment wraps the multi-agent MonopolyEnv to create a single-agent
-    training environment. The learning agent is always player 0, while other
-    players are controlled by opponent agents.
-
-    Supports action masking through the info dict for use with MaskablePPO.
-
-    Attributes:
-        action_space: Discrete action space (149 actions in Phase 2)
-        observation_space: Flattened observation space for compatibility
-    """
-
-    metadata = {
-        "render_modes": ["human", "ansi"],
-    }
+class SingleAgentMonopolyEnv(gym.Env):
+    metadata = {"render_modes": ["human", "ansi"]}
 
     def __init__(
         self,
@@ -45,265 +25,127 @@ class SingleAgentMonopolyEnv(gym.Env[NDArray[np.float32], int]):
         flatten_obs: bool = True,
         render_mode: str | None = None,
         seed: int | None = None,
-    ) -> None:
-        """Initialize single-agent Monopoly environment.
-
-        Args:
-            num_players: Total players including the learning agent (2-4)
-            opponent_type: Type of opponent agents ("random", "rule_based")
-            max_turns: Maximum turns before truncation
-            reward_type: "sparse" or "dense"
-            flatten_obs: Whether to flatten observations (required for MLP policies)
-            render_mode: "human", "ansi", or None
-            seed: Random seed
-        """
+        learner_seat: int = 0,
+    ):
         super().__init__()
-
-        if not 2 <= num_players <= 4:
-            raise ValueError(f"num_players must be 2-4, got {num_players}")
-
-        self.num_players = num_players
-        self.opponent_type = opponent_type
-        self.max_turns = max_turns
-        self.reward_type = reward_type
-        self.flatten_obs = flatten_obs
-        self.render_mode = render_mode
-        self._seed = seed
-
-        # Create underlying multi-agent environment
+        if not 0 <= learner_seat < num_players:
+            raise ValueError("Invalid learner seat")
+        self.num_players, self.opponent_type = num_players, opponent_type
+        self.max_turns, self.reward_type = max_turns, reward_type
+        self.flatten_obs, self.render_mode = flatten_obs, render_mode
+        self.learner_seat, self._seed = learner_seat, seed
+        self._agent_id = f"player_{learner_seat}"
         self._env = MonopolyEnv(
-            num_players=num_players,
-            max_turns=max_turns,
-            reward_type=reward_type,
-            render_mode=render_mode,
+            num_players, max_turns, reward_type, render_mode, cutoff_player=learner_seat
         )
+        self.action_space = spaces.Discrete(GAMEPLAY_ACTION_SPACE_SIZE)
+        self.observation_space = (
+            spaces.Box(0, 1, (get_flat_observation_size(num_players),), dtype=np.float32)
+            if flatten_obs
+            else self._env.observation_space(self._agent_id)
+        )
+        self._opponent_policy: Callable | None = None
+        self._stream = np.random.default_rng(seed)
+        self._done = False
 
-        # Create opponent agents (lazy import to avoid circular dependencies)
-        self._opponents = self._create_opponents()
+    def set_opponent_policy(self, policy_fn: Callable | None) -> None:
+        self._opponent_policy = policy_fn
 
-        # Define spaces (no trades in single-agent env, so use gameplay-only space)
-        self.action_space: spaces.Space[int] = spaces.Discrete(GAMEPLAY_ACTION_SPACE_SIZE)
+    def reset(self, *, seed: int | None = None, options: dict | None = None):
+        super().reset(seed=seed)
+        if seed is not None:
+            self._stream = np.random.default_rng(seed)
+        episode = int(self._stream.integers(0, 2**32))
+        seeds = np.random.SeedSequence(episode).spawn(self.num_players + 1)
+        self._env.reset(seed=int(seeds[0].generate_state(1)[0]))
+        from agents import AggressiveAgent, ConservativeAgent, RandomAgent, RuleBasedAgent
 
-        if flatten_obs:
-            flat_size = get_flat_observation_size(num_players)
-            self.observation_space: spaces.Space[Any] = spaces.Box(
-                low=-1.0, high=1.0, shape=(flat_size,), dtype=np.float32
+        types = {
+            "random": RandomAgent,
+            "self": RandomAgent,
+            "rule_based": RuleBasedAgent,
+            "aggressive": AggressiveAgent,
+            "conservative": ConservativeAgent,
+        }
+        if self.opponent_type not in types:
+            raise ValueError(f"Unknown opponent {self.opponent_type}")
+        cls = types[self.opponent_type]
+        self._opponents = {
+            f"player_{i}": (
+                cls(i, seed=int(seeds[i + 1].generate_state(1)[0]))
+                if cls is RandomAgent
+                else cls(i)
             )
-        else:
-            self.observation_space = self._env._observation_space
+            for i in range(self.num_players)
+            if i != self.learner_seat
+        }
+        self.episode_reward, self.episode_length = 0.0, 0
+        self._done = False
+        from monopoly_engine.progress import ProgressGuard
 
-        # Agent ID for the learning agent
-        self._agent_id = "player_0"
-
-    def _create_opponents(self) -> dict[str, Any]:
-        """Create opponent agents based on opponent_type.
-
-        Returns:
-            Dictionary mapping agent IDs to agent instances.
-        """
-        # Import agents lazily to avoid circular imports
-        from agents import (
-            AggressiveAgent,
-            ConservativeAgent,
-            RandomAgent,
-            RuleBasedAgent,
-        )
-
-        opponents: dict[str, Any] = {}
-        for i in range(1, self.num_players):
-            agent_id = f"player_{i}"
-            if self.opponent_type == "random":
-                opponents[agent_id] = RandomAgent(i, seed=self._seed)
-            elif self.opponent_type == "rule_based":
-                opponents[agent_id] = RuleBasedAgent(i)
-            elif self.opponent_type == "aggressive":
-                opponents[agent_id] = AggressiveAgent(i)
-            elif self.opponent_type == "conservative":
-                opponents[agent_id] = ConservativeAgent(i)
-            else:
-                # Default to random for unknown types
-                opponents[agent_id] = RandomAgent(i, seed=self._seed)
-        return opponents
-
-    def reset(
-        self,
-        *,
-        seed: int | None = None,
-        options: dict[str, Any] | None = None,
-    ) -> tuple[NDArray[np.float32], dict[str, Any]]:
-        """Reset the environment.
-
-        Args:
-            seed: Random seed
-            options: Additional options
-
-        Returns:
-            Tuple of (observation, info)
-        """
-        actual_seed = seed if seed is not None else self._seed
-        self._env.reset(seed=actual_seed)
-
-        # Reset opponent agents
-        for agent in self._opponents.values():
-            agent.reset()
-
-        # Play opponent turns until it's player_0's turn
-        self._play_until_agent_turn()
-
-        # Get observation for learning agent
-        obs = self._get_observation()
-        info = self._get_info()
-
-        return obs, info
-
-    def step(
-        self, action: int
-    ) -> tuple[NDArray[np.float32], SupportsFloat, bool, bool, dict[str, Any]]:
-        """Take a step in the environment.
-
-        Args:
-            action: Action index for the learning agent
-
-        Returns:
-            Tuple of (observation, reward, terminated, truncated, info)
-        """
-        # Check if the learning agent is already terminated/truncated
-        agent_terminated = self._env.terminations.get(self._agent_id, False)
-        agent_truncated = self._env.truncations.get(self._agent_id, False)
-
-        if agent_terminated or agent_truncated:
-            # Agent is done - pass None and return terminal state
-            self._env.step(None)
-            obs = self._get_observation()
-            info = self._get_info()
-            # Calculate final reward
-            reward = 0.0
-            if self._env.game is not None and self._env.game.game_over:
-                if self._env.game.winner == 0:
-                    reward = 1.0 if self.reward_type == "sparse" else 10.0
-                else:
-                    reward = -1.0 if self.reward_type == "sparse" else -1.0
-            return obs, reward, agent_terminated, agent_truncated, info
-
-        # Execute learning agent's action
-        self._env.step(action)
-
-        # Get reward for the learning agent
-        _, reward, terminated, truncated, _ = self._env.last()
-
-        # If not done, play opponent turns
-        if not (terminated or truncated):
-            self._play_until_agent_turn()
-
-        # Check termination status again after opponent turns
-        terminated = self._env.terminations.get(self._agent_id, False)
-        truncated = self._env.truncations.get(self._agent_id, False)
-
-        # Check if game ended during opponent turns
-        if self._env.game is not None and self._env.game.game_over:
-            terminated = True
-            # Recalculate reward if game ended
-            if self._env.game.winner == 0:
-                reward = 1.0 if self.reward_type == "sparse" else 10.0
-            else:
-                reward = -1.0 if self.reward_type == "sparse" else -1.0
-
-        obs = self._get_observation()
-        info = self._get_info()
-
-        return obs, float(reward), terminated, truncated, info
-
-    def _play_until_agent_turn(self) -> None:
-        """Play opponent turns until it's the learning agent's turn.
-
-        Optimized: Skip observation encoding for opponents since most don't use it.
-        """
-        max_iterations = 1000  # Prevent infinite loops
-        iterations = 0
-
-        while (
-            self._env.agent_selection != self._agent_id
-            and not all(self._env.terminations.values())
-            and iterations < max_iterations
-        ):
-            current_agent = self._env.agent_selection
-
-            if current_agent in self._opponents:
-                opponent = self._opponents[current_agent]
-                # Use observe=False to skip expensive observation encoding
-                # Most opponents (RandomAgent) don't use the observation anyway
-                _, _, term, trunc, info = self._env.last(observe=False)
-
-                if term or trunc:
-                    self._env.step(None)
-                else:
-                    action_mask = info.get(
-                        "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
-                    )
-                    # Pass None for observation - RandomAgent ignores it
-                    action = opponent.choose_action(None, action_mask, self._env.game)
-                    self._env.step(action)
-            else:
-                break
-
-            iterations += 1
-
-    def _get_observation(self) -> NDArray[np.float32]:
-        """Get observation for the learning agent.
-
-        Returns:
-            Flattened observation array if flatten_obs=True, else dict observation.
-        """
-        obs = self._env.observe(self._agent_id)
-
-        if self.flatten_obs:
-            return flatten_observation(obs)
-        # For non-flattened, we still return the flattened version
-        # because the observation_space is defined as Box
-        # Users who want dict obs should set flatten_obs=False and
-        # handle the dict space themselves
-        return flatten_observation(obs)
-
-    def _get_info(self) -> dict[str, Any]:
-        """Get info dict with action mask.
-
-        Returns:
-            Info dictionary containing the action mask for MaskablePPO.
-        """
-        agent_info = self._env.infos.get(self._agent_id, {})
-        action_mask = agent_info.get(
-            "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
-        )
-        return {
-            "action_mask": action_mask,
+        self._guard = ProgressGuard()
+        self._reset_reward = self._advance()
+        self._pending_terminal = self._flags()[0] or self._flags()[1]
+        return self._get_observation(), {
+            **self._get_info(),
+            "pending_terminal": self._pending_terminal,
         }
 
-    def render(self) -> str | list[str] | None:  # type: ignore[override]
-        """Render the environment.
+    def _flags(self):
+        return (self._env.terminations[self._agent_id], self._env.truncations[self._agent_id])
 
-        Returns:
-            String representation if render_mode is "ansi", None otherwise.
-        """
+    def _advance(self) -> float:
+        reward = 0.0
+        for _ in range(10000):
+            if any(self._flags()) or self._env.agent_selection == self._agent_id:
+                return reward
+            agent = self._env.agent_selection
+            obs, _, terminated, truncated, info = self._env.last()
+            if terminated or truncated:
+                self._env.step(None)
+                continue
+            if self.opponent_type == "self" and self._opponent_policy is not None:
+                action = int(self._opponent_policy(flatten_observation(obs), info["action_mask"]))
+            else:
+                action = self._opponents[agent].choose_action(
+                    obs, info["action_mask"], self._env.game
+                )
+            self._guard.check(self._env.game)
+            self._env.step(action)
+            reward += self._env.rewards.get(self._agent_id, 0.0)
+        raise RuntimeError("Stalled opponent interval; trajectory invalid")
+
+    def step(self, action: int):
+        if self._done:
+            raise RuntimeError("Episode finished; reset before stepping again")
+        if self._pending_terminal:
+            reward = self._reset_reward
+            self._pending_terminal = False
+        else:
+            self._guard.check(self._env.game)
+            self._env.step(action)
+            reward = self._env.rewards[self._agent_id] + self._advance()
+        terminated, truncated = self._flags()
+        self._done = terminated or truncated
+        self.episode_length += 1
+        self.episode_reward += reward
+        info = self._get_info()
+        if self._done:
+            info["episode"] = {"r": self.episode_reward, "l": self.episode_length}
+        return self._get_observation(), float(reward), terminated, truncated, info
+
+    def _get_observation(self):
+        obs = self._env.observe(self._agent_id)
+        return flatten_observation(obs) if self.flatten_obs else obs
+
+    def _get_info(self) -> dict[str, Any]:
+        return dict(self._env.infos[self._agent_id])
+
+    def action_masks(self):
+        return self._get_info()["action_mask"].copy()
+
+    def render(self):
         return self._env.render()
 
-    def close(self) -> None:
-        """Clean up resources."""
+    def close(self):
         self._env.close()
-
-    def action_masks(self) -> NDArray[np.bool_]:
-        """Get the current action mask.
-
-        This method is provided for compatibility with sb3-contrib's MaskablePPO.
-        The action mask indicates which actions are valid (True) or invalid (False).
-
-        Returns:
-            Boolean array of shape (149,) indicating valid actions.
-        """
-        agent_info = self._env.infos.get(self._agent_id, {})
-        mask = agent_info.get(
-            "action_mask", np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)
-        )
-        # Ensure it's a numpy array with correct dtype
-        if isinstance(mask, np.ndarray):
-            return mask.astype(np.bool_)
-        return np.ones(GAMEPLAY_ACTION_SPACE_SIZE, dtype=np.bool_)

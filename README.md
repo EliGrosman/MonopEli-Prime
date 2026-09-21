@@ -1,6 +1,11 @@
 # MonopEli
 
-A full-stack Monopoly platform: pure Python game engine, reinforcement learning training, FastAPI backend with WebSocket, and React frontend — all containerized and production-ready.
+A full-stack Monopoly platform: pure Python game engine, reinforcement learning training, FastAPI backend with WebSocket, and React frontend — containerized for local development and deployment.
+
+
+Current revival status: [foundation-v1 implementation and validation](docs/foundation/validation-report.md).
+The 95% game-completion gate is blocked; substantive model training remains deferred. Historical
+training results below are not certified playing-strength measurements under the new rules and encodings.
 
 ## Quick Start
 

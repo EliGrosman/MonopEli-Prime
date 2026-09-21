@@ -6,6 +6,7 @@ and coordinates state broadcasts.
 """
 
 import asyncio
+import secrets
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -34,6 +35,7 @@ class ActiveGame:
     started_at: datetime | None = None
     player_slots: dict[int, PlayerSlot] = field(default_factory=dict)
     spectator_count: int = 0
+    root_seed: int | None = None
 
     def is_expired(self, timeout_minutes: int) -> bool:
         """Check if game has exceeded timeout."""
@@ -107,9 +109,9 @@ class GameManager:
             if player_names is None:
                 player_names = [f"Player {i + 1}" for i in range(num_players)]
             elif len(player_names) != num_players:
-                raise ValueError(
-                    f"Expected {num_players} player names, got {len(player_names)}"
-                )
+                raise ValueError(f"Expected {num_players} player names, got {len(player_names)}")
+
+            seed = secrets.randbits(64) if seed is None else seed
 
             # Create game engine instance
             game = MonopolyGame(
@@ -132,6 +134,7 @@ class GameManager:
 
             active_game = ActiveGame(
                 id=game_id,
+                root_seed=seed,
                 game=game,
                 created_at=datetime.now(UTC),
                 player_slots=player_slots,
@@ -197,7 +200,7 @@ class GameManager:
 
             # Execute action
             try:
-                action.execute(active_game.game)
+                active_game.game.apply_action(action.player_id, action)
             except Exception as e:
                 return False, f"Action execution failed: {e}"
 
@@ -235,13 +238,12 @@ class GameManager:
         if active_game is None or active_game.game.game_over:
             return
 
-        current_player = active_game.game.current_player
+        current_player = active_game.game.decision_player
         if self._ai_manager.is_ai_player(game_id, current_player):
             # Schedule AI turn processing (don't block the response)
             import asyncio
-            asyncio.create_task(
-                self._ai_manager.process_ai_turns_for_game(self, game_id)
-            )
+
+            asyncio.create_task(self._ai_manager.process_ai_turns_for_game(self, game_id))
 
     async def claim_player_slot(
         self,
@@ -425,9 +427,7 @@ class GameManager:
             GameInfo(
                 id=g.id,
                 num_players=len(g.player_slots),
-                players_joined=sum(
-                    1 for p in g.player_slots.values() if p.session_id is not None
-                ),
+                players_joined=sum(1 for p in g.player_slots.values() if p.session_id is not None),
                 started=g.started_at is not None,
                 game_over=g.game.game_over,
                 created_at=g.created_at,

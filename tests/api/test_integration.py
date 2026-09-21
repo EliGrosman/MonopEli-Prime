@@ -25,7 +25,8 @@ from api.main import create_app
 @pytest.fixture
 def app():
     """Create test application."""
-    return create_app()
+    from api.config import Settings
+    return create_app(Settings(rate_limit_per_minute=10000, rate_limit_burst=10000))
 
 
 @pytest.fixture
@@ -49,6 +50,27 @@ def get_game_state(client: TestClient, game_id: str) -> dict:
     response = client.get(f"/api/games/{game_id}")
     return response.json()
 
+
+
+def resolve_required_decisions(client, game_id, ws, others=()):
+    """Drive explicit roll/purchase decisions before ending a test turn."""
+    for _ in range(30):
+        state = get_game_state(client, game_id)
+        legal = {action["type"]: action for action in state["legal_actions"]}
+        if "EndTurn" in legal:
+            return
+        if "PassBuy" in legal:
+            request = {"action_type": "pass_buy"}
+        elif "RollDice" in legal:
+            request = {"action_type": "roll_dice"}
+        else:
+            raise AssertionError(f"Unexpected scripted decision: {legal}")
+        ws.send_json({"type": "action", "data": request})
+        assert ws.receive_json()["data"]["success"]
+        assert ws.receive_json()["type"] == "state_update"
+        for other in others:
+            assert other.receive_json()["type"] == "state_update"
+    raise AssertionError("Required decisions did not finish")
 
 # ============================================================================
 # Turn Cycle Tests
@@ -84,6 +106,7 @@ class TestTurnCycle:
             assert state["data"]["last_roll"] is not None
 
             # End turn
+            resolve_required_decisions(client, game_id, ws)
             ws.send_json({"type": "action", "data": {"action_type": "end_turn"}})
             result = ws.receive_json()
             assert result["type"] == "action_result"
@@ -138,6 +161,8 @@ class TestTurnCycle:
             ws0.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
             ws0.receive_json()  # result
             ws0.receive_json()  # state
+
+            resolve_required_decisions(client, game_id, ws0)
 
             ws0.send_json({"type": "action", "data": {"action_type": "end_turn"}})
             ws0.receive_json()  # result
@@ -269,6 +294,7 @@ class TestAllActionTypes:
             ws.receive_json()
 
             # End turn
+            resolve_required_decisions(client, game_id, ws)
             ws.send_json({"type": "action", "data": {"action_type": "end_turn"}})
             result = ws.receive_json()
             assert result["data"]["success"] is True
@@ -453,6 +479,8 @@ class TestRESTAPIIntegration:
             ws.receive_json()
             ws.receive_json()
 
+            resolve_required_decisions(client, game_id, ws)
+
             ws.send_json({"type": "action", "data": {"action_type": "end_turn"}})
             ws.receive_json()
             ws.receive_json()
@@ -516,6 +544,7 @@ class TestGameProgression:
                     other_ws.receive_json()  # broadcast
 
                     # End turn
+                    resolve_required_decisions(client, game_id, current_ws, (other_ws,))
                     current_ws.send_json({"type": "action", "data": {"action_type": "end_turn"}})
                     current_ws.receive_json()  # result
                     current_ws.receive_json()  # state
