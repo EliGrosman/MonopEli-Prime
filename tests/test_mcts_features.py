@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from mcts.features import extract_features, get_feature_size
 from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
-
-from mcts.features import extract_features, get_feature_size
-
 
 # ===========================================================================
 # B2: Feature Extraction tests

@@ -144,6 +144,13 @@ OFFSET_ROLL_DICE = 149
 OFFSET_SELL_GROUP = 150
 ACTION_VERSION = "action-v2"
 GAMEPLAY_ACTION_SPACE_SIZE = 158
+TRADE_ACTION_VERSION = "action-v3"
+OFFSET_ACCEPT_TRADE_V3 = 158
+OFFSET_REJECT_TRADE_V3 = 159
+OFFSET_TRADE_CANDIDATE = 160
+TRADE_CANDIDATE_COUNT = 32
+TRADE_ACTION_SPACE_SIZE = 192
+TRADE_CANDIDATE_VERSION = "foundation-benefit-candidates-v1"
 
 # Total action space size (with Phase 2.5a trades)
 ACTION_SPACE_SIZE = GAMEPLAY_ACTION_SPACE_SIZE
@@ -195,7 +202,12 @@ class ActionEncoder:
         enable_trades: Whether trade actions are enabled (Phase 2.5a).
     """
 
-    def __init__(self, enable_trades: bool = False) -> None:
+    def __init__(
+        self,
+        enable_trades: bool = False,
+        *,
+        rules_id: str = "foundation-v1",
+    ) -> None:
         """Initialize the ActionEncoder.
 
         Args:
@@ -204,14 +216,19 @@ class ActionEncoder:
         """
         if enable_trades:
             raise ValueError(
-                "Trading is disabled in foundation-v1; "
-                "legacy 907-action checkpoints are incompatible"
+                "Trading is disabled for the obsolete 907-action enable_trades mode; use "
+                "rules_id='foundation-trade-v1' for action-v3"
             )
-        self.enable_trades = enable_trades
-        if enable_trades:
-            self.action_space_size = ACTION_SPACE_SIZE  # 907
-        else:
-            self.action_space_size = GAMEPLAY_ACTION_SPACE_SIZE  # 158
+        if rules_id not in ("foundation-v1", "foundation-trade-v1"):
+            raise ValueError(f"Unknown rules ID: {rules_id}")
+        self.rules_id = rules_id
+        self.enable_trades = rules_id == "foundation-trade-v1"
+        self.action_space_size = (
+            TRADE_ACTION_SPACE_SIZE if self.enable_trades else GAMEPLAY_ACTION_SPACE_SIZE
+        )
+        self.action_version = TRADE_ACTION_VERSION if self.enable_trades else ACTION_VERSION
+        self.candidate_version = TRADE_CANDIDATE_VERSION if self.enable_trades else None
+        self._candidate_maps: dict[tuple[int, int, int], tuple[ProposeTrade, ...]] = {}
 
         # Mask cache: {player_id: (fingerprint_tuple, cached_mask)}
         self._mask_cache: dict[int, tuple[tuple[object, ...], NDArray[np.bool_]]] = {}
@@ -249,6 +266,41 @@ class ActionEncoder:
     def invalidate_cache(self) -> None:
         """Clear the mask cache (call on env reset)."""
         self._mask_cache.clear()
+        self._candidate_maps.clear()
+
+    def _candidates(self, game: "MonopolyGame", player_id: int) -> tuple[ProposeTrade, ...]:
+        key = (id(game), game.state.revision, player_id)
+        cached = self._candidate_maps.get(key)
+        if cached is not None:
+            return cached
+        if not self.enable_trades or game.rules_id != self.rules_id:
+            candidates: tuple[ProposeTrade, ...] = ()
+        else:
+            # The bounded list is a policy aid. Engine validity remains authoritative.
+            from agents import RuleBasedAgent
+            from agents.trading_agent import TradingAgent
+
+            wrapper = TradingAgent(RuleBasedAgent(player_id))
+            candidates = tuple(item.action for item in wrapper.candidates(game))[
+                :TRADE_CANDIDATE_COUNT
+            ]
+        self._candidate_maps[key] = candidates
+        return candidates
+
+    def get_trade_candidates(
+        self, game: "MonopolyGame", player_id: int
+    ) -> tuple[ProposeTrade, ...]:
+        """Return the stable candidate mapping for the current revision."""
+        return self._candidates(game, player_id)
+
+    def encode_current(self, action: Action, game: "MonopolyGame", player_id: int) -> int:
+        """Encode an action using the candidate mapping for the current revision."""
+        if isinstance(action, ProposeTrade) and self.enable_trades:
+            for slot, candidate in enumerate(self._candidates(game, player_id)):
+                if candidate == action:
+                    return OFFSET_TRADE_CANDIDATE + slot
+            raise ValueError("Proposal is not in the current bounded candidate list")
+        return self.encode(action)
 
     @property
     def cache_stats(self) -> tuple[int, int]:
@@ -315,28 +367,16 @@ class ActionEncoder:
         if isinstance(action, PayJailFine):
             return OFFSET_PAY_JAIL_FINE
 
-        # Trade actions (Phase 2.5a)
+        # Trade actions use a bounded revision-specific mapping in action-v3.
         if self.enable_trades:
             if isinstance(action, ProposeTrade):
-                # For simple 1-for-1 trades, encode using the properties
-                if (
-                    len(action.give_properties) == 1
-                    and len(action.want_properties) == 1
-                    and action.give_money == 0
-                    and action.want_money == 0
-                ):
-                    return encode_simple_trade(
-                        action.give_properties[0],
-                        action.want_properties[0],
-                    )
-                # Complex trades not supported in Phase 2.5a
-                raise ValueError("Only 1-for-1 property trades supported in Phase 2.5a")
+                raise ValueError("Parameterized proposals require a current game candidate mapping")
 
             if isinstance(action, AcceptTrade):
-                return OFFSET_ACCEPT_TRADE
+                return OFFSET_ACCEPT_TRADE_V3
 
             if isinstance(action, RejectTrade):
-                return OFFSET_REJECT_TRADE
+                return OFFSET_REJECT_TRADE_V3
 
         raise ValueError(f"Unsupported action type: {type(action).__name__}")
 
@@ -421,40 +461,26 @@ class ActionEncoder:
         if action_idx == OFFSET_PAY_JAIL_FINE:
             return PayJailFine(player_id=player_id)
 
-        # Trade actions (Phase 2.5a)
+        # Trade actions (action-v3)
         if self.enable_trades:
-            # Simple 1-for-1 trades (indices 149-904)
-            if OFFSET_SIMPLE_TRADE <= action_idx < OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM:
-                my_prop, their_prop = decode_simple_trade(action_idx)
-                # Find the owner of their_prop
-                prop = game.property_manager.get(their_prop)
-                if prop is None or prop.owner is None:
-                    raise ValueError(f"Property {their_prop} has no owner for trade")
-                to_player = prop.owner
-                return ProposeTrade(
-                    player_id=player_id,
-                    to_player=to_player,
-                    give_properties=[my_prop],
-                    want_properties=[their_prop],
-                    give_money=0,
-                    want_money=0,
-                )
-
-            # Accept Trade (index 905)
-            if action_idx == OFFSET_ACCEPT_TRADE:
+            if action_idx == OFFSET_ACCEPT_TRADE_V3:
                 # Find the pending trade for this player
                 trade_id = find_trade_for_player(game, player_id)
                 if trade_id is None:
                     raise ValueError("No pending trade to accept")
                 return AcceptTrade(player_id=player_id, trade_id=trade_id)
-
-            # Reject Trade (index 906)
-            if action_idx == OFFSET_REJECT_TRADE:
+            if action_idx == OFFSET_REJECT_TRADE_V3:
                 # Find the pending trade for this player
                 trade_id = find_trade_for_player(game, player_id)
                 if trade_id is None:
                     raise ValueError("No pending trade to reject")
                 return RejectTrade(player_id=player_id, trade_id=trade_id)
+            if OFFSET_TRADE_CANDIDATE <= action_idx < TRADE_ACTION_SPACE_SIZE:
+                slot = action_idx - OFFSET_TRADE_CANDIDATE
+                candidates = self._candidates(game, player_id)
+                if slot >= len(candidates):
+                    raise ValueError("Trade candidate slot is not available at this revision")
+                return candidates[slot]
 
         raise ValueError(f"Invalid action index: {action_idx}")
 
@@ -465,8 +491,20 @@ class ActionEncoder:
         if game.game_over or player_id != game.decision_player or game.players[player_id].bankrupt:
             return mask
         from monopoly_engine.foundation import legal_actions
+
         for action in legal_actions(game, player_id):
             mask[self.encode(action)] = True
+        if self.enable_trades:
+            if game.state.phase == "trade_response":
+                trade_id = find_trade_for_player(game, player_id)
+                if trade_id is not None:
+                    accept = AcceptTrade(player_id, trade_id)
+                    reject = RejectTrade(player_id, trade_id)
+                    mask[OFFSET_ACCEPT_TRADE_V3] = accept.validate(game)[0]
+                    mask[OFFSET_REJECT_TRADE_V3] = reject.validate(game)[0]
+            else:
+                for slot, action in enumerate(self._candidates(game, player_id)):
+                    mask[OFFSET_TRADE_CANDIDATE + slot] = action.validate(game)[0]
         return mask
 
     def get_action_name(self, action_idx: int) -> str:

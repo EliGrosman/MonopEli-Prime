@@ -30,6 +30,7 @@ function createMockLobby(overrides: Partial<LobbyState> = {}): LobbyState {
       go_salary: 200,
       allow_spectators: false,
       private: false,
+      rules_id: 'foundation-v1',
     },
     spectator_count: 0,
     game_id: null,

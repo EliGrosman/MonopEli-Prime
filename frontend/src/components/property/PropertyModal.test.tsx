@@ -60,6 +60,7 @@ describe('PropertyModal', () => {
   };
 
   const mockGameState: GameState = {
+    revision: 0,
     players: mockPlayers,
     properties: mockProperties,
     currentPlayer: 0,

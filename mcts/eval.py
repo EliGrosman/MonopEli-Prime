@@ -7,13 +7,9 @@ Results follow the same EvaluationResult pattern as training/evaluate.py.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-from monopoly_engine.game import MonopolyGame
-from monopoly_gym.action_space import ActionEncoder
+from typing import TYPE_CHECKING
 
 # Agent imports are deferred to function bodies to avoid a circular import:
 #   agents/mcts_agent.py  →  mcts/__init__.py  →  mcts/eval.py
@@ -58,7 +54,7 @@ class MCTSEvalResult:
             f"({self.wins}W/{self.losses}L/{self.draws}D), "
             f"avg game {self.avg_game_length:.0f} actions, "
             f"{self.avg_time_sec:.1f}s/game, "
-            f"{self.avg_mcts_time_per_move*1000:.1f}ms/move"
+            f"{self.avg_mcts_time_per_move * 1000:.1f}ms/move"
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -106,9 +102,12 @@ def _make_opponent(opponent_type: str, player_id: int) -> Agent:
     )
 
 
-def play_evaluation_game(mcts_agent: MCTSAgent, opponents: list[Agent],
-                         max_turns: int = 1000, seed: int | None = None) -> tuple[int | None, int, float]:
-    raise RuntimeError("MCTS is experimental, not a certified baseline; use the foundation runner explicitly")
+def play_evaluation_game(
+    mcts_agent: MCTSAgent, opponents: list[Agent], max_turns: int = 1000, seed: int | None = None
+) -> tuple[int | None, int, float]:
+    raise RuntimeError(
+        "MCTS is experimental, not a certified baseline; use the foundation runner explicitly"
+    )
 
 
 def evaluate_mcts_agent(
@@ -177,10 +176,7 @@ def evaluate_mcts_agent(
 
         for game_idx in range(num_games):
             game_seed = (seed + game_idx) if seed is not None else None
-            opp_agents = [
-                _make_opponent(opp_type, player_id=i + 1)
-                for i in range(num_opponents)
-            ]
+            opp_agents = [_make_opponent(opp_type, player_id=i + 1) for i in range(num_opponents)]
 
             winner, actions, elapsed = play_evaluation_game(
                 mcts_agent,
@@ -225,9 +221,7 @@ def evaluate_mcts_agent(
 
         if writer is not None:
             writer.add_scalar(f"eval/win_rate_vs_{opp_type}", result.win_rate, 0)
-            writer.add_scalar(
-                f"eval/avg_time_vs_{opp_type}", result.avg_time_sec, 0
-            )
+            writer.add_scalar(f"eval/avg_time_vs_{opp_type}", result.avg_time_sec, 0)
 
     if writer is not None:
         writer.close()

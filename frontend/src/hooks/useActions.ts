@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useUIStore } from '@/store/uiStore';
@@ -15,10 +15,10 @@ interface UseActionsOptions {
  * Provides computed states for UI enablement.
  */
 export function useActions({ send }: UseActionsOptions) {
-  const { setLoading, setError, gameState } = useGameStore();
+  const { setError, gameState, pendingRequestId } = useGameStore();
   const { playerId } = useSessionStore();
   const { addToast } = useUIStore();
-  const [isActionPending, setIsActionPending] = useState(false);
+  const isActionPending = pendingRequestId !== null;
 
   // Current player state
   const currentPlayer = useMemo(
@@ -39,9 +39,6 @@ export function useActions({ send }: UseActionsOptions) {
 
   const sendAction = useCallback(
     (actionType: string, data: Record<string, unknown> = {}) => {
-      setIsActionPending(true);
-      setLoading(true);
-
       try {
         send({
           type: 'action',
@@ -54,13 +51,9 @@ export function useActions({ send }: UseActionsOptions) {
         const message = error instanceof Error ? error.message : 'Action failed';
         setError(message);
         addToast(message, 'error');
-      } finally {
-        // Note: Loading state will be cleared when we receive state update
-        setIsActionPending(false);
-        setLoading(false);
       }
     },
-    [send, setLoading, setError, addToast]
+    [send, setError, addToast]
   );
 
   return {
@@ -139,17 +132,17 @@ export function useActions({ send }: UseActionsOptions) {
     // Trade (simplified)
     proposeTradeOffer: useCallback(
       (targetPlayerId: number, offer: Record<string, unknown>) =>
-        sendAction('propose_trade', { target_player: targetPlayerId, ...offer }),
+        sendAction('propose_trade', { to_player: targetPlayerId, ...offer }),
       [sendAction]
     ),
 
     acceptTrade: useCallback(
-      (tradeId: string) => sendAction('accept_trade', { trade_id: tradeId }),
+      (tradeId: number) => sendAction('accept_trade', { trade_id: tradeId }),
       [sendAction]
     ),
 
     rejectTrade: useCallback(
-      (tradeId: string) => sendAction('reject_trade', { trade_id: tradeId }),
+      (tradeId: number) => sendAction('reject_trade', { trade_id: tradeId }),
       [sendAction]
     ),
   };

@@ -11,8 +11,6 @@ import pytest
 
 from monopoly_engine import MonopolyGame
 from monopoly_gym import (
-    OFFSET_ACCEPT_TRADE,
-    OFFSET_REJECT_TRADE,
     OFFSET_SIMPLE_TRADE,
     SIMPLE_TRADE_DIM,
     ActionEncoder,
@@ -325,260 +323,111 @@ class TestTradeRewards:
         assert rewards[0] <= -1.5, "Should get penalty for giving opponent monopoly"
 
 
-class TestActionEncoderWithTrades:
-    """Tests for ActionEncoder with trade support."""
+def _v3_trade_setup() -> tuple[MonopolyGame, ActionEncoder]:
+    game = MonopolyGame(num_players=2, seed=42, rules_id="foundation-trade-v1")
+    game.state.phase = "asset_management"
+    game.state.roll_owed = False
+    for position in (1, 6):
+        game.property_manager.properties[position].owner = 0
+    for position in (3, 8, 9):
+        game.property_manager.properties[position].owner = 1
+    encoder = ActionEncoder(rules_id="foundation-trade-v1")
+    assert encoder.get_trade_candidates(game, 0)
+    return game, encoder
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
+
+def _v3_env_setup() -> MonopolyEnv:
+    env = MonopolyEnv(num_players=2, rules_id="foundation-trade-v1")
+    env.reset(options={"engine_seed": 42})
+    game, _ = _v3_trade_setup()
+    env.game = game
+    env.agent_selection = "player_0"
+    env.action_encoder.invalidate_cache()
+    env._update_infos()
+    return env
+
+
+class TestActionEncoderWithTrades:
+    """Tests for the bounded action-v3 trade representation."""
+
     def test_action_space_size_with_trades(self) -> None:
-        """With trades enabled, action space should be 907."""
-        encoder = ActionEncoder(enable_trades=True)
-        assert encoder.action_space_size == 907
+        encoder = ActionEncoder(rules_id="foundation-trade-v1")
+        assert encoder.action_space_size == 192
 
     def test_action_space_size_without_trades(self) -> None:
         """Without trades, action space should be 149."""
         encoder = ActionEncoder(enable_trades=False)
         assert encoder.action_space_size == 158
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_decode_trade_action(self) -> None:
-        """Should decode trade action to ProposeTrade."""
-        game = MonopolyGame(num_players=2, seed=42)
-        game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
+        game, encoder = _v3_trade_setup()
+        candidate = encoder.get_trade_candidates(game, 0)[0]
+        assert encoder.decode(160, 0, game) == candidate
 
-        encoder = ActionEncoder(enable_trades=True)
-        action_idx = encode_simple_trade(1, 3)
-
-        decoded = encoder.decode(action_idx, player_id=0, game=game)
-
-        from monopoly_engine import ProposeTrade
-
-        assert isinstance(decoded, ProposeTrade)
-        assert decoded.give_properties == [1]
-        assert decoded.want_properties == [3]
-        assert decoded.to_player == 1
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_get_action_mask_includes_trades(self) -> None:
-        """Action mask should include trade actions when enabled."""
-        game = MonopolyGame(num_players=2, seed=42)
-        game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-
-        encoder = ActionEncoder(enable_trades=True)
+        game, encoder = _v3_trade_setup()
         mask = encoder.get_action_mask(game, player_id=0)
+        assert mask[160:192].any()
 
-        # Should have some trade actions enabled
-        trade_mask = mask[OFFSET_SIMPLE_TRADE : OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM]
-        assert trade_mask.sum() > 0, "Should have valid trade actions"
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_get_action_mask_trade_response_mode(self) -> None:
-        """In trade response mode, only accept/reject should be valid."""
-        game = MonopolyGame(num_players=2, seed=42)
-        game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-
-        # Create pending trade
-        game.propose_trade(
-            from_player=0,
-            to_player=1,
-            give_properties=[1],
-            want_properties=[3],
-            give_money=0,
-            want_money=0,
-        )
-
-        encoder = ActionEncoder(enable_trades=True)
-        mask = encoder.get_action_mask(game, player_id=1, pending_trade_response=True)
-
-        # Only accept/reject should be valid
-        assert mask[OFFSET_ACCEPT_TRADE], "Accept should be valid"
-        assert mask[OFFSET_REJECT_TRADE], "Reject should be valid"
-
-        # Gameplay actions should not be valid
-        assert not mask[:OFFSET_SIMPLE_TRADE].any(), "Gameplay actions should be invalid"
-
-        # Trade proposal actions should not be valid
-        trade_mask = mask[OFFSET_SIMPLE_TRADE : OFFSET_SIMPLE_TRADE + SIMPLE_TRADE_DIM]
-        assert not trade_mask.any(), "Trade proposals should be invalid during response"
+        game, encoder = _v3_trade_setup()
+        game.apply_action(0, encoder.get_trade_candidates(game, 0)[0])
+        mask = encoder.get_action_mask(game, 1)
+        assert mask[158] and mask[159]
+        assert mask.sum() == 2
 
 
 class TestMonopolyEnvWithTrades:
-    """Tests for MonopolyEnv with trade support."""
+    """Tests for AEC action/observation-v3 trade support."""
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_creation_with_trades(self) -> None:
-        """Environment should support enable_trades parameter."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
+        env = MonopolyEnv(num_players=2, rules_id="foundation-trade-v1")
         assert env.enable_trades
-        assert env.action_encoder.action_space_size == 907
+        assert env.action_encoder.action_space_size == 192
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_action_space_with_trades(self) -> None:
-        """Action space should reflect trade actions when enabled."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
+        env = MonopolyEnv(num_players=2, rules_id="foundation-trade-v1")
         env.reset(seed=42)
-        assert env._action_space.n == 907  # type: ignore[attr-defined]
+        assert env._action_space.n == 192  # type: ignore[attr-defined]
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_trade_proposal_flow(self) -> None:
-        """Trade proposal should switch to responder."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
-        env.reset(seed=42)
-
-        assert env.game is not None
-
-        # Give players properties
-        env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-        env._update_infos()  # Refresh cached action mask after state change
-
-        # Player 0 starts
-        assert env.agent_selection == "player_0"
-
-        # Player 0 proposes trade
-        trade_action = encode_simple_trade(1, 3)
-        env.step(trade_action)
-
-        # Should switch to player 1 for response
+        env = _v3_env_setup()
+        env.step(160)
         assert env.agent_selection == "player_1"
-        assert env._pending_trade_response
+        assert env.game.state.phase == "trade_response"
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_trade_accept_flow(self) -> None:
-        """Accepting trade should execute swap and return to proposer."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
-        env.reset(seed=42)
-
-        assert env.game is not None
-
-        # Give players properties
-        env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-        env._update_infos()  # Refresh cached action mask after state change
-
-        # Player 0 proposes trade: Mediterranean for Baltic
-        trade_action = encode_simple_trade(1, 3)
-        env.step(trade_action)
-
-        # Player 1 accepts
-        env.step(OFFSET_ACCEPT_TRADE)
-
-        # Properties should be swapped
-        assert env.game.property_manager.get(1).owner == 1  # type: ignore[union-attr]
-        assert env.game.property_manager.get(3).owner == 0  # type: ignore[union-attr]
-
-        # Should return to player 0's turn
+        env = _v3_env_setup()
+        offered = env.action_encoder.decode(160, 0, env.game)
+        env.step(160)
+        env.step(158)
+        for position in offered.give_properties:
+            assert env.game.property_manager.get(position).owner == 1  # type: ignore[union-attr]
+        for position in offered.want_properties:
+            assert env.game.property_manager.get(position).owner == 0  # type: ignore[union-attr]
         assert env.agent_selection == "player_0"
-        assert not env._pending_trade_response
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_trade_reject_flow(self) -> None:
-        """Rejecting trade should keep properties unchanged and return to proposer."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
-        env.reset(seed=42)
-
-        assert env.game is not None
-
-        # Give players properties
-        env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-        env._update_infos()  # Refresh cached action mask after state change
-
-        # Player 0 proposes trade
-        trade_action = encode_simple_trade(1, 3)
-        env.step(trade_action)
-
-        # Player 1 rejects
-        env.step(OFFSET_REJECT_TRADE)
-
-        # Properties should be unchanged
-        assert env.game.property_manager.get(1).owner == 0  # type: ignore[union-attr]
-        assert env.game.property_manager.get(3).owner == 1  # type: ignore[union-attr]
-
-        # Should return to player 0's turn
+        env = _v3_env_setup()
+        before = [(p.owner, p.mortgaged) for p in env.game.property_manager.properties.values()]
+        env.step(160)
+        env.step(159)
+        after = [(p.owner, p.mortgaged) for p in env.game.property_manager.properties.values()]
+        assert after == before
         assert env.agent_selection == "player_0"
-        assert not env._pending_trade_response
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_trade_observation_includes_context(self) -> None:
-        """Observation should include trade context when trades enabled."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
-        env.reset(seed=42)
-
+        env = _v3_env_setup()
         obs = env.observe("player_0")
         assert "trade_context" in obs
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=ValueError,
-        reason="Deferred search/trading positive path; foundation rejects this mode",
-    )
     def test_env_trade_mask_during_response(self) -> None:
-        """During trade response, only accept/reject should be valid."""
-        env = MonopolyEnv(num_players=2, enable_trades=True)
-        env.reset(seed=42)
-
-        assert env.game is not None
-
-        # Give players properties
-        env.game.property_manager.get(1).owner = 0  # type: ignore[union-attr]
-        env.game.property_manager.get(3).owner = 1  # type: ignore[union-attr]
-        env._update_infos()  # Refresh cached action mask after state change
-
-        # Player 0 proposes trade
-        trade_action = encode_simple_trade(1, 3)
-        env.step(trade_action)
-
-        # Get mask for player 1 (responder)
+        env = _v3_env_setup()
+        env.step(160)
         _, _, _, _, info = env.last()
         mask = info["action_mask"]
-
-        # Only accept/reject should be valid
-        assert mask[OFFSET_ACCEPT_TRADE]
-        assert mask[OFFSET_REJECT_TRADE]
-        assert not mask[:OFFSET_SIMPLE_TRADE].any()
+        assert mask[158] and mask[159]
+        assert mask.sum() == 2
 
 
 class TestFindTradeForPlayer:

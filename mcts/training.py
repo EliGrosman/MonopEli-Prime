@@ -103,12 +103,8 @@ def _build_datasets(
     val_idx = perm[:val_size]
     train_idx = perm[val_size:]
 
-    train_ds = TensorDataset(
-        features_t[train_idx], policies_t[train_idx], outcomes_t[train_idx]
-    )
-    val_ds = TensorDataset(
-        features_t[val_idx], policies_t[val_idx], outcomes_t[val_idx]
-    )
+    train_ds = TensorDataset(features_t[train_idx], policies_t[train_idx], outcomes_t[train_idx])
+    val_ds = TensorDataset(features_t[val_idx], policies_t[val_idx], outcomes_t[val_idx])
 
     return train_ds, val_ds
 
@@ -142,10 +138,7 @@ def _compute_loss(
     log_probs = nn.functional.log_softmax(policy_logits, dim=-1)
     policy_loss = -(target_policies * log_probs).sum(dim=-1).mean()
 
-    total_loss = (
-        config.value_loss_weight * value_loss
-        + config.policy_loss_weight * policy_loss
-    )
+    total_loss = config.value_loss_weight * value_loss + config.policy_loss_weight * policy_loss
 
     return total_loss, value_loss.item(), policy_loss.item()
 
@@ -245,9 +238,7 @@ def train_value_network(
         lr=config.learning_rate,
         weight_decay=config.weight_decay,
     )
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(
-        optimizer, gamma=config.lr_decay
-    )
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.lr_decay)
 
     # Optional TensorBoard writer
     writer = None

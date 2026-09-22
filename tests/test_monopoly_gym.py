@@ -12,7 +12,6 @@ from gymnasium import spaces
 
 from monopoly_engine import MonopolyGame
 from monopoly_gym import (
-    ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
     GAMEPLAY_ACTION_SPACE_SIZE,
@@ -21,10 +20,7 @@ from monopoly_gym import (
     OFFSET_BUY_PROPERTY,
     OFFSET_END_TURN,
     OFFSET_MORTGAGE,
-    OFFSET_PASS_BUY,
     OFFSET_PAY_JAIL_FINE,
-    OFFSET_SELL_HOTEL,
-    OFFSET_SELL_HOUSE,
     OFFSET_UNMORTGAGE,
     OFFSET_USE_JAIL_CARD,
     ActionEncoder,
@@ -104,8 +100,8 @@ class TestMonopolyEnv:
             env.step(OFFSET_END_TURN)
         assert env.state() == before
         assert env.rewards == {"player_0": 0, "player_1": 0}
-            # Should have received a penalty (cumulative rewards)
-            # Note: penalty is small (-0.01)
+        # Should have received a penalty (cumulative rewards)
+        # Note: penalty is small (-0.01)
 
     def test_observe_returns_dict(self) -> None:
         """Test observe() returns dict with expected keys."""

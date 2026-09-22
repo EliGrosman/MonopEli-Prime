@@ -20,15 +20,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # Self-play loop
-    parser.add_argument(
-        "--iterations", type=int, default=50, help="Number of self-play iterations"
-    )
-    parser.add_argument(
-        "--games-per-iter", type=int, default=100, help="Games per iteration"
-    )
-    parser.add_argument(
-        "--simulations", type=int, default=100, help="MCTS simulations per move"
-    )
+    parser.add_argument("--iterations", type=int, default=50, help="Number of self-play iterations")
+    parser.add_argument("--games-per-iter", type=int, default=100, help="Games per iteration")
+    parser.add_argument("--simulations", type=int, default=100, help="MCTS simulations per move")
     parser.add_argument("--num-players", type=int, default=4, help="Players per game")
     parser.add_argument(
         "--temperature",
@@ -41,12 +35,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # Evaluation
-    parser.add_argument(
-        "--eval-freq", type=int, default=5, help="Evaluate every N iterations"
-    )
-    parser.add_argument(
-        "--eval-games", type=int, default=50, help="Games for evaluation"
-    )
+    parser.add_argument("--eval-freq", type=int, default=5, help="Evaluate every N iterations")
+    parser.add_argument("--eval-games", type=int, default=50, help="Games for evaluation")
     parser.add_argument(
         "--opponent",
         type=str,
@@ -56,9 +46,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # Checkpoint / resume
-    parser.add_argument(
-        "--resume", type=str, default=None, help="Resume from checkpoint directory"
-    )
+    parser.add_argument("--resume", type=str, default=None, help="Resume from checkpoint directory")
     parser.add_argument(
         "--eval-only",
         type=str,
@@ -69,14 +57,10 @@ def _build_parser() -> argparse.ArgumentParser:
     # Network training hyperparameters
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--batch-size", type=int, default=256, help="Training batch size")
-    parser.add_argument(
-        "--epochs", type=int, default=10, help="Training epochs per iteration"
-    )
+    parser.add_argument("--epochs", type=int, default=10, help="Training epochs per iteration")
 
     # Game settings
-    parser.add_argument(
-        "--max-turns", type=int, default=500, help="Max turns per game"
-    )
+    parser.add_argument("--max-turns", type=int, default=500, help="Max turns per game")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
     return parser

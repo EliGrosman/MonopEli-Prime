@@ -6,6 +6,7 @@ Only main existed locally; live remote heads matched the five tracking refs.
 
 | Remote branch | Decision | Purpose, evidence and remaining work |
 | --- | --- | --- |
+| codex/foundation-v1 | Trading integration and review closeout; submit through normal PR review | Contains authoritative trading, browser request fixes, and the learner/API certification supplement. Preserve the documented evidence and retain the branch after merge as the foundation recovery line. Merge requires green remote CI and normal review. No merge or deletion is performed by this closeout. |
 | feature/mcts_engine | Redundant ref; deletion pending release validation | Fully merged by a18305a (PR #7), zero unique commits. Search/network/data/tests live on main. Learned heads are disconnected, chance sampling biased. Later search milestone owns these defects. |
 | feature/llm_trading | Redundant ref; deletion pending release validation | Fully merged by de9030d (PR #8), zero unique commits. Clients, negotiation, verifier and hybrid on main. Later guided-agent/trading milestone must replace side effects with events and complete browser trading. |
 | feature/mcts_updates | Mixed; retain | 14 unique commits directly after main. Heuristic/candidate trading and budget improvements useful later. Keep 994c401, 79d9694, f340fe9, 2bc5b5a, ce7d792 and associated tests. Its evaluator rolls on every action and still mishandles bankruptcy; supersede those patches with foundation runner. Comparison/export concepts reimplemented, not cherry-picked. No unique model/data artifact in delta. |

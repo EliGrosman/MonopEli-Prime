@@ -4,7 +4,6 @@ Tests for game management REST API endpoints.
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 from api.services.game_manager import GameManager
 

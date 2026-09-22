@@ -14,9 +14,12 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
   const [isEditing, setIsEditing] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
 
-  const handleChange = useCallback((key: keyof LobbySettingsType, value: number | boolean) => {
-    setLocalSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (key: keyof LobbySettingsType, value: number | boolean | string) => {
+      setLocalSettings((prev) => ({ ...prev, [key]: value }));
+    },
+    []
+  );
 
   const handleSave = useCallback(() => {
     onUpdate?.(localSettings);
@@ -47,6 +50,10 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
           <dd className="text-gray-900 font-medium">
             {settings.allow_spectators ? 'Allowed' : 'Not Allowed'}
           </dd>
+          <dt className="text-gray-600">Trading</dt>
+          <dd className="text-gray-900 font-medium">
+            {settings.rules_id === 'foundation-trade-v1' ? 'Enabled' : 'Disabled'}
+          </dd>
         </dl>
       </div>
     );
@@ -71,6 +78,22 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
 
       {isEditing ? (
         <div className="space-y-4">
+          {/* Starting Money */}
+          <div>
+            <label htmlFor="rulesId" className="block text-sm font-medium text-gray-700 mb-1">
+              Rules
+            </label>
+            <select
+              id="rulesId"
+              value={localSettings.rules_id ?? 'foundation-v1'}
+              onChange={(e) => handleChange('rules_id', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
+            >
+              <option value="foundation-v1">Foundation (no trading)</option>
+              <option value="foundation-trade-v1">Foundation with trading</option>
+            </select>
+          </div>
+
           {/* Starting Money */}
           <div>
             <label htmlFor="startingMoney" className="block text-sm font-medium text-gray-700 mb-1">
@@ -174,6 +197,10 @@ export function LobbySettings({ settings, isHost, onUpdate }: LobbySettingsProps
           <dt className="text-gray-600">Spectators</dt>
           <dd className="text-gray-900 font-medium">
             {settings.allow_spectators ? 'Allowed' : 'Not Allowed'}
+          </dd>
+          <dt className="text-gray-600">Trading</dt>
+          <dd className="text-gray-900 font-medium">
+            {settings.rules_id === 'foundation-trade-v1' ? 'Enabled' : 'Disabled'}
           </dd>
         </dl>
       )}

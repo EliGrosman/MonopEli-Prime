@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LLMConfig:
     """Configuration for an LLM client."""
@@ -46,6 +47,7 @@ class LLMConfig:
 # ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
+
 
 class LLMClient(ABC):
     """Abstract base class for LLM providers.
@@ -106,14 +108,13 @@ class LLMClient(ABC):
 # Claude (Anthropic Messages API)
 # ---------------------------------------------------------------------------
 
+
 class ClaudeClient(LLMClient):
     """Anthropic Claude API client using httpx sync."""
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__(config)
-        api_key = os.environ.get(
-            config.api_key_env_var or "ANTHROPIC_API_KEY", ""
-        )
+        api_key = os.environ.get(config.api_key_env_var or "ANTHROPIC_API_KEY", "")
         self._client = httpx.Client(
             base_url="https://api.anthropic.com",
             headers={
@@ -140,7 +141,9 @@ class ClaudeClient(LLMClient):
                 return str(data["content"][0]["text"])
             except (httpx.HTTPError, KeyError, IndexError) as exc:
                 logger.warning(
-                    "Claude API attempt %d failed: %s", attempt + 1, exc,
+                    "Claude API attempt %d failed: %s",
+                    attempt + 1,
+                    exc,
                 )
                 if attempt == self.config.max_retries:
                     raise
@@ -154,14 +157,13 @@ class ClaudeClient(LLMClient):
 # OpenAI (Chat Completions API)
 # ---------------------------------------------------------------------------
 
+
 class OpenAIClient(LLMClient):
     """OpenAI Chat Completions API client using httpx sync."""
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__(config)
-        api_key = os.environ.get(
-            config.api_key_env_var or "OPENAI_API_KEY", ""
-        )
+        api_key = os.environ.get(config.api_key_env_var or "OPENAI_API_KEY", "")
         base = config.base_url or "https://api.openai.com"
         self._client = httpx.Client(
             base_url=base,
@@ -185,14 +187,17 @@ class OpenAIClient(LLMClient):
         for attempt in range(self.config.max_retries + 1):
             try:
                 resp = self._client.post(
-                    "/v1/chat/completions", json=payload,
+                    "/v1/chat/completions",
+                    json=payload,
                 )
                 resp.raise_for_status()
                 data = resp.json()
                 return str(data["choices"][0]["message"]["content"])
             except (httpx.HTTPError, KeyError, IndexError) as exc:
                 logger.warning(
-                    "OpenAI API attempt %d failed: %s", attempt + 1, exc,
+                    "OpenAI API attempt %d failed: %s",
+                    attempt + 1,
+                    exc,
                 )
                 if attempt == self.config.max_retries:
                     raise
@@ -206,16 +211,13 @@ class OpenAIClient(LLMClient):
 # Ollama (local REST API)
 # ---------------------------------------------------------------------------
 
+
 class OllamaClient(LLMClient):
     """Local Ollama REST API client using httpx sync."""
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__(config)
-        base = (
-            config.base_url
-            or os.environ.get("OLLAMA_BASE_URL", "")
-            or "http://localhost:11434"
-        )
+        base = config.base_url or os.environ.get("OLLAMA_BASE_URL", "") or "http://localhost:11434"
         self._client = httpx.Client(
             base_url=base,
             timeout=config.timeout_seconds,
@@ -242,7 +244,9 @@ class OllamaClient(LLMClient):
                 return str(data["message"]["content"])
             except (httpx.HTTPError, KeyError) as exc:
                 logger.warning(
-                    "Ollama API attempt %d failed: %s", attempt + 1, exc,
+                    "Ollama API attempt %d failed: %s",
+                    attempt + 1,
+                    exc,
                 )
                 if attempt == self.config.max_retries:
                     raise
@@ -269,14 +273,11 @@ def create_client(config: LLMConfig) -> LLMClient:
     The provider is resolved from ``config.provider`` or the
     ``MONOPOLY_LLM_PROVIDER`` environment variable.
     """
-    provider = (
-        os.environ.get("MONOPOLY_LLM_PROVIDER", "") or config.provider
-    ).lower()
+    provider = (os.environ.get("MONOPOLY_LLM_PROVIDER", "") or config.provider).lower()
     cls = _PROVIDERS.get(provider)
     if cls is None:
         raise ValueError(
-            f"Unknown LLM provider: {provider!r}. "
-            f"Choose from: {', '.join(_PROVIDERS)}"
+            f"Unknown LLM provider: {provider!r}. Choose from: {', '.join(_PROVIDERS)}"
         )
     return cls(config)
 
@@ -284,6 +285,7 @@ def create_client(config: LLMConfig) -> LLMClient:
 # ---------------------------------------------------------------------------
 # JSON parsing helper
 # ---------------------------------------------------------------------------
+
 
 def _try_parse_json(text: str) -> dict[str, Any] | None:
     """Attempt to parse JSON from LLM output.

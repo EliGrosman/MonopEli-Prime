@@ -159,9 +159,7 @@ class RewardTracker:
 
         for player_id in range(self.num_players):
             player = game.players[player_id]
-            self._prev_net_worth[player_id] = calculate_net_worth(
-                player, game.property_manager
-            )
+            self._prev_net_worth[player_id] = calculate_net_worth(player, game.property_manager)
             self._prev_monopolies[player_id] = count_monopolies(game, player_id)
 
     def calculate_reward(
@@ -197,9 +195,7 @@ class RewardTracker:
             new_monopolies = count_monopolies(game, player_id)
             prev_monopolies = self._prev_monopolies.get(player_id, 0)
             if new_monopolies > prev_monopolies:
-                reward += self.config.monopoly_bonus * (
-                    new_monopolies - prev_monopolies
-                )
+                reward += self.config.monopoly_bonus * (new_monopolies - prev_monopolies)
 
             # Update tracking
             self._prev_net_worth[player_id] = new_worth

@@ -16,6 +16,7 @@ from monopoly_engine.types import PropertyColor, TradeOfferData
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _game_with_ownership() -> MonopolyGame:
     """Create a game with specific property ownership.
 
@@ -37,6 +38,7 @@ def _game_with_ownership() -> MonopolyGame:
 # ---------------------------------------------------------------------------
 # monopoly_proximity
 # ---------------------------------------------------------------------------
+
 
 class TestMonopolyProximity:
     def test_full_monopoly(self) -> None:
@@ -79,6 +81,7 @@ class TestMonopolyProximity:
 # ---------------------------------------------------------------------------
 # trade_impact
 # ---------------------------------------------------------------------------
+
 
 class TestTradeImpact:
     def test_basic_property_swap(self) -> None:
@@ -192,6 +195,7 @@ class TestTradeImpact:
 # property_strategic_value
 # ---------------------------------------------------------------------------
 
+
 class TestPropertyStrategicValue:
     def test_monopoly_completing_property_is_most_valuable(self) -> None:
         """Connecticut Ave (9) completes Light Blue for Player 1."""
@@ -242,6 +246,7 @@ class TestPropertyStrategicValue:
 # ---------------------------------------------------------------------------
 # suggest_valuable_trades
 # ---------------------------------------------------------------------------
+
 
 class TestSuggestValuableTrades:
     def test_suggests_monopoly_completing_trade(self) -> None:

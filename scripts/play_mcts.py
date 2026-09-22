@@ -28,6 +28,7 @@ from monopoly_gym.action_space import ActionEncoder
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_network_path(ckpt_path: str) -> Path:
     """Resolve checkpoint dir to network.pt, or return path directly."""
     p = Path(ckpt_path)
@@ -65,6 +66,7 @@ def _top_actions(
 # ---------------------------------------------------------------------------
 # Core demo function
 # ---------------------------------------------------------------------------
+
 
 def play_demo_game(
     network_path: str | None = None,
@@ -114,10 +116,7 @@ def play_demo_game(
         agents[opp.player_id] = opp
 
     mode = "network" if net_file else "random rollouts"
-    print(
-        f"\nMCTS Game Demo — {num_players} players, "
-        f"{num_simulations} simulations, {mode}"
-    )
+    print(f"\nMCTS Game Demo — {num_players} players, {num_simulations} simulations, {mode}")
     print("=" * 60)
 
     action_count = 0
@@ -215,23 +214,24 @@ def play_demo_game(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="MCTS Game Demo",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--network", type=str, default=None,
-                        help="Path to checkpoint dir or network.pt file")
-    parser.add_argument("--simulations", type=int, default=200,
-                        help="MCTS simulations per move")
-    parser.add_argument("--num-players", type=int, default=4,
-                        help="Total players (1 MCTS + rest rule-based)")
-    parser.add_argument("--max-turns", type=int, default=200,
-                        help="Max action steps before truncation")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Print opponent moves too")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed for reproducibility")
+    parser.add_argument(
+        "--network", type=str, default=None, help="Path to checkpoint dir or network.pt file"
+    )
+    parser.add_argument("--simulations", type=int, default=200, help="MCTS simulations per move")
+    parser.add_argument(
+        "--num-players", type=int, default=4, help="Total players (1 MCTS + rest rule-based)"
+    )
+    parser.add_argument(
+        "--max-turns", type=int, default=200, help="Max action steps before truncation"
+    )
+    parser.add_argument("--verbose", action="store_true", help="Print opponent moves too")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     args = parser.parse_args()
 
     play_demo_game(

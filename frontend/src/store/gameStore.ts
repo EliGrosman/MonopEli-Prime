@@ -27,6 +27,7 @@ interface GameStore {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  pendingRequestId: string | null;
 
   // Actions
   setGameId: (id: string | null) => void;
@@ -36,6 +37,7 @@ interface GameStore {
   setConnected: (connected: boolean) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setPendingRequest: (requestId: string | null) => void;
   reset: () => void;
 
   // Selectors (computed state)
@@ -58,6 +60,7 @@ const initialState = {
   isConnected: false,
   isLoading: false,
   error: null,
+  pendingRequestId: null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -71,6 +74,8 @@ export const useGameStore = create<GameStore>()(
         // Transform snake_case from backend to camelCase for frontend
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const raw = rawState as any;
+        const currentRevision = get().gameState?.revision ?? -1;
+        if (typeof raw.revision === 'number' && raw.revision < currentRevision) return;
 
         // Transform players
         const players = (raw.players || []).map((p: Record<string, unknown>) => ({
@@ -128,6 +133,7 @@ export const useGameStore = create<GameStore>()(
           housesRemaining: raw.houses_remaining,
           hotelsRemaining: raw.hotels_remaining,
           gameOver: raw.game_over,
+          revision: raw.revision ?? 0,
           lastRoll: raw.last_roll
             ? {
                 die1: raw.last_roll[0],
@@ -150,6 +156,8 @@ export const useGameStore = create<GameStore>()(
       setLoading: (loading) => set({ isLoading: loading }),
 
       setError: (error) => set({ error }),
+
+      setPendingRequest: (pendingRequestId) => set({ pendingRequestId }),
 
       addEvent: (event) =>
         set((state) => ({

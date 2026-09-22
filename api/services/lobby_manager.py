@@ -342,6 +342,13 @@ class LobbyManager:
             if lobby.host_session_id != host_session_id:
                 return False, "Only host can add AI players", -1
 
+            ordinary_types = {"random", "rule_based", "aggressive", "conservative"}
+            trading_types = {f"trading_{name}" for name in ordinary_types}
+            if ai_type not in ordinary_types | trading_types:
+                return False, f"Unknown AI type: {ai_type}", -1
+            if ai_type in trading_types and lobby.settings.rules_id != "foundation-trade-v1":
+                return False, "Trading AI requires foundation-trade-v1", -1
+
             slot_id = lobby.get_next_slot()
             if slot_id is None:
                 return False, "Lobby is full", -1
@@ -552,6 +559,7 @@ class LobbyManager:
             game_id = await self._game_manager.create_game(
                 num_players=len(player_names),
                 player_names=player_names,
+                rules_id=lobby.settings.rules_id,
             )
 
             # Set up AI agents and mark AI player slots

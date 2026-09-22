@@ -79,7 +79,7 @@ def play_game(
         agents = [TradingAgent(agent, response=trading) for agent in agents]
     for agent in agents:
         agent.reset()
-    encoder = ActionEncoder()
+    encoder = ActionEncoder(rules_id=rules_id)
     guard = ProgressGuard()
     trace = []
     digest = hashlib.sha256()
@@ -93,8 +93,10 @@ def play_game(
             # Resolve an offered trade before applying the soft focal boundary.
             # This keeps a proposal/response pair atomic for horizon accounting
             # and makes an always-rejecting control preserve ordinary gameplay.
-            if game.state.phase != "trade_response" and game.turn_number >= max_turns and (
-                game.decision_player == focal_seat or game.players[focal_seat].bankrupt
+            if (
+                game.state.phase != "trade_response"
+                and game.turn_number >= max_turns
+                and (game.decision_player == focal_seat or game.players[focal_seat].bankrupt)
             ):
                 break
             guard.check(game)
@@ -103,10 +105,13 @@ def play_game(
             t = time.monotonic()
             if hasattr(agents[pid], "choose_native_action"):
                 decoded = agents[pid].choose_native_action(game, encoder)
-                try:
-                    action = encoder.encode(decoded)
-                except ValueError:
+                if type(decoded).__name__ in ("ProposeTrade", "AcceptTrade", "RejectTrade"):
                     action = None
+                else:
+                    action = encoder.encode(decoded)
+            elif hasattr(agents[pid], "choose_decision"):
+                decoded = agents[pid].choose_decision(game.decision_view(pid))
+                action = encoder.encode_current(decoded, game, pid)
             else:
                 mask = encoder.get_action_mask(game, pid)
                 if not mask.any():
@@ -188,8 +193,10 @@ def play_game(
         "runtime_seconds": time.monotonic() - start,
         "inference_seconds": inference,
         "rules_id": rules_id,
-        "action_version": "action-v2",
-        "observation_version": "observation-v2",
+        "action_version": encoder.action_version,
+        "observation_version": (
+            "observation-v3" if rules_id == "foundation-trade-v1" else "observation-v2"
+        ),
         "reward_version": "terminal-v1",
         "evaluator_version": EVALUATOR_VERSION,
         "native_action_version": "native-action-v1" if trading else None,

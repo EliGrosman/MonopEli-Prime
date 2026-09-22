@@ -69,7 +69,9 @@ class ResponseCache:
         self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
     def get(
-        self, state_hash: str, prompt_hash: str,
+        self,
+        state_hash: str,
+        prompt_hash: str,
     ) -> dict[str, Any] | None:
         """Look up a cached response. Returns ``None`` on miss."""
         key = f"{state_hash}:{prompt_hash}"
@@ -117,10 +119,14 @@ class ResponseCache:
 
         # Player financial state
         for p in game.players:
-            state_parts.append((
-                p.id, p.money, p.bankrupt,
-                calculate_net_worth(p, game.property_manager),
-            ))
+            state_parts.append(
+                (
+                    p.id,
+                    p.money,
+                    p.bankrupt,
+                    calculate_net_worth(p, game.property_manager),
+                )
+            )
 
         # Property ownership and building state
         prop_data: list[tuple[int, int | None, int, bool]] = []

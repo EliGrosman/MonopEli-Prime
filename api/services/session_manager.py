@@ -281,7 +281,8 @@ class SessionManager:
             List of sessions in the game
         """
         return [
-            s for s in self.sessions.values()
+            s
+            for s in self.sessions.values()
             if s.current_game_id == game_id and not s.is_expired(self.expire_hours)
         ]
 
@@ -295,7 +296,8 @@ class SessionManager:
             List of sessions in the lobby
         """
         return [
-            s for s in self.sessions.values()
+            s
+            for s in self.sessions.values()
             if s.current_lobby_id == lobby_id and not s.is_expired(self.expire_hours)
         ]
 
@@ -306,10 +308,7 @@ class SessionManager:
             Number of sessions removed
         """
         async with self._lock:
-            expired = [
-                sid for sid, s in self.sessions.items()
-                if s.is_expired(self.expire_hours)
-            ]
+            expired = [sid for sid, s in self.sessions.items() if s.is_expired(self.expire_hours)]
             for sid in expired:
                 del self.sessions[sid]
             return len(expired)

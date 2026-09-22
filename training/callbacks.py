@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
@@ -59,9 +57,9 @@ class DiagnosticCallback(BaseCallback):
             if self.model.rollout_buffer.buffer_size > 0:
                 # Get observations from buffer
                 # Handle different SB3 versions - try different attributes
-                if hasattr(self.model.rollout_buffer, 'observations'):
+                if hasattr(self.model.rollout_buffer, "observations"):
                     obs = self.model.rollout_buffer.observations
-                elif hasattr(self.model.rollout_buffer, 'obs'):
+                elif hasattr(self.model.rollout_buffer, "obs"):
                     obs = self.model.rollout_buffer.obs
                 else:
                     if self.verbose >= 1:
@@ -69,7 +67,7 @@ class DiagnosticCallback(BaseCallback):
                     return
 
                 # Get current position in buffer
-                pos = getattr(self.model.rollout_buffer, 'pos', 0)
+                pos = getattr(self.model.rollout_buffer, "pos", 0)
                 if pos == 0:
                     # Buffer not yet filled, skip
                     return
@@ -113,8 +111,10 @@ class DiagnosticCallback(BaseCallback):
                 self.logger.record("diagnostics/value_max", float(np.max(values_np)))
 
                 if self.verbose >= 2:
-                    print(f"[DiagnosticCallback] Value stats: "
-                          f"mean={np.mean(values_np):.4f}, std={np.std(values_np):.4f}")
+                    print(
+                        f"[DiagnosticCallback] Value stats: "
+                        f"mean={np.mean(values_np):.4f}, std={np.std(values_np):.4f}"
+                    )
 
         except Exception as e:
             if self.verbose >= 1:
@@ -133,11 +133,11 @@ class DiagnosticCallback(BaseCallback):
                     # Sanitize name for TensorBoard (replace dots with slashes)
                     sanitized_name = name.replace(".", "/")
                     self.logger.record(f"gradients/{sanitized_name}_norm", param_norm)
-                    total_norm += param_norm ** 2
+                    total_norm += param_norm**2
                     param_count += 1
 
             if param_count > 0:
-                total_norm = total_norm ** 0.5  # sqrt of sum of squares
+                total_norm = total_norm**0.5  # sqrt of sum of squares
                 self.logger.record("gradients/total_norm", total_norm)
 
                 if self.verbose >= 2:
@@ -154,13 +154,13 @@ class DiagnosticCallback(BaseCallback):
 
             # Try different attribute names for log_probs
             log_probs = None
-            if hasattr(rollout_buffer, 'log_probs'):
+            if hasattr(rollout_buffer, "log_probs"):
                 log_probs = rollout_buffer.log_probs
-            elif hasattr(rollout_buffer, 'logp'):
+            elif hasattr(rollout_buffer, "logp"):
                 log_probs = rollout_buffer.logp
 
             if log_probs is not None:
-                pos = getattr(rollout_buffer, 'pos', 0)
+                pos = getattr(rollout_buffer, "pos", 0)
                 if pos > 0:
                     # Get valid log probabilities
                     valid_log_probs = log_probs[:pos]
@@ -185,13 +185,13 @@ class DiagnosticCallback(BaseCallback):
 
             # Try different attribute names for actions
             actions = None
-            if hasattr(rollout_buffer, 'actions'):
+            if hasattr(rollout_buffer, "actions"):
                 actions = rollout_buffer.actions
-            elif hasattr(rollout_buffer, 'acts'):
+            elif hasattr(rollout_buffer, "acts"):
                 actions = rollout_buffer.acts
 
             if actions is not None:
-                pos = getattr(rollout_buffer, 'pos', 0)
+                pos = getattr(rollout_buffer, "pos", 0)
                 if pos > 0:
                     # Get valid actions (shape: [n_steps, n_envs])
                     valid_actions = actions[:pos]
@@ -210,8 +210,10 @@ class DiagnosticCallback(BaseCallback):
                     self.logger.record("diagnostics/most_common_action_freq", most_common_freq)
 
                     if self.verbose >= 2:
-                        print(f"[DiagnosticCallback] Unique actions: {unique_actions}, "
-                              f"Most common: {most_common_action} ({most_common_freq:.2%})")
+                        print(
+                            f"[DiagnosticCallback] Unique actions: {unique_actions}, "
+                            f"Most common: {most_common_action} ({most_common_freq:.2%})"
+                        )
 
         except Exception as e:
             if self.verbose >= 1:

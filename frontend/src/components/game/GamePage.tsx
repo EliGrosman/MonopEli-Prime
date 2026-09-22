@@ -5,6 +5,7 @@ import { ConnectionStatus, Loading } from '@/components/common';
 import { PropertyModal } from '@/components/property';
 import { PlayerPanel } from './PlayerPanel';
 import { ActionPanel } from './ActionPanel';
+import { TradePanel } from './TradePanel';
 import { useGameState } from '@/hooks/useGameState';
 import { useSessionStore } from '@/store/sessionStore';
 import { useGameStore } from '@/store/gameStore';
@@ -17,7 +18,7 @@ export function GamePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { setCurrentGame, playerId } = useSessionStore();
   const { addToast } = useUIStore();
-  const { gameState } = useGameStore();
+  const { gameState, isConnected, pendingRequestId } = useGameStore();
   const { isLoading, error, connectionState, reconnect, isMyTurn, send } = useGameState();
 
   // Property modal state
@@ -110,7 +111,7 @@ export function GamePage() {
           <PlayerPanel />
 
           <p className="text-sm text-gray-600">
-            Rules: {gameState?.rules_id ?? 'foundation-v1'} · No auctions or trading
+            Rules: {gameState?.rules_id ?? 'foundation-v1'} · No auctions
           </p>
           {gameState?.debt && (
             <section aria-label="Debt resolution" className="bg-amber-50 p-4 rounded">
@@ -131,6 +132,7 @@ export function GamePage() {
                     <button
                       key={`${a.type}-${a.property_id}`}
                       className="block p-2 underline"
+                      disabled={!isConnected || pendingRequestId !== null}
                       onClick={() =>
                         send({
                           type: 'action',
@@ -145,6 +147,7 @@ export function GamePage() {
             </section>
           )}
           {/* Action Panel */}
+          <TradePanel key={gameState?.revision ?? 0} send={send} />
           <ActionPanel send={send} />
 
           {/* Event Log placeholder */}

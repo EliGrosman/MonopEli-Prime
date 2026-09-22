@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from monopoly_engine import (
     BuildHotel,
@@ -30,6 +31,8 @@ from monopoly_engine import (
 )
 from monopoly_engine.actions import PassBuy
 from monopoly_gym.action_space import (
+    _BUYABLE_TO_INDEX,
+    _DEVELOPABLE_TO_INDEX,
     ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
@@ -46,8 +49,6 @@ from monopoly_gym.action_space import (
     OFFSET_UNMORTGAGE,
     OFFSET_USE_JAIL_CARD,
     ActionEncoder,
-    _BUYABLE_TO_INDEX,
-    _DEVELOPABLE_TO_INDEX,
 )
 
 if TYPE_CHECKING:
@@ -740,7 +741,7 @@ class TestPropertyBasedTests:
         encoded = encoder.encode(original)
         decoded = encoder.decode(encoded, player_id=0, game=game)
 
-        assert type(decoded) == type(original)
+        assert type(decoded) is type(original)
         assert hasattr(decoded, "property_id") and decoded.property_id == original.property_id
 
     @given(prop_idx=st.integers(0, 27))  # 28 buyable positions

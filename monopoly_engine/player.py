@@ -178,7 +178,5 @@ class Player:
 
     def __str__(self) -> str:
         """Human-readable string representation."""
-        status = (
-            "BANKRUPT" if self.bankrupt else ("IN JAIL" if self.in_jail else "active")
-        )
+        status = "BANKRUPT" if self.bankrupt else ("IN JAIL" if self.in_jail else "active")
         return f"{self.name} (${self.money}, pos {self.position}, {status})"

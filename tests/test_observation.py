@@ -8,12 +8,11 @@ This module tests the ObservationEncoder class including:
 - Edge cases and multi-player scenarios
 """
 
-from typing import Any
-
 import numpy as np
 import pytest
 from gymnasium import spaces
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from monopoly_engine import MonopolyGame
 from monopoly_gym.observation import (
@@ -26,8 +25,8 @@ from monopoly_gym.observation import (
     MAX_MONEY,
     MAX_TURN_NUMBER,
     NUM_PROPERTIES,
-    PROPERTY_POSITIONS,
     PROPERTY_POS_TO_IDX,
+    PROPERTY_POSITIONS,
     ObservationEncoder,
     flatten_observation,
     get_flat_observation_size,

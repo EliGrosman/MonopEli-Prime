@@ -60,6 +60,7 @@ class SelfPlayConfig:
     num_players: int = 4
     max_turns: int = 1000
     reward_type: str = "sparse"  # "sparse" or "dense"
+    rules_id: str = "foundation-v1"
     terminal_win_reward: float = 1.0  # Fixed foundation terminal win reward
     terminal_loss_reward: float = -1.0  # Fixed foundation elimination reward
     worth_scale: float | None = None  # Deprecated shaping configuration
@@ -114,8 +115,6 @@ class TrainingMetrics:
         return self.total_game_length / self.games_completed if self.games_completed > 0 else 0.0
 
 
-
-
 class SelfPlayEnv(SingleAgentMonopolyEnv):
     """Compatibility configuration for the shared learner adapter."""
 
@@ -131,6 +130,7 @@ class SelfPlayEnv(SingleAgentMonopolyEnv):
         render_mode=None,
         learner_seat=0,
         seed=None,
+        rules_id="foundation-v1",
     ):
         if (terminal_win_reward, terminal_loss_reward, worth_scale) != (1.0, -1.0, None):
             raise ValueError("foundation-v1 fixes terminal rewards at +1/-1; shaping is deferred")
@@ -142,6 +142,7 @@ class SelfPlayEnv(SingleAgentMonopolyEnv):
             render_mode=render_mode,
             learner_seat=learner_seat,
             seed=seed,
+            rules_id=rules_id,
         )
 
 
@@ -257,6 +258,7 @@ class SelfPlayTrainer:
                     terminal_win_reward=config.terminal_win_reward,
                     terminal_loss_reward=config.terminal_loss_reward,
                     worth_scale=config.worth_scale,
+                    rules_id=config.rules_id,
                 )
                 env.reset(seed=int(episode_seed.generate_state(1)[0]))
                 return env
@@ -374,6 +376,9 @@ class SelfPlayTrainer:
         # Save final model
         final_path = save_path / "final_model"
         self._model.save(str(final_path))
+        from training.compatibility import write_checkpoint_metadata
+
+        write_checkpoint_metadata(final_path, config.rules_id, config.num_players)
 
         if config.verbose:
             print(f"\n{'=' * 60}")
@@ -411,6 +416,9 @@ class SelfPlayTrainer:
     def _load_pretrained(self, path: Path) -> None:
         from sb3_contrib import MaskablePPO
 
+        from training.compatibility import validate_checkpoint_metadata
+
+        validate_checkpoint_metadata(path, self.config.rules_id, self.config.num_players)
         self._model = MaskablePPO.load(str(path), env=self._vec_env)
 
     def evaluate(self, opponent_type: str, n_episodes: int = 200) -> float:
@@ -574,6 +582,13 @@ class SelfPlayCallback:
 
         checkpoint_path = self.save_path / f"checkpoint_{self.num_timesteps}"
         self.trainer._model.save(str(checkpoint_path))
+        from training.compatibility import write_checkpoint_metadata
+
+        write_checkpoint_metadata(
+            checkpoint_path,
+            self.trainer.config.rules_id,
+            self.trainer.config.num_players,
+        )
 
         # Track best model
         if self.trainer.metrics.eval_results:
@@ -585,6 +600,11 @@ class SelfPlayCallback:
                 self._best_win_rate = vs_random
                 best_path = self.save_path / "best_model"
                 self.trainer._model.save(str(best_path))
+                write_checkpoint_metadata(
+                    best_path,
+                    self.trainer.config.rules_id,
+                    self.trainer.config.num_players,
+                )
                 if self.verbose:
                     print(f"[{self.num_timesteps:,}] New best model! ({vs_random:.0%} vs random)")
 
@@ -601,6 +621,7 @@ def make_selfplay_env(
     terminal_loss_reward: float = -1.0,
     worth_scale: float | None = None,
     seed: int | None = None,
+    rules_id: str = "foundation-v1",
 ) -> SelfPlayEnv:
     """Factory function to create a self-play environment."""
     env = SelfPlayEnv(
@@ -611,6 +632,7 @@ def make_selfplay_env(
         terminal_win_reward=terminal_win_reward,
         terminal_loss_reward=terminal_loss_reward,
         worth_scale=worth_scale,
+        rules_id=rules_id,
     )
     if seed is not None:
         env.reset(seed=seed)

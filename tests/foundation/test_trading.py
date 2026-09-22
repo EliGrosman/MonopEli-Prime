@@ -141,9 +141,7 @@ def test_mutual_policy_finds_one_and_two_property_bundles_without_mutation():
     assert any(
         len(c.action.give_properties) == 2 and c.action.want_properties == [3] for c in cached
     )
-    assert any(
-        len(c.action.give_properties) == len(c.action.want_properties) == 1 for c in cached
-    )
+    assert any(len(c.action.give_properties) == len(c.action.want_properties) == 1 for c in cached)
     assert any(c.action.give_money or c.action.want_money for c in cached)
     assert all(
         score_offer(
@@ -210,9 +208,7 @@ def test_trade_enables_development_and_changes_survival():
 def test_rejection_control_preserves_ordinary_gameplay(players):
     options = dict(policies=["rule_based"] * players, seed=13000000, max_turns=1000)
     baseline = play_game(**options)
-    rejection = play_game(
-        **options, rules_id="foundation-trade-v1", trading="reject", capture=True
-    )
+    rejection = play_game(**options, rules_id="foundation-trade-v1", trading="reject", capture=True)
     for field in (
         "status",
         "winner",

@@ -49,6 +49,7 @@ async def create_game(
             num_players=request.num_players,
             player_names=request.player_names,
             seed=request.seed,
+            rules_id=request.rules_id,
         )
     except ValueError as e:
         raise HTTPException(

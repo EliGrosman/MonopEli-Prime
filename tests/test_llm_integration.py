@@ -24,9 +24,7 @@ from mcts.llm.trade_responder import TradeResponder
 from monopoly_engine.game import MonopolyGame
 from monopoly_engine.types import TradeOfferData
 
-_SKIP_REASON = (
-    "Set MONOPOLY_LLM_INTEGRATION_TEST=1 to run live LLM tests"
-)
+_SKIP_REASON = "Set MONOPOLY_LLM_INTEGRATION_TEST=1 to run live LLM tests"
 _ENABLED = os.environ.get("MONOPOLY_LLM_INTEGRATION_TEST") == "1"
 
 pytestmark = pytest.mark.skipif(not _ENABLED, reason=_SKIP_REASON)
@@ -100,7 +98,9 @@ class TestLLMIntegration:
 
         responder = TradeResponder(self.client)
         result = responder.respond_to_trade(
-            game, player_id=0, trade=trade,
+            game,
+            player_id=0,
+            trade=trade,
         )
 
         assert "decision" in result
@@ -165,7 +165,9 @@ class TestLLMIntegration:
 
         responder = TradeResponder(self.client)
         result = responder.respond_to_trade(
-            game, player_id=proposal.to_player, trade=trade,
+            game,
+            player_id=proposal.to_player,
+            trade=trade,
         )
 
         assert result["decision"] in ("accept", "reject", "counter")

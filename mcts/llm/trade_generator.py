@@ -108,7 +108,8 @@ class TradeGenerator:
             return None
         if response.get("no_trade"):
             logger.info(
-                "LLM decided no trade: %s", response.get("reasoning", ""),
+                "LLM decided no trade: %s",
+                response.get("reasoning", ""),
             )
             return None
 

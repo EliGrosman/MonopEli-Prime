@@ -48,6 +48,7 @@ describe('PropertyList', () => {
   };
 
   const mockGameState: GameState = {
+    revision: 0,
     players: mockPlayers,
     properties: mockProperties,
     currentPlayer: 0,
@@ -166,6 +167,7 @@ describe('PropertySummary', () => {
   };
 
   const mockGameState: GameState = {
+    revision: 0,
     players: mockPlayers,
     properties: mockProperties,
     currentPlayer: 0,

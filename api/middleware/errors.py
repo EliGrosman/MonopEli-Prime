@@ -152,8 +152,7 @@ class ErrorHandlingMiddleware:
             request_id = getattr(request.state, "request_id", "unknown")
 
             logger.warning(
-                '{"request_id": "%s", "error_code": "%s", "message": "%s", '
-                '"status_code": %d}',
+                '{"request_id": "%s", "error_code": "%s", "message": "%s", "status_code": %d}',
                 request_id,
                 exc.error_code,
                 exc.message,
@@ -227,9 +226,7 @@ class ErrorHandlingMiddleware:
             )
 
         @app.exception_handler(Exception)
-        async def generic_exception_handler(
-            request: Request, exc: Exception
-        ) -> JSONResponse:
+        async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
             """Handle unexpected exceptions."""
             request_id = getattr(request.state, "request_id", "unknown")
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .actions import Action
+    from .decision import DecisionView
     from .foundation import TransitionResult
 
 from .board import Board
@@ -112,10 +113,22 @@ class MonopolyGame:
     def decision_player(self) -> int:
         return self.state.decision_player
 
-    def apply_action(self, player_id: int, action: "Action") -> "TransitionResult":
+    def apply_action(
+        self,
+        player_id: int,
+        action: "Action",
+        *,
+        expected_revision: int | None = None,
+    ) -> "TransitionResult":
         from .foundation import apply_action
 
-        return apply_action(self, player_id, action)
+        return apply_action(self, player_id, action, expected_revision=expected_revision)
+
+    def decision_view(self, viewer_id: int | None) -> "DecisionView":
+        """Return the immutable public decision contract for a viewer."""
+        from .decision import build_decision_view
+
+        return build_decision_view(self, viewer_id)
 
     def validate_phase(self, action: "Action") -> tuple[bool, str]:
         from .foundation import validate_phase
@@ -749,6 +762,11 @@ class MonopolyGame:
         Returns:
             Reconstructed MonopolyGame instance
         """
+        # Restored games must not retain references into the serialized snapshot.
+        from copy import deepcopy
+
+        data = deepcopy(data)
+
         # Create game with minimal initialization
         game = cls.__new__(cls)
         from .foundation import RULES_IDS

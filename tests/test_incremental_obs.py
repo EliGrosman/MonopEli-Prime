@@ -4,11 +4,9 @@ Verifies that IncrementalObservationEncoder produces identical observations
 to the base ObservationEncoder while providing cache hit benefits.
 """
 
-import time
 from typing import Any
 
 import numpy as np
-import pytest
 
 from monopoly_engine import MonopolyGame
 from monopoly_engine.actions import (
@@ -54,7 +52,7 @@ class TestIncrementalEncoderInit:
         assert enc.enable_trades is False
 
     def test_creates_with_trades(self) -> None:
-        enc = IncrementalObservationEncoder(2, enable_trades=True)
+        enc = IncrementalObservationEncoder(2, rules_id="foundation-trade-v1")
         assert enc.enable_trades is True
 
     def test_observation_space_matches_base(self) -> None:
@@ -63,8 +61,8 @@ class TestIncrementalEncoderInit:
         assert base.get_observation_space() == inc.get_observation_space()
 
     def test_observation_space_matches_base_with_trades(self) -> None:
-        base = ObservationEncoder(3, enable_trades=True)
-        inc = IncrementalObservationEncoder(3, enable_trades=True)
+        base = ObservationEncoder(3, rules_id="foundation-trade-v1")
+        inc = IncrementalObservationEncoder(3, rules_id="foundation-trade-v1")
         assert base.get_observation_space() == inc.get_observation_space()
 
 
@@ -184,28 +182,25 @@ class TestIncrementalCorrectness:
             assert _obs_equal(obs_base, obs_inc), f"Mismatch for player {pid}"
 
 
-
-
-
-
-
-
 class TestIntegrationWithEnv:
     """Test incremental encoder works correctly within MonopolyEnv."""
 
     def test_env_uses_fresh_encoding_by_default(self) -> None:
         from monopoly_gym.env import MonopolyEnv
+
         env = MonopolyEnv(num_players=2)
         assert type(env.obs_encoder) is ObservationEncoder
 
     def test_env_can_disable_incremental(self) -> None:
         from monopoly_gym.env import MonopolyEnv
+
         env = MonopolyEnv(num_players=2, incremental_obs=False)
         assert isinstance(env.obs_encoder, ObservationEncoder)
         assert not isinstance(env.obs_encoder, IncrementalObservationEncoder)
 
     def test_env_resets_cache(self) -> None:
         from monopoly_gym.env import MonopolyEnv
+
         env = MonopolyEnv(num_players=2)
         env.reset(seed=42)
         old = env.observe("player_0")
@@ -249,9 +244,7 @@ class TestIntegrationWithEnv:
         env_base.reset(seed=42)
 
         steps = 0
-        for agent_inc, agent_base in zip(
-            env_inc.agent_iter(), env_base.agent_iter()
-        ):
+        for agent_inc, agent_base in zip(env_inc.agent_iter(), env_base.agent_iter()):
             assert agent_inc == agent_base
 
             obs_inc, _, term_inc, trunc_inc, info_inc = env_inc.last()

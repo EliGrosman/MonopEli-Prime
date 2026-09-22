@@ -54,9 +54,7 @@ async def _send_message(websocket: WebSocket, message: WSMessage) -> bool:
         return False
 
 
-async def _send_error(
-    websocket: WebSocket, message: str, code: str | None = None
-) -> bool:
+async def _send_error(websocket: WebSocket, message: str, code: str | None = None) -> bool:
     """Send an error message.
 
     Args:
@@ -91,6 +89,9 @@ async def _handle_action(
         game_manager: The game manager
     """
     # Spectators cannot perform actions
+    request_id = data.get("request_id")
+    if not isinstance(request_id, str) or not 1 <= len(request_id) <= 100:
+        request_id = None
     if connection.player_id is None:
         await _send_message(
             websocket,
@@ -99,6 +100,8 @@ async def _handle_action(
                 data=WSActionResult(
                     success=False,
                     message="Spectators cannot perform actions",
+                    request_id=request_id,
+                    error_code="SPECTATOR_ACTION",
                 ).model_dump(),
             ),
         )
@@ -116,6 +119,32 @@ async def _handle_action(
                 data=WSActionResult(
                     success=False,
                     message=f"Invalid action: {e}",
+                    request_id=request_id,
+                    error_code="INVALID_ACTION",
+                ).model_dump(),
+            ),
+        )
+        return
+
+    active_game = await game_manager.get_game(connection.game_id)
+    if active_game is None:
+        await _send_error(websocket, "Game not found", code="GAME_NOT_FOUND")
+        return
+    if active_game.game.rules_id == "foundation-trade-v1" and (
+        action_req.contract_version != "decision-contract-v1"
+        or action_req.expected_revision is None
+        or action_req.request_id is None
+    ):
+        await _send_message(
+            websocket,
+            WSMessage(
+                type=WSMessageType.ACTION_RESULT,
+                data=WSActionResult(
+                    success=False,
+                    message="Trading games require contract version, revision and request ID",
+                    request_id=action_req.request_id,
+                    revision=active_game.game.state.revision,
+                    error_code="CONTRACT_REQUIRED",
                 ).model_dump(),
             ),
         )
@@ -127,6 +156,9 @@ async def _handle_action(
         action,
         broadcast=True,
         exclude_session=connection.session_id,
+        expected_revision=action_req.expected_revision,
+        request_id=action_req.request_id,
+        actor_session_id=connection.session_id,
     )
 
     # Send result to the client that performed the action FIRST
@@ -134,7 +166,21 @@ async def _handle_action(
         websocket,
         WSMessage(
             type=WSMessageType.ACTION_RESULT,
-            data=WSActionResult(success=success, message=message).model_dump(),
+            data=WSActionResult(
+                success=success,
+                message=message,
+                request_id=action_req.request_id,
+                revision=active_game.game.state.revision,
+                error_code=(
+                    "STALE_REVISION"
+                    if "Stale decision revision" in message
+                    else "DUPLICATE_REQUEST"
+                    if "Duplicate request" in message
+                    else "INVALID_ACTION"
+                    if not success
+                    else None
+                ),
+            ).model_dump(),
         ),
     )
 
@@ -148,6 +194,13 @@ async def _handle_action(
                     type=WSMessageType.STATE_UPDATE,
                     data=state.model_dump(),
                 ),
+            )
+    elif active_game.game.rules_id == "foundation-trade-v1":
+        state = await game_manager.get_game_state(connection.game_id)
+        if state:
+            await _send_message(
+                websocket,
+                WSMessage(type=WSMessageType.STATE_UPDATE, data=state.model_dump()),
             )
 
     # Note: Game over is communicated via state_update
@@ -207,9 +260,7 @@ async def websocket_endpoint(
     websocket: WebSocket,
     game_id: str,
     session_id: str = Query(..., description="Client session identifier"),
-    player_id: int | None = Query(
-        None, description="Player slot to claim (None = spectator)"
-    ),
+    player_id: int | None = Query(None, description="Player slot to claim (None = spectator)"),
     player_name: str = Query("Unknown", description="Display name"),
     game_manager: GameManager = Depends(get_game_manager_ws),
     conn_manager: ConnectionManager = Depends(get_connection_manager_ws),
@@ -314,8 +365,7 @@ async def websocket_endpoint(
     # Notify others of player join or reconnection (if player, not spectator)
     if player_id is not None:
         event_type = (
-            WSMessageType.PLAYER_RECONNECTED if is_reconnect
-            else WSMessageType.PLAYER_JOINED
+            WSMessageType.PLAYER_RECONNECTED if is_reconnect else WSMessageType.PLAYER_JOINED
         )
         await conn_manager.broadcast_to_game(
             game_id,

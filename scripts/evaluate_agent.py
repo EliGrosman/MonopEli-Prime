@@ -19,9 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Evaluate a trained Monopoly agent"
-    )
+    parser = argparse.ArgumentParser(description="Evaluate a trained Monopoly agent")
 
     parser.add_argument(
         "model_path",
@@ -84,9 +82,9 @@ def main() -> None:
         print(f"Error: Model not found: {args.model_path}")
         sys.exit(1)
 
-    print("="*60)
+    print("=" * 60)
     print("Monopoly Agent Evaluation")
-    print("="*60)
+    print("=" * 60)
     print(f"\nModel: {args.model_path}")
     print(f"Games per opponent: {args.games}")
     print(f"Opponents: {', '.join(args.opponents)}")
@@ -111,13 +109,13 @@ def main() -> None:
         verbose=not args.quiet,
     )
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RESULTS")
-    print("="*60)
+    print("=" * 60)
     print(summary)
 
     # Check against targets
-    print("\n" + "-"*60)
+    print("\n" + "-" * 60)
     print("Target Comparison:")
 
     random_result = summary.results.get("random")

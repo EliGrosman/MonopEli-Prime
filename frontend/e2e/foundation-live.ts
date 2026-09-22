@@ -5,6 +5,7 @@ for (const scenario of [
   { name: 'jail-card', button: /Use Get Out of Jail Free Card/ },
   { name: 'jail-roll', button: /roll/i },
   { name: 'debt', button: /Mortgage Property · property 39/ },
+  { name: 'trade-debt', button: /Mortgage Property · property 39/ },
   { name: 'purchase', button: /Pass on buying/ },
 ]) {
   test(`live engine/API/browser: ${scenario.name}`, async ({ page, request }) => {
@@ -29,7 +30,7 @@ for (const scenario of [
       )
       .toBe(1);
     const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
-    if (scenario.name === 'debt') {
+    if (scenario.name === 'debt' || scenario.name === 'trade-debt') {
       expect(state.debt).toBeNull();
       expect(state.players[0].money).toBe(100);
       expect(state.properties['39'].mortgaged).toBe(true);
@@ -53,3 +54,100 @@ for (const scenario of [
     }
   });
 }
+
+test('live engine/API/browser: human trade proposal and response', async ({ browser, request }) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/trade');
+  expect(response.ok()).toBeTruthy();
+  const {
+    game_id: id,
+    session_id: proposerSession,
+    recipient_session_id: recipientSession,
+  } = await response.json();
+
+  const proposer = await browser.newPage();
+  await proposer.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 1' }, version: 0 })
+    );
+  }, proposerSession);
+  await proposer.goto(`/game/${id}`);
+  await expect(proposer.getByRole('region', { name: 'Compose trade' })).toBeVisible();
+  await proposer.getByLabel('Recipient').selectOption('1');
+  await proposer.getByRole('checkbox', { name: /Mediterranean Avenue/ }).check();
+  await proposer.getByRole('checkbox', { name: /Baltic Avenue/ }).check();
+  await proposer.getByRole('button', { name: 'Review and send offer' }).click();
+  await expect(proposer.getByRole('region', { name: 'Review trade' })).toBeVisible();
+  await proposer.getByRole('button', { name: 'Send offer' }).click();
+
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return state.game_phase;
+    })
+    .toBe('trade_response');
+
+  const recipient = await browser.newPage();
+  await recipient.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 2' }, version: 0 })
+    );
+  }, recipientSession);
+  await recipient.goto(`/game/${id}`);
+  await expect(recipient.getByText('Your response')).toBeVisible();
+  await recipient.reload();
+  await expect(recipient.getByRole('button', { name: 'Accept' })).toBeEnabled();
+  await recipient.getByRole('button', { name: 'Accept' }).click();
+
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return [state.game_phase, state.properties['1'].owner, state.properties['3'].owner];
+    })
+    .toEqual(['asset_management', 1, 0]);
+  await expect(proposer.getByRole('region', { name: 'Compose trade' })).toBeVisible();
+});
+
+test('live engine/API/browser: human offer receives a bot response', async ({ page, request }) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/trade-human-bot');
+  const { game_id: id, session_id: session } = await response.json();
+  await page.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 1' }, version: 0 })
+    );
+  }, session);
+  await page.goto(`/game/${id}`);
+  await page.getByLabel('Recipient').selectOption('1');
+  await page.getByRole('checkbox', { name: /Oriental Avenue/ }).check();
+  await page.getByRole('checkbox', { name: /Baltic Avenue/ }).check();
+  await page.getByRole('button', { name: 'Review and send offer' }).click();
+  await page.getByRole('button', { name: 'Send offer' }).click();
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return [state.game_phase, state.properties['6'].owner, state.properties['3'].owner];
+    })
+    .toEqual(['asset_management', 1, 0]);
+});
+
+test('live engine/API/browser: human rejects a bot offer', async ({ page, request }) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/trade-bot-human');
+  const { game_id: id, recipient_session_id: session } = await response.json();
+  await page.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 2' }, version: 0 })
+    );
+  }, session);
+  await page.goto(`/game/${id}`);
+  await expect(page.getByText('Your response')).toBeVisible();
+  await page.getByRole('button', { name: 'Reject' }).click();
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return [state.properties['6'].owner, state.properties['3'].owner];
+    })
+    .toEqual([0, 1]);
+});

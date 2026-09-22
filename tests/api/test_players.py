@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 
 from api.services.session_manager import SessionManager
 
-
 # client fixture comes from conftest.py
 
 
@@ -77,9 +76,7 @@ class TestSessionManagerUnit:
         """Test setting current game for session."""
         session = await session_manager.create_session()
 
-        success = await session_manager.set_current_game(
-            session.id, "game-123", player_id=2
-        )
+        success = await session_manager.set_current_game(session.id, "game-123", player_id=2)
 
         assert success is True
         updated = await session_manager.get_session(session.id)
@@ -139,9 +136,7 @@ class TestCreateSession:
 
     def test_create_session_success(self, client: TestClient):
         """Test creating a new session."""
-        response = client.post(
-            "/api/players/session", json={"display_name": "TestPlayer"}
-        )
+        response = client.post("/api/players/session", json={"display_name": "TestPlayer"})
 
         assert response.status_code == 201
         data = response.json()
@@ -159,9 +154,7 @@ class TestCreateSession:
 
     def test_create_session_name_too_long(self, client: TestClient):
         """Test creating session with name that's too long."""
-        response = client.post(
-            "/api/players/session", json={"display_name": "A" * 50}
-        )
+        response = client.post("/api/players/session", json={"display_name": "A" * 50})
 
         assert response.status_code == 422  # Validation error
 
@@ -172,15 +165,11 @@ class TestGetCurrentPlayer:
     def test_get_current_player_success(self, client: TestClient):
         """Test getting current player info."""
         # First create a session
-        create_resp = client.post(
-            "/api/players/session", json={"display_name": "MyPlayer"}
-        )
+        create_resp = client.post("/api/players/session", json={"display_name": "MyPlayer"})
         session_id = create_resp.json()["session_id"]
 
         # Then get player info
-        response = client.get(
-            "/api/players/me", headers={"X-Session-Id": session_id}
-        )
+        response = client.get("/api/players/me", headers={"X-Session-Id": session_id})
 
         assert response.status_code == 200
         data = response.json()
@@ -189,9 +178,7 @@ class TestGetCurrentPlayer:
 
     def test_get_current_player_invalid_session(self, client: TestClient):
         """Test getting player with invalid session."""
-        response = client.get(
-            "/api/players/me", headers={"X-Session-Id": "invalid"}
-        )
+        response = client.get("/api/players/me", headers={"X-Session-Id": "invalid"})
 
         assert response.status_code == 401
 
@@ -208,9 +195,7 @@ class TestUpdateCurrentPlayer:
     def test_update_display_name(self, client: TestClient):
         """Test updating display name."""
         # Create session
-        create_resp = client.post(
-            "/api/players/session", json={"display_name": "OldName"}
-        )
+        create_resp = client.post("/api/players/session", json={"display_name": "OldName"})
         session_id = create_resp.json()["session_id"]
 
         # Update name
@@ -245,22 +230,16 @@ class TestDeleteSession:
         session_id = create_resp.json()["session_id"]
 
         # Delete it
-        response = client.delete(
-            "/api/players/me", headers={"X-Session-Id": session_id}
-        )
+        response = client.delete("/api/players/me", headers={"X-Session-Id": session_id})
 
         assert response.status_code == 204
 
         # Verify it's gone
-        get_resp = client.get(
-            "/api/players/me", headers={"X-Session-Id": session_id}
-        )
+        get_resp = client.get("/api/players/me", headers={"X-Session-Id": session_id})
         assert get_resp.status_code == 401
 
     def test_delete_invalid_session(self, client: TestClient):
         """Test deleting with invalid session."""
-        response = client.delete(
-            "/api/players/me", headers={"X-Session-Id": "invalid"}
-        )
+        response = client.delete("/api/players/me", headers={"X-Session-Id": "invalid"})
 
         assert response.status_code == 401

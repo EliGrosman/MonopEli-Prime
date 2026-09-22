@@ -8,7 +8,6 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from .action_space import GAMEPLAY_ACTION_SPACE_SIZE
 from .env import MonopolyEnv
 from .observation import flatten_observation, get_flat_observation_size
 
@@ -26,6 +25,7 @@ class SingleAgentMonopolyEnv(gym.Env):
         render_mode: str | None = None,
         seed: int | None = None,
         learner_seat: int = 0,
+        rules_id: str = "foundation-v1",
     ):
         super().__init__()
         if not 0 <= learner_seat < num_players:
@@ -34,13 +34,24 @@ class SingleAgentMonopolyEnv(gym.Env):
         self.max_turns, self.reward_type = max_turns, reward_type
         self.flatten_obs, self.render_mode = flatten_obs, render_mode
         self.learner_seat, self._seed = learner_seat, seed
+        self.rules_id = rules_id
         self._agent_id = f"player_{learner_seat}"
         self._env = MonopolyEnv(
-            num_players, max_turns, reward_type, render_mode, cutoff_player=learner_seat
+            num_players,
+            max_turns,
+            reward_type,
+            render_mode,
+            cutoff_player=learner_seat,
+            rules_id=rules_id,
         )
-        self.action_space = spaces.Discrete(GAMEPLAY_ACTION_SPACE_SIZE)
+        self.action_space = spaces.Discrete(self._env.action_encoder.action_space_size)
         self.observation_space = (
-            spaces.Box(0, 1, (get_flat_observation_size(num_players),), dtype=np.float32)
+            spaces.Box(
+                0,
+                np.inf if rules_id == "foundation-trade-v1" else 1,
+                (get_flat_observation_size(num_players, rules_id=rules_id),),
+                dtype=np.float32,
+            )
             if flatten_obs
             else self._env.observation_space(self._agent_id)
         )
@@ -55,9 +66,26 @@ class SingleAgentMonopolyEnv(gym.Env):
         super().reset(seed=seed)
         if seed is not None:
             self._stream = np.random.default_rng(seed)
-        episode = int(self._stream.integers(0, 2**32))
+        options = options or {}
+        requested_engine_seed = options.get("engine_seed")
+        episode = (
+            int(requested_engine_seed)
+            if requested_engine_seed is not None
+            else int(self._stream.integers(0, 2**32))
+        )
         seeds = np.random.SeedSequence(episode).spawn(self.num_players + 1)
-        self._env.reset(seed=int(seeds[0].generate_state(1)[0]))
+        policy_seeds = options.get("policy_seeds")
+        if policy_seeds is not None and (
+            len(policy_seeds) != self.num_players
+            or any(type(value) is not int or value < 0 for value in policy_seeds)
+        ):
+            raise ValueError("policy_seeds must contain one nonnegative integer per player")
+        if policy_seeds is None:
+            policy_seeds = [int(seeds[i + 1].generate_state(1)[0]) for i in range(self.num_players)]
+        if requested_engine_seed is None:
+            self._env.reset(seed=int(seeds[0].generate_state(1)[0]))
+        else:
+            self._env.reset(options={"engine_seed": episode})
         from agents import AggressiveAgent, ConservativeAgent, RandomAgent, RuleBasedAgent
 
         types = {
@@ -66,19 +94,30 @@ class SingleAgentMonopolyEnv(gym.Env):
             "rule_based": RuleBasedAgent,
             "aggressive": AggressiveAgent,
             "conservative": ConservativeAgent,
+            "trading_random": RandomAgent,
+            "trading_rule_based": RuleBasedAgent,
+            "trading_aggressive": AggressiveAgent,
+            "trading_conservative": ConservativeAgent,
         }
         if self.opponent_type not in types:
             raise ValueError(f"Unknown opponent {self.opponent_type}")
         cls = types[self.opponent_type]
         self._opponents = {
             f"player_{i}": (
-                cls(i, seed=int(seeds[i + 1].generate_state(1)[0]))
+                cls(i, seed=policy_seeds[i])
                 if cls is RandomAgent
                 else cls(i)
             )
             for i in range(self.num_players)
             if i != self.learner_seat
         }
+        if self.opponent_type.startswith("trading_"):
+            from agents.trading_agent import TradingAgent
+
+            self._opponents = {
+                agent: TradingAgent(opponent, response="mutual")
+                for agent, opponent in self._opponents.items()
+            }
         self.episode_reward, self.episode_length = 0.0, 0
         self._done = False
         from monopoly_engine.progress import ProgressGuard
@@ -107,9 +146,29 @@ class SingleAgentMonopolyEnv(gym.Env):
             if self.opponent_type == "self" and self._opponent_policy is not None:
                 action = int(self._opponent_policy(flatten_observation(obs), info["action_mask"]))
             else:
-                action = self._opponents[agent].choose_action(
-                    obs, info["action_mask"], self._env.game
-                )
+                opponent = self._opponents[agent]
+                if self._env.game.state.phase == "trade_response" and not hasattr(
+                    opponent, "choose_native_action"
+                ):
+                    from monopoly_engine import RejectTrade
+
+                    trade_id = next(iter(self._env.game.state.pending_trades))
+                    native = RejectTrade(self._env.agent_name_mapping[agent], trade_id)
+                    action = self._env.action_encoder.encode_current(
+                        native, self._env.game, self._env.agent_name_mapping[agent]
+                    )
+                elif hasattr(opponent, "choose_native_action"):
+                    native = opponent.choose_native_action(self._env.game, self._env.action_encoder)
+                    action = self._env.action_encoder.encode_current(
+                        native, self._env.game, self._env.agent_name_mapping[agent]
+                    )
+                else:
+                    native = opponent.choose_decision(
+                        self._env.game.decision_view(self._env.agent_name_mapping[agent])
+                    )
+                    action = self._env.action_encoder.encode_current(
+                        native, self._env.game, self._env.agent_name_mapping[agent]
+                    )
             self._guard.check(self._env.game)
             self._env.step(action)
             reward += self._env.rewards.get(self._agent_id, 0.0)

@@ -186,7 +186,11 @@ class TestMCTSAgentChooseAction:
         # All calls on the same state with temperature=0 should agree
         assert len(set(actions)) == 1
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_with_network(self, tmp_path: pytest.TempPathFactory) -> None:
         """Agent loaded with a network checkpoint should return valid action."""
         from mcts.features import get_feature_size

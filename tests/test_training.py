@@ -7,8 +7,9 @@ those packages are not installed.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestTrainingConfig:
@@ -196,7 +197,7 @@ class TestEvaluationSummary:
         assert summary.overall_win_rate == 0.0
 
     def test_with_single_result(self) -> None:
-        from training import EvaluationSummary, EvaluationResult
+        from training import EvaluationResult, EvaluationSummary
 
         summary = EvaluationSummary(model_path="test/model")
         summary.results["random"] = EvaluationResult(
@@ -216,7 +217,7 @@ class TestEvaluationSummary:
         assert summary.overall_win_rate == 0.90
 
     def test_with_multiple_results(self) -> None:
-        from training import EvaluationSummary, EvaluationResult
+        from training import EvaluationResult, EvaluationSummary
 
         summary = EvaluationSummary(model_path="test/model")
         summary.results["random"] = EvaluationResult(
@@ -247,7 +248,7 @@ class TestEvaluationSummary:
         assert summary.overall_win_rate == 0.80
 
     def test_str_representation(self) -> None:
-        from training import EvaluationSummary, EvaluationResult
+        from training import EvaluationResult, EvaluationSummary
 
         summary = EvaluationSummary(model_path="models/test")
         summary.results["random"] = EvaluationResult(
@@ -399,29 +400,29 @@ class TestMakeEnv:
     """Tests for environment factory function."""
 
     def test_make_env_creates_callable(self) -> None:
-        from training import make_env, EnvironmentConfig
+        from training import EnvironmentConfig, make_env
 
         config = EnvironmentConfig()
         factory = make_env(config, seed=42)
         assert callable(factory)
 
     def test_make_env_creates_valid_env(self) -> None:
-        from training import make_env, EnvironmentConfig
+        from training import EnvironmentConfig, make_env
 
         config = EnvironmentConfig(num_players=2)
         factory = make_env(config, seed=42)
         env = factory()
 
-        assert hasattr(env, 'reset')
-        assert hasattr(env, 'step')
-        assert hasattr(env, 'action_space')
-        assert hasattr(env, 'observation_space')
+        assert hasattr(env, "reset")
+        assert hasattr(env, "step")
+        assert hasattr(env, "action_space")
+        assert hasattr(env, "observation_space")
 
         env.close()
 
     def test_make_env_with_different_configs(self) -> None:
         """Test make_env with various environment configurations."""
-        from training import make_env, EnvironmentConfig
+        from training import EnvironmentConfig, make_env
 
         # Test with different num_players
         for num_players in [2, 3, 4]:
@@ -433,7 +434,7 @@ class TestMakeEnv:
 
     def test_make_env_with_seed_none(self) -> None:
         """Test make_env with no seed."""
-        from training import make_env, EnvironmentConfig
+        from training import EnvironmentConfig, make_env
 
         config = EnvironmentConfig()
         factory = make_env(config, seed=None)
@@ -455,7 +456,7 @@ class TestCurriculumTrainer:
         assert trainer.seed == 42
 
     def test_trainer_initialization_custom(self) -> None:
-        from training import CurriculumTrainer, CurriculumConfig
+        from training import CurriculumConfig, CurriculumTrainer
 
         config = CurriculumConfig(max_attempts_per_stage=5)
         trainer = CurriculumTrainer(
@@ -514,26 +515,31 @@ class TestSB3Integration:
     def test_import_maskable_ppo(self, sb3) -> None:  # type: ignore[no-untyped-def]
         """Test that MaskablePPO can be imported."""
         from sb3_contrib import MaskablePPO
+
         assert MaskablePPO is not None
 
     def test_create_model_function_exists(self, sb3) -> None:  # type: ignore[no-untyped-def]
         """Test that create_model function is available."""
         from training import create_model
+
         assert callable(create_model)
 
     def test_create_vectorized_env_function_exists(self, sb3) -> None:  # type: ignore[no-untyped-def]
         """Test that create_vectorized_env is available."""
         from training import create_vectorized_env
+
         assert callable(create_vectorized_env)
 
     def test_train_agent_function_exists(self, sb3) -> None:  # type: ignore[no-untyped-def]
         """Test that train_agent function is available."""
         from training import train_agent
+
         assert callable(train_agent)
 
     def test_load_model_function_exists(self, sb3) -> None:  # type: ignore[no-untyped-def]
         """Test that load_model function is available."""
         from training import load_model
+
         assert callable(load_model)
 
 
@@ -546,6 +552,7 @@ class TestPlayGame:
 
     def test_play_game_import(self, sb3) -> None:  # type: ignore[no-untyped-def]
         from training import play_game
+
         assert callable(play_game)
 
 
@@ -558,14 +565,17 @@ class TestEvaluationFunctions:
 
     def test_evaluate_against_opponent_import(self, sb3) -> None:  # type: ignore[no-untyped-def]
         from training import evaluate_against_opponent
+
         assert callable(evaluate_against_opponent)
 
     def test_evaluate_agent_import(self, sb3) -> None:  # type: ignore[no-untyped-def]
         from training import evaluate_agent
+
         assert callable(evaluate_agent)
 
     def test_quick_evaluate_import(self, sb3) -> None:  # type: ignore[no-untyped-def]
         from training import quick_evaluate
+
         assert callable(quick_evaluate)
 
 
@@ -606,13 +616,13 @@ class TestTrainingModuleExports:
         """Test that config classes can be imported without sb3."""
         # These imports should work without sb3
         from training import (
-            TrainingConfig,
+            CurriculumConfig,
+            CurriculumStage,
             EnvironmentConfig,
             EvaluationResult,
             EvaluationSummary,
-            CurriculumStage,
-            CurriculumConfig,
             StageResult,
+            TrainingConfig,
         )
 
         # Verify they are the expected types
@@ -630,42 +640,49 @@ class TestConfigDataclassFeatures:
 
     def test_training_config_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import TrainingConfig
 
         assert is_dataclass(TrainingConfig)
 
     def test_environment_config_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import EnvironmentConfig
 
         assert is_dataclass(EnvironmentConfig)
 
     def test_evaluation_result_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import EvaluationResult
 
         assert is_dataclass(EvaluationResult)
 
     def test_curriculum_stage_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import CurriculumStage
 
         assert is_dataclass(CurriculumStage)
 
     def test_stage_result_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import StageResult
 
         assert is_dataclass(StageResult)
 
     def test_curriculum_config_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import CurriculumConfig
 
         assert is_dataclass(CurriculumConfig)
 
     def test_evaluation_summary_is_dataclass(self) -> None:
         from dataclasses import is_dataclass
+
         from training import EvaluationSummary
 
         assert is_dataclass(EvaluationSummary)

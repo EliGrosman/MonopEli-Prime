@@ -6,12 +6,10 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import pytest
 import torch
 import torch.nn
 
 from mcts.network import ValueNetwork
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -307,9 +305,7 @@ class TestValueNetworkTraining:
         values, policy_logits = net(x)
 
         value_loss = torch.nn.functional.mse_loss(values, target_values)
-        policy_loss = -(target_policy * torch.log_softmax(policy_logits, dim=-1)).sum(
-            dim=-1
-        ).mean()
+        policy_loss = -(target_policy * torch.log_softmax(policy_logits, dim=-1)).sum(dim=-1).mean()
         loss = value_loss + policy_loss
         loss.backward()
 
@@ -330,18 +326,14 @@ class TestValueNetworkTraining:
         # Initial loss
         values, policy_logits = net(x)
         value_loss = torch.nn.functional.mse_loss(values, target_values)
-        policy_loss = -(
-            target_policy * torch.log_softmax(policy_logits, dim=-1)
-        ).sum(dim=-1).mean()
+        policy_loss = -(target_policy * torch.log_softmax(policy_logits, dim=-1)).sum(dim=-1).mean()
         initial_loss = (value_loss + policy_loss).item()
 
         # Training step
         optimizer.zero_grad()
         values, policy_logits = net(x)
         value_loss = torch.nn.functional.mse_loss(values, target_values)
-        policy_loss = -(
-            target_policy * torch.log_softmax(policy_logits, dim=-1)
-        ).sum(dim=-1).mean()
+        policy_loss = -(target_policy * torch.log_softmax(policy_logits, dim=-1)).sum(dim=-1).mean()
         loss = value_loss + policy_loss
         loss.backward()
         optimizer.step()
@@ -350,9 +342,9 @@ class TestValueNetworkTraining:
         with torch.no_grad():
             values, policy_logits = net(x)
             value_loss = torch.nn.functional.mse_loss(values, target_values)
-            policy_loss = -(
-                target_policy * torch.log_softmax(policy_logits, dim=-1)
-            ).sum(dim=-1).mean()
+            policy_loss = (
+                -(target_policy * torch.log_softmax(policy_logits, dim=-1)).sum(dim=-1).mean()
+            )
             final_loss = (value_loss + policy_loss).item()
 
         assert final_loss < initial_loss

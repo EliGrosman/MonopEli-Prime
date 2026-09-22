@@ -65,6 +65,7 @@ class GameState(BaseModel):
     game_over: bool
     winner: int | None
     event_log: list[str]
+    decision_contract: dict[str, Any]
 
     @classmethod
     def from_engine(
@@ -85,8 +86,10 @@ class GameState(BaseModel):
         pm = game.property_manager
 
         from monopoly_engine.foundation import legal_actions
+
         pid = game.decision_player
         return cls(
+            rules_id=game.rules_id,
             game_phase=game.state.phase,
             decision_player=pid,
             revision=game.state.revision,
@@ -124,6 +127,7 @@ class GameState(BaseModel):
             game_over=state["game_over"],
             winner=state["winner"],
             event_log=state["event_log"],
+            decision_contract=game.decision_view(None).to_dict(),
         )
 
 
@@ -144,6 +148,7 @@ class CreateGameRequest(BaseModel):
     num_players: int = Field(ge=2, le=8, default=4)
     player_names: list[str] | None = None
     seed: int | None = None
+    rules_id: str = Field(default="foundation-v1", pattern="^(foundation-v1|foundation-trade-v1)$")
 
 
 class CreateGameResponse(BaseModel):

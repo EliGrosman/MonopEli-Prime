@@ -184,6 +184,23 @@ def test_selfplay_uses_identical_contract():
             break
 
 
+def test_learner_wrappers_accept_the_frozen_engine_seed():
+    from training.pettingzoo_selfplay import SelfPlayEnv
+
+    for wrapper in (SingleAgentMonopolyEnv, SelfPlayEnv):
+        env = wrapper(
+            2,
+            opponent_type="trading_rule_based",
+            rules_id="foundation-trade-v1",
+        )
+        env.reset(options={"engine_seed": 19_000_007})
+        assert env._env.episode_seed == 19_000_007
+        assert env._env.game.to_dict() == MonopolyGame(
+            2, seed=19_000_007, rules_id="foundation-trade-v1"
+        ).to_dict()
+        assert env.action_space.n == 192
+
+
 def test_masked_gym_and_aec_api_contracts():
     from gymnasium.utils.env_checker import check_env
     from pettingzoo.test import api_test

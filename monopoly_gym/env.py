@@ -10,8 +10,8 @@ from pettingzoo import AECEnv
 
 from monopoly_engine import MonopolyGame
 
-from .action_space import ACTION_VERSION, GAMEPLAY_ACTION_SPACE_SIZE, ActionEncoder
-from .observation import OBSERVATION_VERSION, ObservationEncoder
+from .action_space import ActionEncoder
+from .observation import OBSERVATION_VERSION, TRADE_OBSERVATION_VERSION, ObservationEncoder
 
 
 class MonopolyEnv(AECEnv):
@@ -31,23 +31,32 @@ class MonopolyEnv(AECEnv):
         trade_reward_config: Any = None,
         incremental_obs: bool = False,
         cutoff_player: int | None = None,
+        rules_id: str = "foundation-v1",
     ):
         super().__init__()
         if not 2 <= num_players <= 4:
             raise ValueError("num_players must be 2-4")
         if max_turns <= 0:
             raise ValueError("Expected a positive turn horizon")
-        if reward_type != "sparse" or enable_trades:
-            raise ValueError("foundation-v1 supports terminal-only sparse rewards and no trading")
+        if reward_type != "sparse":
+            raise ValueError("Foundation rules support terminal-only sparse rewards")
+        if enable_trades:
+            raise ValueError("enable_trades is obsolete; select rules_id='foundation-trade-v1'")
+        if rules_id not in ("foundation-v1", "foundation-trade-v1"):
+            raise ValueError(f"Unknown rules ID: {rules_id}")
         self.num_players, self.max_turns = num_players, max_turns
         self.reward_type, self.render_mode = reward_type, render_mode
-        self.enable_trades, self.cutoff_player = False, cutoff_player
+        self.rules_id = rules_id
+        self.enable_trades = rules_id == "foundation-trade-v1"
+        self.cutoff_player = cutoff_player
         self.possible_agents = [f"player_{i}" for i in range(num_players)]
         self.agent_name_mapping = dict(zip(self.possible_agents, range(num_players)))
-        self.obs_encoder = ObservationEncoder(num_players)
-        self.action_encoder = ActionEncoder()
+        self.action_encoder = ActionEncoder(rules_id=rules_id)
+        self.obs_encoder = ObservationEncoder(
+            num_players, rules_id=rules_id, action_encoder=self.action_encoder
+        )
         self._observation_space = self.obs_encoder.get_observation_space()
-        self._action_space = spaces.Discrete(GAMEPLAY_ACTION_SPACE_SIZE)
+        self._action_space = spaces.Discrete(self.action_encoder.action_space_size)
         self.game: MonopolyGame | None = None
         self._rng = np.random.default_rng()
 
@@ -60,8 +69,12 @@ class MonopolyEnv(AECEnv):
     def reset(self, seed: int | None = None, options: dict | None = None) -> None:
         if seed is not None:
             self._rng = np.random.default_rng(seed)
-        self.episode_seed = int(self._rng.integers(0, 2**32))
-        self.game = MonopolyGame(self.num_players, seed=self.episode_seed)
+        engine_seed = options.get("engine_seed") if options else None
+        self.episode_seed = (
+            int(engine_seed) if engine_seed is not None else int(self._rng.integers(0, 2**32))
+        )
+        self.game = MonopolyGame(self.num_players, seed=self.episode_seed, rules_id=self.rules_id)
+        self.action_encoder.invalidate_cache()
         self.agents = self.possible_agents.copy()
         self.agent_selection = self.agents[0]
         self.rewards = dict.fromkeys(self.agents, 0.0)
@@ -86,6 +99,9 @@ class MonopolyEnv(AECEnv):
         if action is None or not self._action_space.contains(action):
             raise ValueError("A live decision requires an in-range action")
         pid = self.agent_name_mapping[actor]
+        mask = self.action_encoder.get_action_mask(self.game, pid)
+        if not mask[int(action)]:
+            raise ValueError("Action is not legal for the current decision")
         decoded = self.action_encoder.decode(int(action), pid, self.game)
         # Validate before consuming rewards: rejected decisions are mutation-free.
         valid, reason = decoded.validate(self.game)
@@ -105,7 +121,12 @@ class MonopolyEnv(AECEnv):
         at_boundary = (
             focal is None or self.game.decision_player == focal or self.game.players[focal].bankrupt
         )
-        if not self.game.game_over and self.game.turn_number >= self.max_turns and at_boundary:
+        if (
+            not self.game.game_over
+            and self.game.state.phase != "trade_response"
+            and self.game.turn_number >= self.max_turns
+            and at_boundary
+        ):
             for agent in self.agents:
                 self.truncations[agent] = not self.terminations[agent]
         self.agent_selection = f"player_{self.game.decision_player}"
@@ -126,9 +147,18 @@ class MonopolyEnv(AECEnv):
                 "elimination_order": self.game.state.elimination_order.copy(),
                 "turns": self.game.turn_number,
                 "horizon_overshoot": max(0, self.game.turn_number - self.max_turns),
-                "rules_id": "foundation-v1",
-                "action_version": ACTION_VERSION,
-                "observation_version": OBSERVATION_VERSION,
+                "rules_id": self.rules_id,
+                "action_version": self.action_encoder.action_version,
+                "observation_version": (
+                    TRADE_OBSERVATION_VERSION if self.enable_trades else OBSERVATION_VERSION
+                ),
+                "decision_contract_version": "decision-contract-v1",
+                "revision": self.game.state.revision,
+                "candidate_version": self.action_encoder.candidate_version,
+                "trade_candidates": [
+                    action.to_dict()
+                    for action in self.action_encoder.get_trade_candidates(self.game, pid)
+                ],
                 "episode_seed": self.episode_seed,
                 "cutoff_reason": "turn_limit" if self.truncations.get(agent) else None,
             }

@@ -42,6 +42,7 @@ class LobbySettings(BaseModel):
     go_salary: int = Field(ge=100, le=500, default=200)
     allow_spectators: bool = True
     private: bool = False  # If true, requires invite code
+    rules_id: str = Field(default="foundation-v1", pattern="^(foundation-v1|foundation-trade-v1)$")
 
 
 class LobbyState(BaseModel):

@@ -13,7 +13,9 @@ from monopoly_engine.types import PROPERTY_GROUPS, PropertyColor, TradeOfferData
 
 if TYPE_CHECKING:
     from monopoly_engine import Action, MonopolyGame
-    from monopoly_gym.action_space import ActionEncoder
+from monopoly_gym.action_space import ActionEncoder
+
+from .base import Agent
 
 MIN_GAIN = 25
 MAX_CASH_ADJUSTMENT = 500
@@ -149,22 +151,27 @@ def score_offer(game: MonopolyGame, offer: TradeOfferData) -> tuple[int, int] | 
     return proposer_gain, recipient_gain
 
 
-class TradingAgent:
+class TradingAgent(Agent):
     """Wrap an indexed heuristic with authoritative native trade decisions."""
 
-    def __init__(self, base, response: Literal["mutual", "reject"] = "mutual") -> None:
+    def __init__(self, base, response: Literal["mutual", "reject", "alternate"] = "mutual") -> None:
+        super().__init__(base.player_id, name=f"Trading{base.name}")
         self.base = base
-        self.player_id = base.player_id
-        self.name = f"Trading{base.name}"
         self.response = response
         self.stats: Counter[str] = Counter()
+        self._resume_action: Action | None = None
         self._template_cache: dict[
             tuple, list[tuple[int, tuple[int, ...], tuple[int, ...], int, int]]
         ] = {}
 
+    def choose_action(self, observation, action_mask, game) -> int:
+        """Compatibility path for ordinary indexed decisions."""
+        return int(self.base.choose_action(observation, action_mask, game))
+
     def reset(self) -> None:
         self.base.reset()
         self.stats.clear()
+        self._resume_action = None
         self._template_cache.clear()
 
     def _templates(
@@ -265,17 +272,23 @@ class TradingAgent:
     def choose_native_action(self, game: MonopolyGame, encoder: ActionEncoder) -> Action:
         if game.state.phase == "trade_response":
             trade_id, offer = next(iter(game.state.pending_trades.items()))
-            if self.response == "reject" or score_offer(game, offer) is None:
+            if (
+                self.response == "reject"
+                or (self.response == "alternate" and trade_id % 2 == 1)
+                or score_offer(game, offer) is None
+            ):
                 self.stats["offers_rejected"] += 1
                 return RejectTrade(self.player_id, trade_id)
             self.stats["offers_accepted"] += 1
             return AcceptTrade(self.player_id, trade_id)
-        mask = encoder.get_action_mask(game, self.player_id)
-        index = int(self.base.choose_action(None, mask, game))
-        action = encoder.decode(index, self.player_id, game)
+        if self._resume_action is not None:
+            action, self._resume_action = self._resume_action, None
+            return action
+        action = self.base.choose_decision(game.decision_view(self.player_id))
         if isinstance(action, EndTurn) and len(game.state.trade_targets_this_turn) < 2:
             candidates = self.candidates(game)
             if candidates:
                 self.stats["offers_proposed"] += 1
+                self._resume_action = action
                 return candidates[0].action
         return action

@@ -1,6 +1,7 @@
 # Foundation milestone implementation and validation
 
-Status: **implemented candidate; readiness blocked**. Keep `foundation-v1`, the 1,000-turn
+Status: **historical no-trade readiness remains blocked; see Milestone 1d below for the opt-in
+trading integration and current validation.** Keep `foundation-v1`, the 1,000-turn
 horizon and the 95% completion requirement unchanged, as requested on 2026-09-21.
 No substantive model training was resumed. Do not promote this candidate as certified Monopoly
 strength or proceed to training on the basis of these results.
@@ -33,6 +34,27 @@ This result supports proceeding to shared environment/API integration. It does n
 certify `foundation-v1`, and it is not a full foundation certification: Gym/API/browser trading is
 still deliberately disabled. The unchanged 95% per-matchup gate therefore remains blocked until
 those consumers share the contract and a fresh certification tournament passes.
+
+## Milestone 1d integration candidate
+
+The opt-in trade rules now use one public `decision-contract-v1` across native agents, AEC,
+the shared single-agent/self-play adapter, API/lobbies/bots, and the browser. Trading learners use
+the bounded, revision-bound `action-v3`/`observation-v3` representation; no-trade learners retain
+v2 without reinterpretation. Human commands carry request IDs and expected revisions, bot choices
+are discarded when stale, and pending offers survive reconnects. The browser supports composing,
+reviewing, accepting, and rejecting complete property/cash/mortgage terms.
+
+The integration closes the response-phase gate, makes snapshot restoration detach from source
+data, and preserves a policy's already-selected continuation across a proposal response. The last
+point is required for an always-reject trading arm to reproduce the paired no-trade action and RNG
+stream after trade bookkeeping is removed.
+
+Current local gates are green: 1,881 backend tests passed with five live-LLM skips, 79 individually
+strict deferred tests, and zero XPASS; repository-wide Ruff, strict engine mypy, 345 frontend unit
+tests, frontend lint/type/format/build, and six live Chromium scenarios pass. The live suite now
+includes a human proposal, recipient reconnect, acceptance, and authoritative property exchange.
+Readiness still depends on the frozen Milestone 1d certification evidence described in
+[trading integration results](trading-integration-results.md).
 
 ## Tournament evidence
 
@@ -132,6 +154,29 @@ new datasets, BC/critic recovery, scaled PPO/PPG and leagues; reward shaping; le
 MCTS; caching optimizations. Historical README/training accuracy and wealth-adjudicated labels
 are not current strength evidence. The next milestone remains blocked until the retained
 readiness criteria are addressed explicitly; the rules and gate have not been relaxed.
+
+## Milestone 1d authoritative trading integration
+
+The frozen `foundation-trade-v1` certification at seed root 19,000,000 completed all 12,000
+scheduled games: 1,000/1,000 in every matchup, zero errors, zero cutoffs, and 8,673,947 AEC v3
+transitions checked against a direct-engine clone. Saved replays and 72 independent repeat games
+verified exactly. The paired `foundation-v1` arm remains separate and continues to fail the 95%
+gate in all rule-based-opponent matchups. Full results and hashes are in
+[trading-integration-results.md](trading-integration-results.md).
+
+The closeout local validation completed with 1,925 passes, five live-LLM skips, 79 strict expected
+failures, and zero XPASS. Global Ruff, strict engine mypy, 356 frontend unit tests, frontend lint,
+format, type/build checks, and nine live Chromium/API/engine scenarios pass. These include the
+review-discovered trading-debt request bug and correlated acknowledgement/reconnect handling.
+The three scripted Chromium scenarios passed in the original 1d validation. Python 3.11 and 3.12
+remain covered by the configured CI matrix rather than this Python 3.13.13 host.
+
+The original AEC certification alone did not supply the planned learner/API seed-block coverage.
+The closeout adds a separately frozen consumer-parity run and a required verifier gate; its
+coverage, result, and provenance are recorded in the integration report linked above.
+That supplement passed all 2,160 consumer games (720 per path), checking 1,713,657 transitions
+with no mismatches against the original tournament. Both learner wrappers exercised incoming
+responses, wins/losses, and early four-player elimination; the combined verifier passes.
 
 ## Browser commands
 

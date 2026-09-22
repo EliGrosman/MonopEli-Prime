@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+
 import uvicorn
 
 from api.config import get_settings

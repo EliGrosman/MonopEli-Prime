@@ -36,12 +36,14 @@ def _make_buffer(n: int = 50, num_players: int = 4) -> ReplayBuffer:
             if j != i % num_players:
                 outcome[j] = -1.0
 
-        buf.add(TrainingExample(
-            features=features,
-            mcts_policy=policy,
-            outcome=outcome,
-            player_id=i % num_players,
-        ))
+        buf.add(
+            TrainingExample(
+                features=features,
+                mcts_policy=policy,
+                outcome=outcome,
+                player_id=i % num_players,
+            )
+        )
 
     return buf
 
@@ -245,9 +247,7 @@ class TestTrainValueNetwork:
         )
 
         # Capture initial weights
-        initial_weights = {
-            name: param.clone() for name, param in net.named_parameters()
-        }
+        initial_weights = {name: param.clone() for name, param in net.named_parameters()}
 
         train_value_network(net, buf, config)
 
@@ -356,12 +356,14 @@ class TestCheckpoint:
         rng = np.random.default_rng(0)
         feature_size = get_feature_size(4)
         for i in range(5):
-            buf.add(TrainingExample(
-                features=rng.random(feature_size).astype(np.float32),
-                mcts_policy=rng.random(149).astype(np.float32),
-                outcome=np.array([1.0, -1.0, -1.0, -1.0], dtype=np.float32),
-                player_id=i % 4,
-            ))
+            buf.add(
+                TrainingExample(
+                    features=rng.random(feature_size).astype(np.float32),
+                    mcts_policy=rng.random(149).astype(np.float32),
+                    outcome=np.array([1.0, -1.0, -1.0, -1.0], dtype=np.float32),
+                    player_id=i % 4,
+                )
+            )
         return buf
 
     def test_checkpoint_directory_structure(self, tmp_path: pytest.TempPathFactory) -> None:
@@ -400,9 +402,7 @@ class TestCheckpoint:
         save_checkpoint(ckpt_dir, net, self._make_buffer(), iteration=0, stats={})
         loaded_net, _, _, _ = load_checkpoint(ckpt_dir)
 
-        for (name, p1), (_, p2) in zip(
-            net.named_parameters(), loaded_net.named_parameters()
-        ):
+        for (name, p1), (_, p2) in zip(net.named_parameters(), loaded_net.named_parameters()):
             assert torch.allclose(p1, p2), f"Parameter {name} differs after load"
 
     def test_checkpoint_creates_parent_dirs(self, tmp_path: pytest.TempPathFactory) -> None:
@@ -488,7 +488,11 @@ class TestSelfPlayLoop:
             ),
         )
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_self_play_one_iteration_runs(self, tmp_path: pytest.TempPathFactory) -> None:
         """self_play_loop should complete one iteration without error."""
         config = self._small_config()
@@ -499,7 +503,11 @@ class TestSelfPlayLoop:
         # Should have created an iteration checkpoint
         assert (save_dir / "mcts_iter_0").exists()  # type: ignore[operator]
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_self_play_creates_best_checkpoint(self, tmp_path: pytest.TempPathFactory) -> None:
         """First eval should create mcts_best checkpoint."""
         config = self._small_config()
@@ -511,7 +519,11 @@ class TestSelfPlayLoop:
         assert (save_dir / "mcts_best").exists()  # type: ignore[operator]
         assert (save_dir / "mcts_best" / "network.pt").exists()  # type: ignore[operator]
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_self_play_iter_checkpoint_structure(self, tmp_path: pytest.TempPathFactory) -> None:
         """Iteration checkpoint should have all required files."""
         config = self._small_config()
@@ -524,7 +536,11 @@ class TestSelfPlayLoop:
         assert (ckpt / "buffer.npz").exists()  # type: ignore[operator]
         assert (ckpt / "metadata.json").exists()  # type: ignore[operator]
 
-    @pytest.mark.xfail(strict=True, raises=NotImplementedError, reason="Deferred search/trading positive path; foundation rejects this mode")
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_self_play_resume(self, tmp_path: pytest.TempPathFactory) -> None:
         """self_play_loop should resume from checkpoint and run more iterations."""
         config = self._small_config()
@@ -564,13 +580,20 @@ class TestTrainingScript:
             [
                 sys.executable,
                 str(script),
-                "--iterations", "1",
-                "--games-per-iter", "2",
-                "--simulations", "5",
-                "--max-turns", "30",
-                "--eval-freq", "999",  # skip head-to-head eval
-                "--epochs", "1",
-                "--save-dir", save_dir,
+                "--iterations",
+                "1",
+                "--games-per-iter",
+                "2",
+                "--simulations",
+                "5",
+                "--max-turns",
+                "30",
+                "--eval-freq",
+                "999",  # skip head-to-head eval
+                "--epochs",
+                "1",
+                "--save-dir",
+                save_dir,
             ],
             capture_output=True,
             text=True,

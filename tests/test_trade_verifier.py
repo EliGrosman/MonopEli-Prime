@@ -13,6 +13,7 @@ from monopoly_engine.types import TradeOfferData
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_game() -> MonopolyGame:
     """Create a game with property ownership for trade evaluation tests."""
     game = MonopolyGame(num_players=3, seed=42)
@@ -63,6 +64,7 @@ def _make_bad_trade() -> TradeOfferData:
 # TradeEvaluation dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestTradeEvaluation:
     def test_fields(self) -> None:
         trade = _make_trade()
@@ -85,6 +87,7 @@ class TestTradeEvaluation:
 # ---------------------------------------------------------------------------
 # MCTSTradeVerifier.__init__
 # ---------------------------------------------------------------------------
+
 
 class TestVerifierInit:
     def test_default_config(self) -> None:
@@ -109,6 +112,7 @@ class TestVerifierInit:
 # ---------------------------------------------------------------------------
 # _apply_trade_to_clone
 # ---------------------------------------------------------------------------
+
 
 class TestApplyTradeToClone:
     def test_does_not_mutate_original(self) -> None:
@@ -170,6 +174,7 @@ class TestApplyTradeToClone:
 # evaluate_trade (with mocked MCTS)
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateTrade:
     def test_recommends_good_trade(self) -> None:
         """Mock simulate to return better value after trade."""
@@ -181,8 +186,10 @@ class TestEvaluateTrade:
         trade = _make_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -212,8 +219,10 @@ class TestEvaluateTrade:
         trade = _make_bad_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -238,8 +247,10 @@ class TestEvaluateTrade:
         trade = _make_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -263,8 +274,10 @@ class TestEvaluateTrade:
         trade = _make_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -288,7 +301,8 @@ class TestEvaluateTrade:
         original_owner = game.property_manager.properties[9].owner
 
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             return {0: 0.3, 1: 0.3, 2: 0.4}
 
@@ -304,6 +318,7 @@ class TestEvaluateTrade:
 # rank_trades
 # ---------------------------------------------------------------------------
 
+
 class TestRankTrades:
     def test_ranks_by_value_delta(self) -> None:
         verifier = MCTSTradeVerifier(
@@ -316,8 +331,10 @@ class TestRankTrades:
         trade_bad = _make_bad_trade()  # Give Brown monopoly for nothing
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -334,7 +351,9 @@ class TestRankTrades:
         verifier._searcher.simulate = fake_simulate  # type: ignore[assignment]
 
         results = verifier.rank_trades(
-            game, player_id=0, candidates=[trade_bad, trade_good],
+            game,
+            player_id=0,
+            candidates=[trade_bad, trade_good],
         )
 
         assert len(results) == 2
@@ -360,8 +379,10 @@ class TestRankTrades:
         trade = _make_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -373,7 +394,9 @@ class TestRankTrades:
         verifier._searcher.simulate = fake_simulate  # type: ignore[assignment]
 
         results = verifier.rank_trades(
-            game, player_id=0, candidates=[trade],
+            game,
+            player_id=0,
+            candidates=[trade],
         )
         assert len(results) == 1
         assert results[0].recommended is True
@@ -387,8 +410,10 @@ class TestRankTrades:
         trade2 = _make_bad_trade()
 
         call_count = 0
+
         def fake_simulate(
-            sim_game: Any, player_id: int,
+            sim_game: Any,
+            player_id: int,
         ) -> dict[int, float]:
             nonlocal call_count
             call_count += 1
@@ -397,7 +422,9 @@ class TestRankTrades:
         verifier._searcher.simulate = fake_simulate  # type: ignore[assignment]
 
         results = verifier.rank_trades(
-            game, player_id=0, candidates=[trade1, trade2],
+            game,
+            player_id=0,
+            candidates=[trade1, trade2],
         )
 
         # 1 before eval + 2 after evals = 3 total calls
@@ -409,6 +436,7 @@ class TestRankTrades:
 # ---------------------------------------------------------------------------
 # Full search mode (simulations_per_eval > 0)
 # ---------------------------------------------------------------------------
+
 
 class TestFullSearchMode:
     def test_uses_search_then_simulate(self) -> None:
@@ -456,6 +484,7 @@ class TestFullSearchMode:
             return {}  # no valid actions
 
         simulate_calls = 0
+
         def mock_simulate(g: Any, pid: int) -> dict[int, float]:
             nonlocal simulate_calls
             simulate_calls += 1

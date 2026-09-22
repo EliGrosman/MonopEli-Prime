@@ -93,6 +93,12 @@ Examples:
         help="Number of players per game (default: 4)",
     )
     parser.add_argument(
+        "--rules-id",
+        choices=["foundation-v1", "foundation-trade-v1"],
+        default="foundation-v1",
+        help="Rules and learner encoding contract (default: foundation-v1)",
+    )
+    parser.add_argument(
         "--max-turns",
         type=int,
         default=1000,
@@ -268,7 +274,7 @@ Examples:
         choices=["auto", "subproc", "dummy"],
         default="auto",
         help="Vectorization backend: auto (SubprocVecEnv except self-play), "
-             "subproc (force SubprocVecEnv), dummy (force DummyVecEnv) (default: auto)",
+        "subproc (force SubprocVecEnv), dummy (force DummyVecEnv) (default: auto)",
     )
 
     args = parser.parse_args()
@@ -301,6 +307,7 @@ Examples:
             total_timesteps=args.timesteps,
             num_envs=args.num_envs,
             num_players=args.num_players,
+            rules_id=args.rules_id,
             max_turns=args.max_turns,
             opponent_type=args.opponent,
             reward_type=args.reward_type,
@@ -356,9 +363,9 @@ def run_curriculum(args: argparse.Namespace) -> None:
 
     total = args.timesteps
     stages = [
-        ("random", int(total * 0.2)),        # 20% vs random
-        ("rule_based", int(total * 0.4)),    # 40% vs rule_based
-        ("self", int(total * 0.4)),          # 40% self-play
+        ("random", int(total * 0.2)),  # 20% vs random
+        ("rule_based", int(total * 0.4)),  # 40% vs rule_based
+        ("self", int(total * 0.4)),  # 40% self-play
     ]
 
     print("=" * 60)
@@ -383,9 +390,9 @@ def run_curriculum(args: argparse.Namespace) -> None:
     use_subproc = args.vec_env != "dummy"
 
     for stage_name, stage_steps in stages:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"STAGE: {stage_name.upper()} ({stage_steps:,} steps)")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Only load external model for first stage when no prior model exists
         stage_load_model = args.load_model if model is None else None
@@ -433,6 +440,7 @@ def run_curriculum(args: argparse.Namespace) -> None:
             trainer._model = model
             # Need to set up environment first
             from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+
             from training.pettingzoo_selfplay import SelfPlayEnv
 
             def make_env(rank: int):
@@ -446,14 +454,11 @@ def run_curriculum(args: argparse.Namespace) -> None:
                     )
                     env.reset(seed=config.seed + rank)
                     return env
+
                 return _init
 
             env_fns = [make_env(i) for i in range(config.num_envs)]
-            stage_use_subproc = (
-                config.use_subproc
-                and config.num_envs > 1
-                and stage_name != "self"
-            )
+            stage_use_subproc = config.use_subproc and config.num_envs > 1 and stage_name != "self"
             if stage_use_subproc:
                 trainer._vec_env = SubprocVecEnv(env_fns)
             else:

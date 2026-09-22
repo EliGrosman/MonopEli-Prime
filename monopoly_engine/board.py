@@ -138,9 +138,7 @@ class Board:
             30,
         ),
         TaxSpace(4, "Income Tax", SpaceType.INCOME_TAX, 200),
-        RailroadSpace(
-            5, "Reading Railroad", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100
-        ),
+        RailroadSpace(5, "Reading Railroad", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100),
         PropertySpace(
             6,
             "Oriental Avenue",
@@ -277,9 +275,7 @@ class Board:
             150,
             120,
         ),
-        RailroadSpace(
-            25, "B&O Railroad", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100
-        ),
+        RailroadSpace(25, "B&O Railroad", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100),
         PropertySpace(
             26,
             "Atlantic Avenue",
@@ -344,9 +340,7 @@ class Board:
             200,
             160,
         ),
-        RailroadSpace(
-            35, "Short Line", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100
-        ),
+        RailroadSpace(35, "Short Line", SpaceType.RAILROAD, 200, (25, 50, 100, 200), 100),
         Space(36, "Chance", SpaceType.CHANCE),
         PropertySpace(
             37,
@@ -459,7 +453,6 @@ class Board:
         return {
             "spaces": [space.to_dict() for space in cls.SPACES],
             "property_groups": {
-                color.name: list(positions)
-                for color, positions in PROPERTY_GROUPS.items()
+                color.name: list(positions) for color, positions in PROPERTY_GROUPS.items()
             },
         }

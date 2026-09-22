@@ -99,6 +99,9 @@ export interface ActionResultMessage extends WSMessage {
     success: boolean;
     actionType: string;
     message?: string;
+    request_id?: string;
+    revision?: number;
+    error_code?: string;
   };
 }
 
@@ -144,6 +147,9 @@ export interface ClientActionMessage {
   type: 'action';
   data: {
     action_type: string;
+    request_id?: string;
+    expected_revision?: number;
+    contract_version?: string;
     [key: string]: unknown;
   };
 }

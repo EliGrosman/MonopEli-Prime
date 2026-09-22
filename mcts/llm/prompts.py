@@ -149,18 +149,24 @@ PROPOSE_TRADE_SCHEMA: dict[str, Any] = {
             "properties": {
                 "to_player": {"type": "integer"},
                 "give_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "give_money": {"type": "integer", "minimum": 0},
                 "want_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "want_money": {"type": "integer", "minimum": 0},
                 "reasoning": {"type": "string"},
             },
             "required": [
-                "to_player", "give_properties", "give_money",
-                "want_properties", "want_money", "reasoning",
+                "to_player",
+                "give_properties",
+                "give_money",
+                "want_properties",
+                "want_money",
+                "reasoning",
             ],
         },
         {
@@ -182,11 +188,13 @@ EVALUATE_TRADE_SCHEMA: dict[str, Any] = {
             "type": "object",
             "properties": {
                 "give_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "give_money": {"type": "integer", "minimum": 0},
                 "want_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "want_money": {"type": "integer", "minimum": 0},
             },
@@ -205,11 +213,13 @@ COUNTER_PROPOSE_SCHEMA: dict[str, Any] = {
             "properties": {
                 "to_player": {"type": "integer"},
                 "give_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "give_money": {"type": "integer", "minimum": 0},
                 "want_properties": {
-                    "type": "array", "items": {"type": "integer"},
+                    "type": "array",
+                    "items": {"type": "integer"},
                 },
                 "want_money": {"type": "integer", "minimum": 0},
             },
@@ -222,6 +232,7 @@ COUNTER_PROPOSE_SCHEMA: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 # Builder functions
 # ---------------------------------------------------------------------------
+
 
 def build_propose_prompt(game_state_text: str, trade_context: str) -> str:
     """Build the user prompt for proposing a trade.
@@ -238,7 +249,9 @@ def build_propose_prompt(game_state_text: str, trade_context: str) -> str:
 
 
 def build_evaluate_prompt(
-    game_state_text: str, trade_text: str, impact_text: str,
+    game_state_text: str,
+    trade_text: str,
+    impact_text: str,
 ) -> str:
     """Build the user prompt for evaluating an incoming trade.
 
@@ -255,7 +268,9 @@ def build_evaluate_prompt(
 
 
 def build_counter_prompt(
-    game_state_text: str, trade_text: str, reason: str,
+    game_state_text: str,
+    trade_text: str,
+    reason: str,
 ) -> str:
     """Build the user prompt for counter-proposing after rejection.
 

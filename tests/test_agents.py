@@ -488,9 +488,7 @@ class TestRuleBasedAgent:
         mask = encoder.get_action_mask(game, 0)
 
         # Find unmortgage actions
-        unmortgage_actions = [
-            i for i in range(OFFSET_UNMORTGAGE, OFFSET_END_TURN) if mask[i]
-        ]
+        unmortgage_actions = [i for i in range(OFFSET_UNMORTGAGE, OFFSET_END_TURN) if mask[i]]
         assert len(unmortgage_actions) > 0, "Should be able to unmortgage"
 
         action = agent.choose_action({}, mask, game)
@@ -540,9 +538,7 @@ class TestRuleBasedAgent:
         build_threshold=st.floats(0.0, 1.0),
     )
     @settings(max_examples=10)
-    def test_thresholds_in_valid_range(
-        self, buy_threshold: float, build_threshold: float
-    ) -> None:
+    def test_thresholds_in_valid_range(self, buy_threshold: float, build_threshold: float) -> None:
         """Agent should accept any threshold in [0, 1]."""
         agent = RuleBasedAgent(
             player_id=0,
@@ -1210,16 +1206,13 @@ class TestPropertyBasedAgent:
         seed=st.integers(0, 10000),
     )
     @settings(max_examples=10, deadline=None)
-    def test_random_agent_always_returns_valid_action(
-        self, num_players: int, seed: int
-    ) -> None:
+    def test_random_agent_always_returns_valid_action(self, num_players: int, seed: int) -> None:
         """RandomAgent should always return a valid action."""
         env = MonopolyEnv(num_players=num_players)
         env.reset(seed=seed)
 
         agents = {
-            f"player_{i}": RandomAgent(player_id=i, seed=seed + i)
-            for i in range(num_players)
+            f"player_{i}": RandomAgent(player_id=i, seed=seed + i) for i in range(num_players)
         }
 
         steps = 0

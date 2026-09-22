@@ -9,19 +9,12 @@ Tests cover:
 - Error handling
 """
 
-import asyncio
-import json
-from typing import Any
-
 import pytest
 from fastapi.testclient import TestClient
-from starlette.testclient import WebSocketTestSession
 
 from api.main import create_app
-from api.models.websocket import WSMessageType
-from api.services.broadcast import Connection, ConnectionManager
+from api.services.broadcast import ConnectionManager
 from api.services.game_manager import GameManager
-
 
 # ============================================================================
 # Fixtures
@@ -87,9 +80,7 @@ class TestWebSocketConnection:
         """Test connecting as a spectator (no player_id)."""
         game_id = create_game(client)
 
-        with client.websocket_connect(
-            f"/ws/games/{game_id}?session_id=test-session"
-        ) as websocket:
+        with client.websocket_connect(f"/ws/games/{game_id}?session_id=test-session") as websocket:
             # Should receive identity first
             identity = websocket.receive_json()
             assert identity["type"] == "identity"
@@ -100,9 +91,7 @@ class TestWebSocketConnection:
 
     def test_connect_to_nonexistent_game(self, client: TestClient):
         """Test connecting to a game that doesn't exist."""
-        with client.websocket_connect(
-            "/ws/games/nonexistent-game-id?session_id=test"
-        ) as websocket:
+        with client.websocket_connect("/ws/games/nonexistent-game-id?session_id=test") as websocket:
             # Should receive error then close
             data = websocket.receive_json()
             assert data["type"] == "error"
@@ -157,9 +146,7 @@ class TestHeartbeat:
         """Test that heartbeat receives acknowledgment."""
         game_id = create_game(client)
 
-        with client.websocket_connect(
-            f"/ws/games/{game_id}?session_id=test"
-        ) as websocket:
+        with client.websocket_connect(f"/ws/games/{game_id}?session_id=test") as websocket:
             # Skip identity and initial state
             websocket.receive_json()  # identity
             websocket.receive_json()  # state
@@ -192,10 +179,7 @@ class TestWebSocketActions:
             websocket.receive_json()  # state
 
             # Send roll dice action
-            websocket.send_json({
-                "type": "action",
-                "data": {"action_type": "roll_dice"}
-            })
+            websocket.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
 
             # Should receive action result
             result = websocket.receive_json()
@@ -218,10 +202,7 @@ class TestWebSocketActions:
             websocket.receive_json()  # state
 
             # Try to send action
-            websocket.send_json({
-                "type": "action",
-                "data": {"action_type": "roll_dice"}
-            })
+            websocket.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
 
             # Should receive failure
             result = websocket.receive_json()
@@ -241,10 +222,7 @@ class TestWebSocketActions:
             websocket.receive_json()  # state
 
             # Send invalid action
-            websocket.send_json({
-                "type": "action",
-                "data": {"action_type": "invalid_action"}
-            })
+            websocket.send_json({"type": "action", "data": {"action_type": "invalid_action"}})
 
             # Should receive failure
             result = websocket.receive_json()
@@ -263,10 +241,7 @@ class TestWebSocketActions:
             websocket.receive_json()  # state
 
             # Try to roll dice when it's not our turn (player 0's turn, we're player 1)
-            websocket.send_json({
-                "type": "action",
-                "data": {"action_type": "roll_dice"}
-            })
+            websocket.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
 
             # Should receive validation failure
             result = websocket.receive_json()
@@ -301,10 +276,7 @@ class TestWebSocketChat:
                 ws1.receive_json()  # Skip player_joined
 
                 # Send chat from player 1
-                ws2.send_json({
-                    "type": "chat",
-                    "data": {"message": "Hello everyone!"}
-                })
+                ws2.send_json({"type": "chat", "data": {"message": "Hello everyone!"}})
 
                 # Both should receive the chat message
                 chat1 = ws1.receive_json()
@@ -329,10 +301,7 @@ class TestWebSocketChat:
 
             # Send very long message
             long_message = "x" * 1000
-            websocket.send_json({
-                "type": "chat",
-                "data": {"message": long_message}
-            })
+            websocket.send_json({"type": "chat", "data": {"message": long_message}})
 
             # Should receive truncated message
             chat = websocket.receive_json()
@@ -352,9 +321,7 @@ class TestWebSocketErrors:
         """Test sending invalid JSON."""
         game_id = create_game(client)
 
-        with client.websocket_connect(
-            f"/ws/games/{game_id}?session_id=test"
-        ) as websocket:
+        with client.websocket_connect(f"/ws/games/{game_id}?session_id=test") as websocket:
             websocket.receive_json()  # Skip identity
             websocket.receive_json()  # Skip state
 
@@ -370,9 +337,7 @@ class TestWebSocketErrors:
         """Test sending unknown message type."""
         game_id = create_game(client)
 
-        with client.websocket_connect(
-            f"/ws/games/{game_id}?session_id=test"
-        ) as websocket:
+        with client.websocket_connect(f"/ws/games/{game_id}?session_id=test") as websocket:
             websocket.receive_json()  # Skip identity
             websocket.receive_json()  # Skip state
 
@@ -416,9 +381,7 @@ class TestConnectionManager:
         assert players == []
 
     @pytest.mark.asyncio
-    async def test_total_games_with_connections(
-        self, connection_manager: ConnectionManager
-    ):
+    async def test_total_games_with_connections(self, connection_manager: ConnectionManager):
         """Test counting games with connections."""
         assert connection_manager.total_games_with_connections() == 0
 
@@ -454,9 +417,7 @@ class TestGameManagerWebSocketIntegration:
         game_id = await game_manager.create_game(num_players=2)
 
         # First claim
-        await game_manager.claim_player_slot(
-            game_id, player_id=0, session_id="session1"
-        )
+        await game_manager.claim_player_slot(game_id, player_id=0, session_id="session1")
 
         # Second claim by different session
         success, msg, _ = await game_manager.claim_player_slot(
@@ -471,9 +432,7 @@ class TestGameManagerWebSocketIntegration:
         game_id = await game_manager.create_game(num_players=2)
 
         # First claim
-        await game_manager.claim_player_slot(
-            game_id, player_id=0, session_id="session1"
-        )
+        await game_manager.claim_player_slot(game_id, player_id=0, session_id="session1")
 
         # Reclaim same session (not a reconnect since no disconnect)
         success, msg, is_reconnect = await game_manager.claim_player_slot(
@@ -507,9 +466,7 @@ class TestGameManagerWebSocketIntegration:
         """Test releasing a player slot permanently."""
         game_id = await game_manager.create_game(num_players=2)
 
-        await game_manager.claim_player_slot(
-            game_id, player_id=0, session_id="session1"
-        )
+        await game_manager.claim_player_slot(game_id, player_id=0, session_id="session1")
 
         # Permanent release fully clears the slot
         released = await game_manager.release_player_slot(
@@ -527,9 +484,7 @@ class TestGameManagerWebSocketIntegration:
         """Test releasing slot with wrong session."""
         game_id = await game_manager.create_game(num_players=2)
 
-        await game_manager.claim_player_slot(
-            game_id, player_id=0, session_id="session1"
-        )
+        await game_manager.claim_player_slot(game_id, player_id=0, session_id="session1")
 
         # Try to release with different session
         released = await game_manager.release_player_slot(
@@ -542,13 +497,9 @@ class TestGameManagerWebSocketIntegration:
         """Test finding player slot by session."""
         game_id = await game_manager.create_game(num_players=4)
 
-        await game_manager.claim_player_slot(
-            game_id, player_id=2, session_id="session1"
-        )
+        await game_manager.claim_player_slot(game_id, player_id=2, session_id="session1")
 
-        player_id = await game_manager.get_player_slot_by_session(
-            game_id, "session1"
-        )
+        player_id = await game_manager.get_player_slot_by_session(game_id, "session1")
         assert player_id == 2
 
     @pytest.mark.asyncio
@@ -556,9 +507,7 @@ class TestGameManagerWebSocketIntegration:
         """Test finding player slot for unknown session."""
         game_id = await game_manager.create_game(num_players=2)
 
-        player_id = await game_manager.get_player_slot_by_session(
-            game_id, "unknown-session"
-        )
+        player_id = await game_manager.get_player_slot_by_session(game_id, "unknown-session")
         assert player_id is None
 
     @pytest.mark.asyncio
@@ -595,10 +544,7 @@ class TestBroadcast:
                 ws1.receive_json()  # Skip player_joined
 
                 # Player 0 rolls dice
-                ws1.send_json({
-                    "type": "action",
-                    "data": {"action_type": "roll_dice"}
-                })
+                ws1.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
 
                 # Player 0 receives action result
                 result = ws1.receive_json()
@@ -628,10 +574,7 @@ class TestBroadcast:
                 spectator_ws.receive_json()  # Skip state
 
                 # Player performs action
-                player_ws.send_json({
-                    "type": "action",
-                    "data": {"action_type": "roll_dice"}
-                })
+                player_ws.send_json({"type": "action", "data": {"action_type": "roll_dice"}})
 
                 # Player gets result
                 player_ws.receive_json()
@@ -678,9 +621,7 @@ class TestDisconnect:
         """Test that player slot is marked disconnected (not fully released)."""
         game_id = create_game(client)
 
-        with client.websocket_connect(
-            f"/ws/games/{game_id}?session_id=session1&player_id=0"
-        ) as ws:
+        with client.websocket_connect(f"/ws/games/{game_id}?session_id=session1&player_id=0") as ws:
             ws.receive_json()  # Skip identity
             ws.receive_json()  # Skip state
 

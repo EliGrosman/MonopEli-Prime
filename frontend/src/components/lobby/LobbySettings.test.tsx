@@ -11,6 +11,7 @@ function createMockSettings(overrides: Partial<LobbySettingsType> = {}): LobbySe
     go_salary: 200,
     allow_spectators: false,
     private: false,
+    rules_id: 'foundation-v1',
     ...overrides,
   };
 }

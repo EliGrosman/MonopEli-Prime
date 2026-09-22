@@ -22,6 +22,7 @@ from mcts.llm.client import (
 # JSON parsing
 # ---------------------------------------------------------------------------
 
+
 class TestTryParseJson:
     def test_valid_json(self) -> None:
         result = _try_parse_json('{"key": "value"}')
@@ -64,6 +65,7 @@ class TestTryParseJson:
 # LLMConfig
 # ---------------------------------------------------------------------------
 
+
 class TestLLMConfig:
     def test_defaults(self) -> None:
         cfg = LLMConfig()
@@ -83,11 +85,14 @@ class TestLLMConfig:
 # complete_json (on base class via a concrete mock subclass)
 # ---------------------------------------------------------------------------
 
+
 class _MockLLMClient(LLMClient):
     """Concrete LLMClient that returns predetermined responses."""
 
     def __init__(
-        self, responses: list[str], config: LLMConfig | None = None,
+        self,
+        responses: list[str],
+        config: LLMConfig | None = None,
     ) -> None:
         super().__init__(config or LLMConfig())
         self._responses = responses
@@ -110,10 +115,12 @@ class TestCompleteJson:
         assert client._call_count == 1
 
     def test_retries_on_invalid_json(self) -> None:
-        client = _MockLLMClient([
-            "I think the best trade is...",  # First: invalid
-            '{"to_player": 1}',              # Retry: valid
-        ])
+        client = _MockLLMClient(
+            [
+                "I think the best trade is...",  # First: invalid
+                '{"to_player": 1}',  # Retry: valid
+            ]
+        )
         result = client.complete_json("sys", "user")
         assert result["to_player"] == 1
         assert client._call_count == 2
@@ -133,6 +140,7 @@ class TestCompleteJson:
 # ---------------------------------------------------------------------------
 # create_client factory
 # ---------------------------------------------------------------------------
+
 
 class TestCreateClient:
     def test_creates_claude_client(self) -> None:
@@ -176,6 +184,7 @@ class TestCreateClient:
 # Provider-specific clients (mocked HTTP)
 # ---------------------------------------------------------------------------
 
+
 def _mock_httpx_response(data: dict[str, Any]) -> httpx.Response:
     """Create a mock httpx.Response with JSON body."""
     resp = httpx.Response(
@@ -191,9 +200,11 @@ class TestClaudeClient:
         cfg = LLMConfig(provider="claude", model="test-model")
         client = ClaudeClient(cfg)
 
-        mock_resp = _mock_httpx_response({
-            "content": [{"text": '{"result": "ok"}'}],
-        })
+        mock_resp = _mock_httpx_response(
+            {
+                "content": [{"text": '{"result": "ok"}'}],
+            }
+        )
         client._client = MagicMock()
         client._client.post.return_value = mock_resp
 
@@ -231,9 +242,11 @@ class TestOpenAIClient:
         cfg = LLMConfig(provider="openai", model="gpt-4o-mini")
         client = OpenAIClient(cfg)
 
-        mock_resp = _mock_httpx_response({
-            "choices": [{"message": {"content": '{"trade": true}'}}],
-        })
+        mock_resp = _mock_httpx_response(
+            {
+                "choices": [{"message": {"content": '{"trade": true}'}}],
+            }
+        )
         client._client = MagicMock()
         client._client.post.return_value = mock_resp
 
@@ -246,9 +259,11 @@ class TestOllamaClient:
         cfg = LLMConfig(provider="ollama", model="llama3.1")
         client = OllamaClient(cfg)
 
-        mock_resp = _mock_httpx_response({
-            "message": {"content": '{"decision": "accept"}'},
-        })
+        mock_resp = _mock_httpx_response(
+            {
+                "message": {"content": '{"decision": "accept"}'},
+            }
+        )
         client._client = MagicMock()
         client._client.post.return_value = mock_resp
 
@@ -260,6 +275,7 @@ class TestOllamaClient:
         with patch.dict("os.environ", {}, clear=False):
             # Remove OLLAMA_BASE_URL if set
             import os
+
             old = os.environ.pop("OLLAMA_BASE_URL", None)
             try:
                 client = OllamaClient(cfg)

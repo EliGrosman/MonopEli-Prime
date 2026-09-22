@@ -1,30 +1,25 @@
 """Tests for rules.py module."""
 
-import pytest
-
 from monopoly_engine import (
-    Player,
-    PropertyManager,
-    PropertyColor,
     PROPERTY_GROUPS,
-    calculate_rent,
-    can_buy_property,
-    get_property_cost,
-    can_build_house,
-    get_building_cost,
-    can_sell_house,
-    get_house_sale_value,
-    can_mortgage_property,
-    get_mortgage_value,
-    can_unmortgage_property,
-    get_unmortgage_cost,
+    Player,
+    PropertyColor,
+    PropertyManager,
     calculate_net_worth,
+    calculate_rent,
     can_afford_rent,
-    is_bankrupt,
+    can_build_house,
+    can_buy_property,
+    can_mortgage_property,
+    can_sell_house,
     get_buildable_properties,
-    get_sellable_houses,
+    get_mortgage_value,
     get_mortgageable_properties,
+    get_property_cost,
+    get_sellable_houses,
+    get_unmortgage_cost,
     get_unmortgageable_properties,
+    is_bankrupt,
     validate_trade,
 )
 
@@ -32,98 +27,74 @@ from monopoly_engine import (
 class TestCalculateRent:
     """Tests for rent calculation."""
 
-    def test_rent_unowned_property(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_unowned_property(self, property_manager: PropertyManager) -> None:
         """Unowned property should have 0 rent."""
         rent = calculate_rent(property_manager, 1)
         assert rent == 0
 
-    def test_rent_mortgaged_property(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_mortgaged_property(self, property_manager: PropertyManager) -> None:
         """Mortgaged property should have 0 rent."""
         property_manager.properties[1].owner = 0
         property_manager.properties[1].mortgaged = True
         rent = calculate_rent(property_manager, 1)
         assert rent == 0
 
-    def test_rent_basic_property(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_basic_property(self, property_manager: PropertyManager) -> None:
         """Property without monopoly should have base rent."""
         property_manager.properties[1].owner = 0
         rent = calculate_rent(property_manager, 1)
         assert rent == 2  # Mediterranean base rent
 
-    def test_rent_monopoly_no_houses(
-        self, property_manager_with_owner: PropertyManager
-    ) -> None:
+    def test_rent_monopoly_no_houses(self, property_manager_with_owner: PropertyManager) -> None:
         """Monopoly without houses should have double rent."""
         rent = calculate_rent(property_manager_with_owner, 1)
         assert rent == 4  # Mediterranean base rent * 2
 
-    def test_rent_with_houses(
-        self, property_manager_with_houses: PropertyManager
-    ) -> None:
+    def test_rent_with_houses(self, property_manager_with_houses: PropertyManager) -> None:
         """Property with houses should use house rent."""
         # Light blue with 2 houses
         rent = calculate_rent(property_manager_with_houses, 6)
         assert rent == 90  # Oriental with 2 houses
 
-    def test_rent_with_hotel(
-        self, property_manager_with_monopoly: PropertyManager
-    ) -> None:
+    def test_rent_with_hotel(self, property_manager_with_monopoly: PropertyManager) -> None:
         """Property with hotel should use hotel rent."""
         property_manager_with_monopoly.properties[6].houses = 5
         rent = calculate_rent(property_manager_with_monopoly, 6)
         assert rent == 550  # Oriental hotel rent
 
-    def test_rent_railroad_one_owned(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_railroad_one_owned(self, property_manager: PropertyManager) -> None:
         """Railroad rent with 1 owned should be $25."""
         property_manager.properties[5].owner = 0
         rent = calculate_rent(property_manager, 5)
         assert rent == 25
 
-    def test_rent_railroad_all_owned(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_railroad_all_owned(self, property_manager: PropertyManager) -> None:
         """Railroad rent with all 4 owned should be $200."""
         for pos in [5, 15, 25, 35]:
             property_manager.properties[pos].owner = 0
         rent = calculate_rent(property_manager, 5)
         assert rent == 200
 
-    def test_rent_railroad_from_card(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_railroad_from_card(self, property_manager: PropertyManager) -> None:
         """Railroad rent from Chance card should be double."""
         property_manager.properties[5].owner = 0
         rent = calculate_rent(property_manager, 5, is_from_card=True)
         assert rent == 50  # $25 * 2
 
-    def test_rent_utility_one_owned(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_utility_one_owned(self, property_manager: PropertyManager) -> None:
         """Utility rent with 1 owned should be 4x dice roll."""
         property_manager.properties[12].owner = 0
         rent = calculate_rent(property_manager, 12, dice_roll=7)
         assert rent == 28  # 4 * 7
 
-    def test_rent_utility_both_owned(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_utility_both_owned(self, property_manager: PropertyManager) -> None:
         """Utility rent with both owned should be 10x dice roll."""
         property_manager.properties[12].owner = 0
         property_manager.properties[28].owner = 0
         rent = calculate_rent(property_manager, 12, dice_roll=7)
         assert rent == 70  # 10 * 7
 
-    def test_rent_utility_from_card(
-        self, property_manager: PropertyManager
-    ) -> None:
+    def test_rent_utility_from_card(self, property_manager: PropertyManager) -> None:
         """Utility rent from Chance card should be 10x dice roll."""
         property_manager.properties[12].owner = 0
         rent = calculate_rent(property_manager, 12, dice_roll=7, is_from_card=True)
@@ -198,9 +169,7 @@ class TestCanBuildHouse:
         property_manager_with_monopoly: PropertyManager,
     ) -> None:
         """Should be able to build with monopoly."""
-        can, reason = can_build_house(
-            player_with_money, property_manager_with_monopoly, 6, 32, 12
-        )
+        can, reason = can_build_house(player_with_money, property_manager_with_monopoly, 6, 32, 12)
         assert can
 
     def test_cannot_build_without_monopoly(
@@ -208,9 +177,7 @@ class TestCanBuildHouse:
     ) -> None:
         """Should not be able to build without monopoly."""
         property_manager.properties[6].owner = player_with_money.id
-        can, reason = can_build_house(
-            player_with_money, property_manager, 6, 32, 12
-        )
+        can, reason = can_build_house(player_with_money, property_manager, 6, 32, 12)
         assert not can
         assert "monopoly" in reason.lower()
 
@@ -221,9 +188,7 @@ class TestCanBuildHouse:
     ) -> None:
         """Should not be able to build on mortgaged property."""
         property_manager_with_monopoly.properties[6].mortgaged = True
-        can, reason = can_build_house(
-            player_with_money, property_manager_with_monopoly, 6, 32, 12
-        )
+        can, reason = can_build_house(player_with_money, property_manager_with_monopoly, 6, 32, 12)
         assert not can
         assert "mortgaged" in reason.lower()
 
@@ -234,9 +199,7 @@ class TestCanBuildHouse:
     ) -> None:
         """Should not be able to build unevenly."""
         property_manager_with_monopoly.properties[6].houses = 1
-        can, reason = can_build_house(
-            player_with_money, property_manager_with_monopoly, 6, 32, 12
-        )
+        can, reason = can_build_house(player_with_money, property_manager_with_monopoly, 6, 32, 12)
         assert not can
         assert "evenly" in reason.lower()
 
@@ -246,9 +209,7 @@ class TestCanBuildHouse:
         property_manager_with_monopoly: PropertyManager,
     ) -> None:
         """Should not be able to build when no houses available."""
-        can, reason = can_build_house(
-            player_with_money, property_manager_with_monopoly, 6, 0, 12
-        )
+        can, reason = can_build_house(player_with_money, property_manager_with_monopoly, 6, 0, 12)
         assert not can
         assert "houses" in reason.lower()
 
@@ -261,9 +222,7 @@ class TestCanBuildHouse:
         # Set all to 4 houses
         for pos in PROPERTY_GROUPS[PropertyColor.LIGHT_BLUE]:
             property_manager_with_houses.properties[pos].houses = 4
-        can, reason = can_build_house(
-            player_with_money, property_manager_with_houses, 6, 32, 0
-        )
+        can, reason = can_build_house(player_with_money, property_manager_with_houses, 6, 32, 0)
         assert not can
         assert "hotel" in reason.lower()
 
@@ -309,9 +268,7 @@ class TestCanSellHouse:
 class TestMortgage:
     """Tests for mortgage functionality."""
 
-    def test_can_mortgage(
-        self, player: Player, property_manager: PropertyManager
-    ) -> None:
+    def test_can_mortgage(self, player: Player, property_manager: PropertyManager) -> None:
         """Should be able to mortgage owned property."""
         property_manager.properties[1].owner = player.id
         can, reason = can_mortgage_property(player, property_manager, 1)
@@ -324,9 +281,7 @@ class TestMortgage:
     ) -> None:
         """Should not be able to mortgage with houses."""
         player.id = 0
-        can, reason = can_mortgage_property(
-            player, property_manager_with_houses, 6
-        )
+        can, reason = can_mortgage_property(player, property_manager_with_houses, 6)
         assert not can
         assert "houses" in reason.lower()
 
@@ -355,9 +310,7 @@ class TestMortgage:
 class TestNetWorth:
     """Tests for net worth calculation."""
 
-    def test_net_worth_cash_only(
-        self, player: Player, property_manager: PropertyManager
-    ) -> None:
+    def test_net_worth_cash_only(self, player: Player, property_manager: PropertyManager) -> None:
         """Net worth with no properties should be cash."""
         worth = calculate_net_worth(player, property_manager)
         assert worth == player.money
@@ -393,9 +346,7 @@ class TestNetWorth:
 class TestBankruptcy:
     """Tests for bankruptcy checks."""
 
-    def test_can_afford_with_cash(
-        self, player: Player, property_manager: PropertyManager
-    ) -> None:
+    def test_can_afford_with_cash(self, player: Player, property_manager: PropertyManager) -> None:
         """Should be able to afford rent with cash."""
         can, shortfall = can_afford_rent(player, property_manager, 100)
         assert can
@@ -409,9 +360,7 @@ class TestBankruptcy:
         assert not can
         assert shortfall > 0
 
-    def test_is_bankrupt(
-        self, player: Player, property_manager: PropertyManager
-    ) -> None:
+    def test_is_bankrupt(self, player: Player, property_manager: PropertyManager) -> None:
         """is_bankrupt should check net worth vs debt."""
         assert not is_bankrupt(player, property_manager, 100)
         assert is_bankrupt(player, property_manager, 10000)
@@ -512,7 +461,5 @@ class TestHelperFunctions:
         """get_unmortgageable_properties should list valid positions."""
         property_manager.properties[1].owner = player_with_money.id
         property_manager.properties[1].mortgaged = True
-        unmortgageable = get_unmortgageable_properties(
-            player_with_money, property_manager
-        )
+        unmortgageable = get_unmortgageable_properties(player_with_money, property_manager)
         assert 1 in unmortgageable

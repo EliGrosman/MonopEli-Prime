@@ -1,14 +1,15 @@
 """Tests for state.py - GameState container and serialization."""
 
 import pytest
-from monopoly_engine.state import GameState
+
+from monopoly_engine.cards import CHANCE_CARDS, COMMUNITY_CHEST_CARDS
 from monopoly_engine.player import Player
-from monopoly_engine.property import PropertyManager, Property
-from monopoly_engine.cards import CardDeck, CHANCE_CARDS, COMMUNITY_CHEST_CARDS
+from monopoly_engine.property import PropertyManager
+from monopoly_engine.state import GameState
 from monopoly_engine.types import (
-    TradeOfferData,
-    TOTAL_HOUSES,
     TOTAL_HOTELS,
+    TOTAL_HOUSES,
+    TradeOfferData,
 )
 
 
@@ -113,9 +114,7 @@ class TestGameStateSerialization:
         assert data["houses_remaining"] == TOTAL_HOUSES
         assert data["hotels_remaining"] == TOTAL_HOTELS
 
-    def test_to_dict_with_properties(
-        self, game_state_with_properties: GameState
-    ) -> None:
+    def test_to_dict_with_properties(self, game_state_with_properties: GameState) -> None:
         """Test serialization with owned properties."""
         data = game_state_with_properties.to_dict()
 
@@ -189,9 +188,7 @@ class TestGameStateSerialization:
         assert restored.houses_remaining == TOTAL_HOUSES
         assert restored.hotels_remaining == TOTAL_HOTELS
 
-    def test_from_dict_with_properties(
-        self, game_state_with_properties: GameState
-    ) -> None:
+    def test_from_dict_with_properties(self, game_state_with_properties: GameState) -> None:
         """Test deserialization with owned properties."""
         data = game_state_with_properties.to_dict()
         restored = GameState.from_dict(data)
@@ -213,9 +210,7 @@ class TestGameStateSerialization:
         assert restored.turn_number == 10
         assert restored.houses_remaining == 30
 
-    def test_from_dict_with_card_decks(
-        self, game_state_with_properties: GameState
-    ) -> None:
+    def test_from_dict_with_card_decks(self, game_state_with_properties: GameState) -> None:
         """Test that card decks are properly restored."""
         data = game_state_with_properties.to_dict()
         restored = GameState.from_dict(data)
@@ -257,9 +252,7 @@ class TestGameStateSerialization:
         assert len(restored.event_log) == 0
         assert len(restored.pending_trades) == 0
 
-    def test_roundtrip_serialization(
-        self, game_state_with_properties: GameState
-    ) -> None:
+    def test_roundtrip_serialization(self, game_state_with_properties: GameState) -> None:
         """Test that serialization and deserialization are inverses."""
         original = game_state_with_properties
         data = original.to_dict()
@@ -285,9 +278,7 @@ class TestObservableState:
         assert "current_player" in observable
         assert "turn_number" in observable
 
-    def test_get_observable_state_hides_deck_order(
-        self, basic_game_state: GameState
-    ) -> None:
+    def test_get_observable_state_hides_deck_order(self, basic_game_state: GameState) -> None:
         """Test that observable state hides exact deck order."""
         observable = basic_game_state.get_observable_state(0)
 
@@ -415,18 +406,14 @@ class TestGameStateHelpers:
         winner = basic_game_state.check_winner()
         assert winner is None
 
-    def test_check_winner_single_player_remaining(
-        self, basic_game_state: GameState
-    ) -> None:
+    def test_check_winner_single_player_remaining(self, basic_game_state: GameState) -> None:
         """Test check_winner when one player remains."""
         basic_game_state.players[1].declare_bankrupt()
 
         winner = basic_game_state.check_winner()
         assert winner == 0
 
-    def test_check_winner_no_players_remaining(
-        self, basic_game_state: GameState
-    ) -> None:
+    def test_check_winner_no_players_remaining(self, basic_game_state: GameState) -> None:
         """Test check_winner when no players remain (edge case)."""
         basic_game_state.players[0].declare_bankrupt()
         basic_game_state.players[1].declare_bankrupt()
@@ -463,9 +450,7 @@ class TestGameStateWithMultiplePlayers:
         assert len(four_player_state.players) == 4
         assert four_player_state.count_active_players() == 4
 
-    def test_four_player_next_player_cycle(
-        self, four_player_state: GameState
-    ) -> None:
+    def test_four_player_next_player_cycle(self, four_player_state: GameState) -> None:
         """Test cycling through 4 players."""
         assert four_player_state.current_player == 0
 

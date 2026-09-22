@@ -9,6 +9,7 @@ from monopoly_engine.game import MonopolyGame
 # TokenBudget
 # ---------------------------------------------------------------------------
 
+
 class TestTokenBudget:
     def test_defaults(self) -> None:
         budget = TokenBudget()
@@ -77,6 +78,7 @@ class TestTokenBudget:
 # ResponseCache - basic operations
 # ---------------------------------------------------------------------------
 
+
 class TestResponseCache:
     def test_put_and_get(self) -> None:
         cache = ResponseCache()
@@ -126,6 +128,7 @@ class TestResponseCache:
 # ResponseCache - eviction
 # ---------------------------------------------------------------------------
 
+
 class TestResponseCacheEviction:
     def test_evicts_oldest_when_full(self) -> None:
         cache = ResponseCache(max_size=3)
@@ -168,6 +171,7 @@ class TestResponseCacheEviction:
 # ---------------------------------------------------------------------------
 # ResponseCache - hashing
 # ---------------------------------------------------------------------------
+
 
 class TestResponseCacheHashing:
     def test_hash_game_state_deterministic(self) -> None:

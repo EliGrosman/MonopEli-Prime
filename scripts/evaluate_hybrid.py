@@ -37,6 +37,7 @@ from monopoly_gym.action_space import ActionEncoder
 # Fake LLM client for evaluation (no real API calls)
 # ---------------------------------------------------------------------------
 
+
 class _EvalLLMClient(LLMClient):
     """LLM client that returns simple heuristic responses for evaluation.
 
@@ -126,6 +127,7 @@ def _make_llm_client(
 # Result tracking
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GameResult:
     """Result of a single evaluation game."""
@@ -161,19 +163,11 @@ class EvalResults:
 
     @property
     def avg_trades_proposed(self) -> float:
-        return (
-            self.total_trades_proposed / self.games_played
-            if self.games_played > 0
-            else 0.0
-        )
+        return self.total_trades_proposed / self.games_played if self.games_played > 0 else 0.0
 
     @property
     def avg_trades_accepted(self) -> float:
-        return (
-            self.total_trades_accepted / self.games_played
-            if self.games_played > 0
-            else 0.0
-        )
+        return self.total_trades_accepted / self.games_played if self.games_played > 0 else 0.0
 
     @property
     def trade_acceptance_rate(self) -> float:
@@ -185,24 +179,17 @@ class EvalResults:
 
     @property
     def avg_game_length(self) -> float:
-        return (
-            self.total_actions / self.games_played
-            if self.games_played > 0
-            else 0.0
-        )
+        return self.total_actions / self.games_played if self.games_played > 0 else 0.0
 
     @property
     def avg_tokens_used(self) -> float:
-        return (
-            self.total_tokens / self.games_played
-            if self.games_played > 0
-            else 0.0
-        )
+        return self.total_tokens / self.games_played if self.games_played > 0 else 0.0
 
 
 # ---------------------------------------------------------------------------
 # Game runner
 # ---------------------------------------------------------------------------
+
 
 def _create_opponent(opp_type: str, player_id: int) -> Agent:
     """Create an opponent agent by type name."""
@@ -269,11 +256,7 @@ def play_eval_game(
 
     # Gather trade metrics from negotiation manager
     mgr = hybrid_agent.negotiation_manager
-    accepted = sum(
-        1
-        for n in mgr._negotiations.values()
-        if n.status == NegotiationStatus.ACCEPTED
-    )
+    accepted = sum(1 for n in mgr._negotiations.values() if n.status == NegotiationStatus.ACCEPTED)
 
     tokens_this_game = llm_client.total_tokens - tokens_before
 
@@ -323,10 +306,7 @@ def run_evaluation(
             llm_client=llm_client,
         )
 
-        opponents = [
-            _create_opponent(opponent_type, i + 1)
-            for i in range(num_players - 1)
-        ]
+        opponents = [_create_opponent(opponent_type, i + 1) for i in range(num_players - 1)]
 
         game_result = play_eval_game(
             hybrid_agent,
@@ -353,8 +333,10 @@ def run_evaluation(
         results.game_results.append(game_result)
 
         if verbose:
-            w = "WIN" if game_result.winner == 0 else (
-                "DRAW" if game_result.winner is None else "LOSS"
+            w = (
+                "WIN"
+                if game_result.winner == 0
+                else ("DRAW" if game_result.winner is None else "LOSS")
             )
             print(
                 f"  Game {game_idx + 1:3d}/{num_games}: {w:4s} "
@@ -370,11 +352,14 @@ def run_evaluation(
 # Output
 # ---------------------------------------------------------------------------
 
+
 def print_results_table(all_results: list[EvalResults]) -> None:
     """Print evaluation results as a formatted table."""
     print("\n" + "=" * 80)
-    print(f"{'Opponent':<15} {'Games':>6} {'Win%':>7} {'Trades':>7} "
-          f"{'Accept%':>8} {'AvgLen':>7} {'Tokens':>7} {'Time':>7}")
+    print(
+        f"{'Opponent':<15} {'Games':>6} {'Win%':>7} {'Trades':>7} "
+        f"{'Accept%':>8} {'AvgLen':>7} {'Tokens':>7} {'Time':>7}"
+    )
     print("-" * 80)
 
     for r in all_results:
@@ -395,6 +380,7 @@ def print_results_table(all_results: list[EvalResults]) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate HybridAgent (MCTS+LLM) against baselines",
@@ -408,36 +394,51 @@ def parse_args() -> argparse.Namespace:
         help="Opponent types (default: random rule_based)",
     )
     parser.add_argument(
-        "--games", type=int, default=10,
+        "--games",
+        type=int,
+        default=10,
         help="Games per opponent (default: 10)",
     )
     parser.add_argument(
-        "--num-players", type=int, default=4,
+        "--num-players",
+        type=int,
+        default=4,
         help="Number of players (default: 4)",
     )
     parser.add_argument(
-        "--mcts-sims", type=int, default=50,
+        "--mcts-sims",
+        type=int,
+        default=50,
         help="MCTS simulations per move (default: 50)",
     )
     parser.add_argument(
-        "--max-turns", type=int, default=500,
+        "--max-turns",
+        type=int,
+        default=500,
         help="Max actions per game (default: 500)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42)",
     )
     parser.add_argument(
-        "--quiet", action="store_true",
+        "--quiet",
+        action="store_true",
         help="Suppress per-game output",
     )
     parser.add_argument(
-        "--llm", type=str, default=None,
+        "--llm",
+        type=str,
+        default=None,
         choices=["ollama", "claude", "openai"],
         help="LLM provider for trade generation (default: fake/no-op client)",
     )
     parser.add_argument(
-        "--llm-model", type=str, default=None,
+        "--llm-model",
+        type=str,
+        default=None,
         help="LLM model name (default: gemma3:4b for ollama)",
     )
     return parser.parse_args()

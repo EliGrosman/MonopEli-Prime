@@ -4,20 +4,15 @@ This module tests that the new monopoly_engine implementation behaves correctly
 compared to the legacy MonopEli-Server implementation, while also fixing known bugs.
 """
 
-import pytest
-from monopoly_engine.game import MonopolyGame
 from monopoly_engine.actions import (
-    RollDice,
-    BuyProperty,
-    BuildHouse,
     BuildHotel,
-    MortgageProperty,
-    UnmortgageProperty,
+    BuildHouse,
+    BuyProperty,
     PayJailFine,
+    RollDice,
     UseJailCard,
-    DeclareBankruptcy,
 )
-from monopoly_engine.types import PropertyColor
+from monopoly_engine.game import MonopolyGame
 from monopoly_engine.rules import calculate_rent
 
 
@@ -174,7 +169,9 @@ class TestMovementAndGO:
 
         assert passed_go, "Should have passed GO"
         assert new_pos == 2, f"Expected position 2, got {new_pos}"
-        assert game.state.players[0].money == initial_money + 200, "Should award $200 for passing GO"
+        assert game.state.players[0].money == initial_money + 200, (
+            "Should award $200 for passing GO"
+        )
 
     def test_landing_on_go_awards_200(self) -> None:
         """Test that landing exactly on GO awards $200."""
@@ -188,7 +185,9 @@ class TestMovementAndGO:
 
         assert passed_go, "Should have passed GO (landed on it)"
         assert new_pos == 0, f"Expected position 0 (GO), got {new_pos}"
-        assert game.state.players[0].money == initial_money + 200, "Should award $200 for landing on GO"
+        assert game.state.players[0].money == initial_money + 200, (
+            "Should award $200 for landing on GO"
+        )
 
     def test_not_passing_go_no_money(self) -> None:
         """Test that not passing GO doesn't award money."""
@@ -257,7 +256,9 @@ class TestBuildingRules:
         valid, msg = action.validate(game)
 
         assert not valid, "Should not be able to build when no houses available"
-        assert "no houses" in msg.lower() or "shortage" in msg.lower(), f"Error should mention shortage, got: {msg}"
+        assert "no houses" in msg.lower() or "shortage" in msg.lower(), (
+            f"Error should mention shortage, got: {msg}"
+        )
 
     def test_hotel_limit_12(self) -> None:
         """Test that hotel limit is 12."""
@@ -278,7 +279,9 @@ class TestBuildingRules:
         valid, msg = action.validate(game)
 
         assert not valid, "Should not be able to build hotel when none available"
-        assert "no hotels" in msg.lower() or "shortage" in msg.lower(), f"Error should mention shortage, got: {msg}"
+        assert "no hotels" in msg.lower() or "shortage" in msg.lower(), (
+            f"Error should mention shortage, got: {msg}"
+        )
 
     def test_hotel_returns_4_houses(self) -> None:
         """Test that building hotel returns 4 houses to bank."""
@@ -297,7 +300,9 @@ class TestBuildingRules:
         action.execute(game)
 
         # Should have returned 4 houses to bank
-        assert game.state.houses_remaining == initial_houses + 4, "Building hotel should return 4 houses"
+        assert game.state.houses_remaining == initial_houses + 4, (
+            "Building hotel should return 4 houses"
+        )
         assert game.state.property_manager.properties[1].houses == 5, "Hotel should be houses=5"
 
 
@@ -321,8 +326,6 @@ class TestMortgaging:
 
     def test_mortgage_gives_50_percent(self) -> None:
         """Test that mortgaging gives 50% of purchase price."""
-        game = MonopolyGame(num_players=2, seed=42)
-
         # Mediterranean costs $60, mortgage value should be $30
         from monopoly_engine.rules import get_mortgage_value
 
@@ -414,9 +417,15 @@ class TestBankruptcy:
         game.handle_bankruptcy(player_id=0, creditor_id=None)
 
         # Properties should be back to unowned
-        assert game.state.property_manager.properties[1].owner is None, "Property should return to bank"
-        assert game.state.property_manager.properties[3].owner is None, "Property should return to bank"
-        assert not game.state.property_manager.properties[1].mortgaged, "Property should be unmortgaged"
+        assert game.state.property_manager.properties[1].owner is None, (
+            "Property should return to bank"
+        )
+        assert game.state.property_manager.properties[3].owner is None, (
+            "Property should return to bank"
+        )
+        assert not game.state.property_manager.properties[1].mortgaged, (
+            "Property should be unmortgaged"
+        )
         assert game.state.players[0].bankrupt, "Player should be marked bankrupt"
 
     def test_bankruptcy_to_player_transfers_assets(self) -> None:
@@ -432,8 +441,12 @@ class TestBankruptcy:
         game.handle_bankruptcy(player_id=0, creditor_id=1)
 
         # Player 1 should receive properties and money
-        assert game.state.property_manager.properties[1].owner == 1, "Property should transfer to creditor"
-        assert game.state.property_manager.properties[3].owner == 1, "Property should transfer to creditor"
+        assert game.state.property_manager.properties[1].owner == 1, (
+            "Property should transfer to creditor"
+        )
+        assert game.state.property_manager.properties[3].owner == 1, (
+            "Property should transfer to creditor"
+        )
         assert game.state.players[1].money == 1600, "Creditor should receive money (1500 + 100)"
         assert game.state.players[0].bankrupt, "Player should be marked bankrupt"
 

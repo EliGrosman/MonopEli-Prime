@@ -21,6 +21,7 @@ from monopoly_engine.types import TradeOfferData
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_game() -> MonopolyGame:
     """Create a game with property ownership for trade tests."""
     game = MonopolyGame(num_players=3, seed=42)
@@ -83,6 +84,7 @@ class _FakeLLMClient:
 # HybridAgentConfig
 # ---------------------------------------------------------------------------
 
+
 class TestHybridAgentConfig:
     def test_default_config(self) -> None:
         config = HybridAgentConfig()
@@ -109,6 +111,7 @@ class TestHybridAgentConfig:
 # HybridAgent.__init__
 # ---------------------------------------------------------------------------
 
+
 class TestHybridAgentInit:
     def test_default_init(self) -> None:
         client = _FakeLLMClient()
@@ -127,7 +130,9 @@ class TestHybridAgentInit:
         mgr = NegotiationManager(max_rounds=5)
         client = _FakeLLMClient()
         agent = HybridAgent(
-            player_id=0, negotiation_manager=mgr, llm_client=client,
+            player_id=0,
+            negotiation_manager=mgr,
+            llm_client=client,
         )
         assert agent.negotiation_manager is mgr
 
@@ -140,6 +145,7 @@ class TestHybridAgentInit:
 # ---------------------------------------------------------------------------
 # choose_action (delegates to MCTSAgent)
 # ---------------------------------------------------------------------------
+
 
 class TestChooseAction:
     def test_delegates_to_mcts_agent(self) -> None:
@@ -188,6 +194,7 @@ class TestChooseAction:
 # _should_attempt_trade
 # ---------------------------------------------------------------------------
 
+
 class TestShouldAttemptTrade:
     def test_respects_budget(self) -> None:
         budget = TokenBudget(max_calls_per_game=0)
@@ -232,6 +239,7 @@ class TestShouldAttemptTrade:
 # ---------------------------------------------------------------------------
 # C3: Trade timing heuristics
 # ---------------------------------------------------------------------------
+
 
 class TestMonopolyGap:
     """Tests for _has_monopoly_gap heuristic."""
@@ -473,10 +481,9 @@ class TestTimingIntegration:
 # _generate_and_verify_trade
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateAndVerifyTrade:
-    @pytest.mark.xfail(
-        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
-    )
+    @pytest.mark.xfail(reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1")
     def test_successful_trade_proposal(self) -> None:
         """LLM generates, MCTS approves, NegotiationManager executes."""
         client = _FakeLLMClient()
@@ -485,20 +492,28 @@ class TestGenerateAndVerifyTrade:
 
         # Mock the generator to return a proposal
         proposal = ProposeTrade(
-            player_id=0, to_player=1,
-            give_properties=[9], want_money=100,
+            player_id=0,
+            to_player=1,
+            give_properties=[9],
+            want_money=100,
         )
         agent._generator.generate_proposal = MagicMock(return_value=proposal)
 
         # Mock the verifier to approve
         eval_result = TradeEvaluation(
             trade=TradeOfferData(
-                from_player=0, to_player=1,
-                give_properties=[9], give_money=0,
-                want_properties=[], want_money=100,
+                from_player=0,
+                to_player=1,
+                give_properties=[9],
+                give_money=0,
+                want_properties=[],
+                want_money=100,
             ),
-            value_before=0.3, value_after=0.4,
-            value_delta=0.1, recommended=True, simulations_used=50,
+            value_before=0.3,
+            value_after=0.4,
+            value_delta=0.1,
+            recommended=True,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -525,19 +540,27 @@ class TestGenerateAndVerifyTrade:
         game = _make_game()
 
         proposal = ProposeTrade(
-            player_id=0, to_player=1,
-            give_properties=[1, 3], want_money=0,
+            player_id=0,
+            to_player=1,
+            give_properties=[1, 3],
+            want_money=0,
         )
         agent._generator.generate_proposal = MagicMock(return_value=proposal)
 
         eval_result = TradeEvaluation(
             trade=TradeOfferData(
-                from_player=0, to_player=1,
-                give_properties=[1, 3], give_money=0,
-                want_properties=[], want_money=0,
+                from_player=0,
+                to_player=1,
+                give_properties=[1, 3],
+                give_money=0,
+                want_properties=[],
+                want_money=0,
             ),
-            value_before=0.4, value_after=0.2,
-            value_delta=-0.2, recommended=False, simulations_used=50,
+            value_before=0.4,
+            value_after=0.2,
+            value_delta=-0.2,
+            recommended=False,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -552,19 +575,27 @@ class TestGenerateAndVerifyTrade:
         game = _make_game()
 
         proposal = ProposeTrade(
-            player_id=0, to_player=1,
-            give_properties=[9], want_money=100,
+            player_id=0,
+            to_player=1,
+            give_properties=[9],
+            want_money=100,
         )
         agent._generator.generate_proposal = MagicMock(return_value=proposal)
 
         eval_result = TradeEvaluation(
             trade=TradeOfferData(
-                from_player=0, to_player=1,
-                give_properties=[9], give_money=0,
-                want_properties=[], want_money=100,
+                from_player=0,
+                to_player=1,
+                give_properties=[9],
+                give_money=0,
+                want_properties=[],
+                want_money=100,
             ),
-            value_before=0.3, value_after=0.4,
-            value_delta=0.1, recommended=True, simulations_used=50,
+            value_before=0.3,
+            value_after=0.4,
+            value_delta=0.1,
+            recommended=True,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -594,6 +625,7 @@ class TestGenerateAndVerifyTrade:
 # ---------------------------------------------------------------------------
 # _respond_to_negotiation
 # ---------------------------------------------------------------------------
+
 
 class TestRespondToNegotiation:
     def _make_pending_negotiation(
@@ -629,8 +661,11 @@ class TestRespondToNegotiation:
         # Mock MCTS evaluation
         eval_result = TradeEvaluation(
             trade=neg.history[-1],
-            value_before=0.3, value_after=0.45,
-            value_delta=0.15, recommended=True, simulations_used=50,
+            value_before=0.3,
+            value_after=0.45,
+            value_delta=0.15,
+            recommended=True,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -644,7 +679,9 @@ class TestRespondToNegotiation:
 
         agent._respond_to_negotiation(game, neg)
         agent._negotiation_mgr.accept.assert_called_once_with(
-            game, 0, 0,
+            game,
+            0,
+            0,
         )
 
     def test_reject_decision(self) -> None:
@@ -655,8 +692,11 @@ class TestRespondToNegotiation:
 
         eval_result = TradeEvaluation(
             trade=neg.history[-1],
-            value_before=0.4, value_after=0.3,
-            value_delta=-0.1, recommended=False, simulations_used=50,
+            value_before=0.4,
+            value_after=0.3,
+            value_delta=-0.1,
+            recommended=False,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
         agent._responder.respond_to_trade = MagicMock(
@@ -666,7 +706,9 @@ class TestRespondToNegotiation:
 
         agent._respond_to_negotiation(game, neg)
         agent._negotiation_mgr.reject.assert_called_once_with(
-            game, 0, 0,
+            game,
+            0,
+            0,
         )
 
     def test_counter_decision(self) -> None:
@@ -677,8 +719,11 @@ class TestRespondToNegotiation:
 
         eval_result = TradeEvaluation(
             trade=neg.history[-1],
-            value_before=0.3, value_after=0.32,
-            value_delta=0.02, recommended=True, simulations_used=50,
+            value_before=0.3,
+            value_after=0.32,
+            value_delta=0.02,
+            recommended=True,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
         agent._responder.respond_to_trade = MagicMock(
@@ -696,7 +741,9 @@ class TestRespondToNegotiation:
 
         agent._respond_to_negotiation(game, neg)
         agent._negotiation_mgr.counter_propose.assert_called_once_with(
-            game, 0, 0,
+            game,
+            0,
+            0,
             give_properties=[9],
             give_money=0,
             want_properties=[6],
@@ -711,8 +758,11 @@ class TestRespondToNegotiation:
 
         eval_result = TradeEvaluation(
             trade=neg.history[-1],
-            value_before=0.3, value_after=0.3,
-            value_delta=0.0, recommended=False, simulations_used=50,
+            value_before=0.3,
+            value_after=0.3,
+            value_delta=0.0,
+            recommended=False,
+            simulations_used=50,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
         agent._responder.respond_to_trade = MagicMock(
@@ -750,6 +800,7 @@ class TestRespondToNegotiation:
 # reset
 # ---------------------------------------------------------------------------
 
+
 class TestReset:
     def test_resets_all_state(self) -> None:
         client = _FakeLLMClient()
@@ -770,6 +821,7 @@ class TestReset:
 # ---------------------------------------------------------------------------
 # close
 # ---------------------------------------------------------------------------
+
 
 class TestClose:
     def test_closes_owned_client(self) -> None:
@@ -797,6 +849,7 @@ class TestClose:
 # Integration: _handle_trade_phase routing
 # ---------------------------------------------------------------------------
 
+
 class TestHandleTradePhase:
     def test_responds_to_pending_first(self) -> None:
         """Pending negotiations take priority over proposing new trades."""
@@ -805,9 +858,12 @@ class TestHandleTradePhase:
         game = _make_game()
 
         trade: TradeOfferData = {
-            "from_player": 1, "to_player": 0,
-            "give_properties": [6], "give_money": 0,
-            "want_properties": [9], "want_money": 0,
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [6],
+            "give_money": 0,
+            "want_properties": [9],
+            "want_money": 0,
         }
         pending = NegotiationRecord(
             negotiation_id=0,
@@ -868,6 +924,7 @@ class TestHandleTradePhase:
 # C5: Integration Tests — full pipeline with mocked LLM
 # ===========================================================================
 
+
 class _ScriptedLLMClient:
     """LLM client that returns scripted JSON responses in sequence."""
 
@@ -903,16 +960,18 @@ class TestC5Integration:
     def test_mcts_veto_blocks_bad_trade(self) -> None:
         """LLM proposes giving away a monopoly; MCTS rejects it."""
         # LLM proposes: give Brown monopoly [1,3] for nothing
-        client = _ScriptedLLMClient([
-            {
-                "to_player": 1,
-                "give_properties": [1, 3],
-                "give_money": 100,
-                "want_properties": [],
-                "want_money": 0,
-                "reasoning": "generous",
-            },
-        ])
+        client = _ScriptedLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [1, 3],
+                    "give_money": 100,
+                    "want_properties": [],
+                    "want_money": 0,
+                    "reasoning": "generous",
+                },
+            ]
+        )
         config = HybridAgentConfig(
             mcts_simulations=10,
             trade_eval_simulations=0,  # Single simulate() call
@@ -928,12 +987,18 @@ class TestC5Integration:
         # Mock the verifier to say this trade is bad
         bad_eval = TradeEvaluation(
             trade=TradeOfferData(
-                from_player=0, to_player=1,
-                give_properties=[1, 3], give_money=100,
-                want_properties=[], want_money=0,
+                from_player=0,
+                to_player=1,
+                give_properties=[1, 3],
+                give_money=100,
+                want_properties=[],
+                want_money=0,
             ),
-            value_before=0.4, value_after=0.15,
-            value_delta=-0.25, recommended=False, simulations_used=1,
+            value_before=0.4,
+            value_after=0.15,
+            value_delta=-0.25,
+            recommended=False,
+            simulations_used=1,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=bad_eval)
 
@@ -946,16 +1011,18 @@ class TestC5Integration:
 
     def test_mcts_approval_executes_trade(self) -> None:
         """LLM proposes a good trade; MCTS approves; NegotiationManager executes."""
-        client = _ScriptedLLMClient([
-            {
-                "to_player": 1,
-                "give_properties": [9],
-                "give_money": 0,
-                "want_properties": [],
-                "want_money": 200,
-                "reasoning": "get cash for CT",
-            },
-        ])
+        client = _ScriptedLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [9],
+                    "give_money": 0,
+                    "want_properties": [],
+                    "want_money": 200,
+                    "reasoning": "get cash for CT",
+                },
+            ]
+        )
         config = HybridAgentConfig(
             mcts_simulations=10,
             trade_eval_simulations=0,
@@ -972,12 +1039,18 @@ class TestC5Integration:
         # Mock the verifier to approve
         good_eval = TradeEvaluation(
             trade=TradeOfferData(
-                from_player=0, to_player=1,
-                give_properties=[9], give_money=0,
-                want_properties=[], want_money=200,
+                from_player=0,
+                to_player=1,
+                give_properties=[9],
+                give_money=0,
+                want_properties=[],
+                want_money=200,
             ),
-            value_before=0.3, value_after=0.4,
-            value_delta=0.1, recommended=True, simulations_used=1,
+            value_before=0.3,
+            value_after=0.4,
+            value_delta=0.1,
+            recommended=True,
+            simulations_used=1,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=good_eval)
 
@@ -1005,15 +1078,15 @@ class TestC5Integration:
         assert client.call_count == 0
         assert agent.trades_proposed == 0
 
-    @pytest.mark.xfail(
-        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
-    )
+    @pytest.mark.xfail(reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1")
     def test_responds_to_incoming_trade_accept(self) -> None:
         """Full pipeline: incoming trade → MCTS eval → LLM decides accept."""
         # LLM responds with accept
-        client = _ScriptedLLMClient([
-            {"decision": "accept", "reasoning": "good deal"},
-        ])
+        client = _ScriptedLLMClient(
+            [
+                {"decision": "accept", "reasoning": "good deal"},
+            ]
+        )
         config = HybridAgentConfig(
             trade_eval_simulations=0,
             fast_accept_threshold=999.0,  # Disable fast path
@@ -1024,16 +1097,22 @@ class TestC5Integration:
         # Set up a pending trade in the engine
         game.state.current_player = 1
         trade_id = game.propose_trade(
-            from_player=1, to_player=0,
-            give_properties=[6], give_money=0,
-            want_properties=[9], want_money=0,
+            from_player=1,
+            to_player=0,
+            give_properties=[6],
+            give_money=0,
+            want_properties=[9],
+            want_money=0,
         )
 
         # Register it in the negotiation manager
         trade: TradeOfferData = {
-            "from_player": 1, "to_player": 0,
-            "give_properties": [6], "give_money": 0,
-            "want_properties": [9], "want_money": 0,
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [6],
+            "give_money": 0,
+            "want_properties": [9],
+            "want_money": 0,
         }
         neg = NegotiationRecord(
             negotiation_id=0,
@@ -1052,8 +1131,11 @@ class TestC5Integration:
         # Mock MCTS to return neutral values (not triggering fast path)
         eval_result = TradeEvaluation(
             trade=trade,
-            value_before=0.33, value_after=0.35,
-            value_delta=0.02, recommended=True, simulations_used=1,
+            value_before=0.33,
+            value_after=0.35,
+            value_delta=0.02,
+            recommended=True,
+            simulations_used=1,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -1062,9 +1144,7 @@ class TestC5Integration:
         # Negotiation should be accepted
         assert neg.status == NegotiationStatus.ACCEPTED
 
-    @pytest.mark.xfail(
-        reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1"
-    )
+    @pytest.mark.xfail(reason="Hybrid/LLM trading integration is deferred from foundation-trade-v1")
     def test_fast_path_accept_skips_llm(self) -> None:
         """When MCTS value improvement exceeds fast_accept_threshold, skip LLM."""
         client = _ScriptedLLMClient([])  # No responses needed
@@ -1078,15 +1158,21 @@ class TestC5Integration:
         # Set up pending trade
         game.state.current_player = 1
         trade_id = game.propose_trade(
-            from_player=1, to_player=0,
-            give_properties=[6], give_money=50,
-            want_properties=[], want_money=0,
+            from_player=1,
+            to_player=0,
+            give_properties=[6],
+            give_money=50,
+            want_properties=[],
+            want_money=0,
         )
 
         trade: TradeOfferData = {
-            "from_player": 1, "to_player": 0,
-            "give_properties": [6], "give_money": 50,
-            "want_properties": [], "want_money": 0,
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [6],
+            "give_money": 50,
+            "want_properties": [],
+            "want_money": 0,
         }
         neg = NegotiationRecord(
             negotiation_id=0,
@@ -1105,8 +1191,11 @@ class TestC5Integration:
         # MCTS shows big improvement → fast path accept
         eval_result = TradeEvaluation(
             trade=trade,
-            value_before=0.25, value_after=0.40,
-            value_delta=0.15, recommended=True, simulations_used=1,
+            value_before=0.25,
+            value_after=0.40,
+            value_delta=0.15,
+            recommended=True,
+            simulations_used=1,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -1125,19 +1214,21 @@ class TestC5Integration:
     )
     def test_counter_proposal_flow(self) -> None:
         """LLM suggests a counter-proposal; NegotiationManager executes it."""
-        client = _ScriptedLLMClient([
-            {
-                "decision": "counter",
-                "reasoning": "want more cash",
-                "counter_proposal": {
-                    "to_player": 1,
-                    "give_properties": [9],
-                    "give_money": 0,
-                    "want_properties": [6],
-                    "want_money": 100,
+        client = _ScriptedLLMClient(
+            [
+                {
+                    "decision": "counter",
+                    "reasoning": "want more cash",
+                    "counter_proposal": {
+                        "to_player": 1,
+                        "give_properties": [9],
+                        "give_money": 0,
+                        "want_properties": [6],
+                        "want_money": 100,
+                    },
                 },
-            },
-        ])
+            ]
+        )
         config = HybridAgentConfig(
             trade_eval_simulations=0,
             fast_accept_threshold=999.0,  # Disable fast path
@@ -1148,15 +1239,21 @@ class TestC5Integration:
         # Set up pending trade from Player 1
         game.state.current_player = 1
         trade_id = game.propose_trade(
-            from_player=1, to_player=0,
-            give_properties=[6], give_money=0,
-            want_properties=[9], want_money=0,
+            from_player=1,
+            to_player=0,
+            give_properties=[6],
+            give_money=0,
+            want_properties=[9],
+            want_money=0,
         )
 
         trade: TradeOfferData = {
-            "from_player": 1, "to_player": 0,
-            "give_properties": [6], "give_money": 0,
-            "want_properties": [9], "want_money": 0,
+            "from_player": 1,
+            "to_player": 0,
+            "give_properties": [6],
+            "give_money": 0,
+            "want_properties": [9],
+            "want_money": 0,
         }
         neg = NegotiationRecord(
             negotiation_id=0,
@@ -1174,8 +1271,11 @@ class TestC5Integration:
 
         eval_result = TradeEvaluation(
             trade=trade,
-            value_before=0.33, value_after=0.34,
-            value_delta=0.01, recommended=False, simulations_used=1,
+            value_before=0.33,
+            value_after=0.34,
+            value_delta=0.01,
+            recommended=False,
+            simulations_used=1,
         )
         agent._verifier.evaluate_trade = MagicMock(return_value=eval_result)
 
@@ -1194,9 +1294,11 @@ class TestC5Integration:
     def test_trade_timing_monopoly_gap_integration(self) -> None:
         """Full pipeline: monopoly gap triggers trade attempt."""
         # LLM returns no_trade (the timing triggers but LLM doesn't find a deal)
-        client = _ScriptedLLMClient([
-            {"no_trade": True, "reasoning": "no good trades"},
-        ])
+        client = _ScriptedLLMClient(
+            [
+                {"no_trade": True, "reasoning": "no good trades"},
+            ]
+        )
         config = HybridAgentConfig(
             mcts_simulations=10,
             trade_eval_simulations=0,

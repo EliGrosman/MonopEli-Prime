@@ -9,10 +9,11 @@ This module contains comprehensive tests for:
 """
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from monopoly_engine import MonopolyGame, calculate_net_worth
-from monopoly_engine.types import PropertyColor, PROPERTY_GROUPS
+from monopoly_engine.types import PROPERTY_GROUPS, PropertyColor
 from monopoly_gym.rewards import (
     RewardConfig,
     RewardTracker,
@@ -20,7 +21,6 @@ from monopoly_gym.rewards import (
     calculate_sparse_reward,
     count_monopolies,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -221,9 +221,7 @@ class TestCalculateSparseReward:
         reward = calculate_sparse_reward(game, player_id=0)
         assert reward == 0.0
 
-    def test_returns_zero_for_all_players_during_game(
-        self, game_4_players: MonopolyGame
-    ) -> None:
+    def test_returns_zero_for_all_players_during_game(self, game_4_players: MonopolyGame) -> None:
         """Test returns 0 for all players when game is active."""
         for player_id in range(4):
             reward = calculate_sparse_reward(game_4_players, player_id=player_id)
@@ -247,9 +245,7 @@ class TestCalculateSparseReward:
         self, game_over_with_winner: MonopolyGame, custom_config: RewardConfig
     ) -> None:
         """Test with custom config for winner."""
-        reward = calculate_sparse_reward(
-            game_over_with_winner, player_id=0, config=custom_config
-        )
+        reward = calculate_sparse_reward(game_over_with_winner, player_id=0, config=custom_config)
         assert reward == custom_config.win_reward
         assert reward == 10.0
 
@@ -257,24 +253,16 @@ class TestCalculateSparseReward:
         self, game_over_with_winner: MonopolyGame, custom_config: RewardConfig
     ) -> None:
         """Test with custom config for loser."""
-        reward = calculate_sparse_reward(
-            game_over_with_winner, player_id=1, config=custom_config
-        )
+        reward = calculate_sparse_reward(game_over_with_winner, player_id=1, config=custom_config)
         assert reward == custom_config.loss_reward
         assert reward == -5.0
 
-    def test_with_none_config_uses_defaults(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_with_none_config_uses_defaults(self, game_over_with_winner: MonopolyGame) -> None:
         """Test that None config uses default values."""
-        reward = calculate_sparse_reward(
-            game_over_with_winner, player_id=0, config=None
-        )
+        reward = calculate_sparse_reward(game_over_with_winner, player_id=0, config=None)
         assert reward == 1.0  # Default win_reward
 
-    def test_returns_loss_for_bankrupt_player(
-        self, game_over_player_lost: MonopolyGame
-    ) -> None:
+    def test_returns_loss_for_bankrupt_player(self, game_over_player_lost: MonopolyGame) -> None:
         """Test returns loss_reward for bankrupt player."""
         reward = calculate_sparse_reward(game_over_player_lost, player_id=0)
         assert reward == -1.0
@@ -301,14 +289,10 @@ class TestCalculateDenseReward:
 
     def test_current_net_worth_is_int(self, game: MonopolyGame) -> None:
         """Test that current_net_worth is an int."""
-        _, current_worth = calculate_dense_reward(
-            game, player_id=0, prev_net_worth=1500
-        )
+        _, current_worth = calculate_dense_reward(game, player_id=0, prev_net_worth=1500)
         assert isinstance(current_worth, int)
 
-    def test_reward_scales_with_positive_net_worth_change(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_reward_scales_with_positive_net_worth_change(self, game: MonopolyGame) -> None:
         """Test reward scales positively with net worth increase."""
         # Give player some property to increase net worth
         game.transfer_property(1, None, 0)  # Mediterranean Ave (cost 60)
@@ -320,9 +304,7 @@ class TestCalculateDenseReward:
         assert current > 1500
         assert reward > 0
 
-    def test_reward_scales_with_negative_net_worth_change(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_reward_scales_with_negative_net_worth_change(self, game: MonopolyGame) -> None:
         """Test reward scales negatively with net worth decrease."""
         # Reduce player money
         game.players[0].money = 1000
@@ -334,9 +316,7 @@ class TestCalculateDenseReward:
         assert current < 1500
         assert reward < 0
 
-    def test_win_bonus_at_game_end(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_win_bonus_at_game_end(self, game_over_with_winner: MonopolyGame) -> None:
         """Test win bonus is added at game end."""
         config = RewardConfig()
         reward, _ = calculate_dense_reward(
@@ -348,9 +328,7 @@ class TestCalculateDenseReward:
         # Winner gets win_reward * 10 bonus
         assert reward >= config.win_reward * 10
 
-    def test_loss_penalty_at_game_end(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_loss_penalty_at_game_end(self, game_over_with_winner: MonopolyGame) -> None:
         """Test loss penalty is added at game end."""
         config = RewardConfig()
         prev_worth = 0  # Simulate bankrupt player
@@ -370,9 +348,7 @@ class TestCalculateDenseReward:
         game.players[0].money = 0
 
         config = RewardConfig()
-        reward, _ = calculate_dense_reward(
-            game, player_id=0, prev_net_worth=0, config=config
-        )
+        reward, _ = calculate_dense_reward(game, player_id=0, prev_net_worth=0, config=config)
 
         # Should include bankruptcy penalty
         assert reward <= config.bankruptcy_penalty
@@ -384,9 +360,7 @@ class TestCalculateDenseReward:
         # Give player property to increase net worth
         game.transfer_property(1, None, 0)
 
-        default_reward, _ = calculate_dense_reward(
-            game, player_id=0, prev_net_worth=1500
-        )
+        default_reward, _ = calculate_dense_reward(game, player_id=0, prev_net_worth=1500)
         custom_reward, _ = calculate_dense_reward(
             game, player_id=0, prev_net_worth=1500, config=custom
         )
@@ -398,9 +372,7 @@ class TestCalculateDenseReward:
 
     def test_with_none_config_uses_defaults(self, game: MonopolyGame) -> None:
         """Test that None config uses default values."""
-        reward, _ = calculate_dense_reward(
-            game, player_id=0, prev_net_worth=1500, config=None
-        )
+        reward, _ = calculate_dense_reward(game, player_id=0, prev_net_worth=1500, config=None)
         # Should work without error
         assert isinstance(reward, float)
 
@@ -430,30 +402,22 @@ class TestCountMonopolies:
         count = count_monopolies(game, player_id=0)
         assert count == 0
 
-    def test_counts_single_monopoly(
-        self, game_with_brown_monopoly: MonopolyGame
-    ) -> None:
+    def test_counts_single_monopoly(self, game_with_brown_monopoly: MonopolyGame) -> None:
         """Test counts single monopoly correctly."""
         count = count_monopolies(game_with_brown_monopoly, player_id=0)
         assert count == 1
 
-    def test_counts_multiple_monopolies(
-        self, game_with_multiple_monopolies: MonopolyGame
-    ) -> None:
+    def test_counts_multiple_monopolies(self, game_with_multiple_monopolies: MonopolyGame) -> None:
         """Test counts multiple monopolies correctly."""
         count = count_monopolies(game_with_multiple_monopolies, player_id=0)
         assert count == 2  # Brown and Light Blue
 
-    def test_excludes_railroad_monopoly(
-        self, game_with_railroads: MonopolyGame
-    ) -> None:
+    def test_excludes_railroad_monopoly(self, game_with_railroads: MonopolyGame) -> None:
         """Test does not count railroad 'monopoly'."""
         count = count_monopolies(game_with_railroads, player_id=0)
         assert count == 0
 
-    def test_excludes_utility_monopoly(
-        self, game_with_utilities: MonopolyGame
-    ) -> None:
+    def test_excludes_utility_monopoly(self, game_with_utilities: MonopolyGame) -> None:
         """Test does not count utility 'monopoly'."""
         count = count_monopolies(game_with_utilities, player_id=0)
         assert count == 0
@@ -567,16 +531,12 @@ class TestRewardTracker:
         reward = tracker.calculate_reward(game, player_id=0, reward_type="sparse")
         assert reward == 0.0  # Game not over
 
-    def test_calculate_reward_sparse_mode_win(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_calculate_reward_sparse_mode_win(self, game_over_with_winner: MonopolyGame) -> None:
         """Test calculate_reward in sparse mode when winning."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game_over_with_winner)
 
-        reward = tracker.calculate_reward(
-            game_over_with_winner, player_id=0, reward_type="sparse"
-        )
+        reward = tracker.calculate_reward(game_over_with_winner, player_id=0, reward_type="sparse")
         assert reward == 1.0
 
     def test_calculate_reward_dense_mode(self, game: MonopolyGame) -> None:
@@ -587,9 +547,7 @@ class TestRewardTracker:
         reward = tracker.calculate_reward(game, player_id=0, reward_type="dense")
         assert isinstance(reward, float)
 
-    def test_calculate_reward_dense_mode_tracks_net_worth(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_calculate_reward_dense_mode_tracks_net_worth(self, game: MonopolyGame) -> None:
         """Test dense mode updates tracked net worth."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game)
@@ -604,9 +562,7 @@ class TestRewardTracker:
         # Net worth should have been updated
         assert tracker._prev_net_worth[0] != initial_worth
 
-    def test_monopoly_bonus_when_completing_monopoly(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_monopoly_bonus_when_completing_monopoly(self, game: MonopolyGame) -> None:
         """Test monopoly bonus is given when completing a monopoly."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game)
@@ -645,22 +601,16 @@ class TestRewardTracker:
 
         assert second_worth != first_worth
 
-    def test_with_custom_config_affects_rewards(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_with_custom_config_affects_rewards(self, game_over_with_winner: MonopolyGame) -> None:
         """Test custom config affects calculated rewards."""
         config = RewardConfig(win_reward=100.0)
         tracker = RewardTracker(num_players=2, config=config)
         tracker.reset(game_over_with_winner)
 
-        reward = tracker.calculate_reward(
-            game_over_with_winner, player_id=0, reward_type="sparse"
-        )
+        reward = tracker.calculate_reward(game_over_with_winner, player_id=0, reward_type="sparse")
         assert reward == 100.0
 
-    def test_invalid_reward_type_raises_valueerror(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_invalid_reward_type_raises_valueerror(self, game: MonopolyGame) -> None:
         """Test invalid reward_type raises ValueError."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game)
@@ -677,9 +627,7 @@ class TestRewardTracker:
             tracker.calculate_reward(game, player_id=0, reward_type="foobar")
         assert "foobar" in str(exc_info.value)
 
-    def test_dense_reward_uses_default_prev_net_worth(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_dense_reward_uses_default_prev_net_worth(self, game: MonopolyGame) -> None:
         """Test dense reward uses default if player not in tracking dict."""
         tracker = RewardTracker(num_players=2)
         # Don't call reset, so _prev_net_worth is empty
@@ -725,9 +673,7 @@ class TestRewardIntegration:
         assert isinstance(sparse, float)
         assert isinstance(dense, float)
 
-    def test_reward_tracking_across_multiple_steps(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_reward_tracking_across_multiple_steps(self, game: MonopolyGame) -> None:
         """Test reward tracking across multiple steps."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game)
@@ -744,9 +690,7 @@ class TestRewardIntegration:
         # Subsequent rewards should be positive (increasing money)
         assert all(isinstance(r, float) for r in rewards)
 
-    def test_rewards_are_reasonable_values(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_rewards_are_reasonable_values(self, game: MonopolyGame) -> None:
         """Test rewards are reasonable values (not NaN, inf, etc.)."""
         import math
 
@@ -790,9 +734,7 @@ class TestRewardIntegration:
             reward = tracker.calculate_reward(game, player_id=0, reward_type="sparse")
             assert reward == 0.0
 
-    def test_sparse_reward_nonzero_at_game_end(
-        self, game_over_with_winner: MonopolyGame
-    ) -> None:
+    def test_sparse_reward_nonzero_at_game_end(self, game_over_with_winner: MonopolyGame) -> None:
         """Test sparse reward is nonzero at game end."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game_over_with_winner)
@@ -808,9 +750,7 @@ class TestRewardIntegration:
         assert loser_reward != 0.0
         assert winner_reward > loser_reward
 
-    def test_dense_reward_reflects_property_acquisition(
-        self, game: MonopolyGame
-    ) -> None:
+    def test_dense_reward_reflects_property_acquisition(self, game: MonopolyGame) -> None:
         """Test dense reward reflects property acquisition."""
         tracker = RewardTracker(num_players=2)
         tracker.reset(game)
@@ -854,9 +794,7 @@ class TestRewardConfigHypothesis:
         loss_reward=st.floats(min_value=-100, max_value=100, allow_nan=False),
     )
     @settings(max_examples=50)
-    def test_config_accepts_any_float_values(
-        self, win_reward: float, loss_reward: float
-    ) -> None:
+    def test_config_accepts_any_float_values(self, win_reward: float, loss_reward: float) -> None:
         """Test config accepts any float values."""
         config = RewardConfig(win_reward=win_reward, loss_reward=loss_reward)
         assert config.win_reward == win_reward
@@ -903,9 +841,7 @@ class TestDenseRewardHypothesis:
 
     @given(prev_net_worth=st.integers(min_value=0, max_value=10000))
     @settings(max_examples=30)
-    def test_dense_reward_handles_various_prev_worth(
-        self, prev_net_worth: int
-    ) -> None:
+    def test_dense_reward_handles_various_prev_worth(self, prev_net_worth: int) -> None:
         """Test dense reward handles various previous net worth values."""
         game = MonopolyGame(num_players=2, seed=42)
         reward, current = calculate_dense_reward(game, 0, prev_net_worth)

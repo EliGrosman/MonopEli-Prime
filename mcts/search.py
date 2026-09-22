@@ -15,7 +15,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
 from monopoly_engine.rules import calculate_net_worth
 from monopoly_gym.action_space import ActionEncoder
@@ -98,10 +97,7 @@ class MCTSNode:
 
         parent_visits = self.parent.visit_count if self.parent is not None else 1
         exploration = (
-            exploration_constant
-            * self.prior
-            * math.sqrt(parent_visits)
-            / (1 + self.visit_count)
+            exploration_constant * self.prior * math.sqrt(parent_visits) / (1 + self.visit_count)
         )
 
         return q_value + exploration
@@ -179,9 +175,7 @@ class MCTSConfig:
         return cls(**data)
 
 
-def clone_game_state(
-    game: MonopolyGame, new_seed: int | None = None
-) -> MonopolyGame:
+def clone_game_state(game: MonopolyGame, new_seed: int | None = None) -> MonopolyGame:
     """Clone a game state for MCTS simulation.
 
     Uses game.to_dict() / MonopolyGame.from_dict() for deep copy.
@@ -234,8 +228,7 @@ def _terminal_values(game: MonopolyGame) -> dict[int, float]:
 
     # Truncated or ongoing -- rank by net worth
     net_worths = [
-        calculate_net_worth(game.players[i], game.property_manager)
-        for i in range(num_players)
+        calculate_net_worth(game.players[i], game.property_manager) for i in range(num_players)
     ]
     ranked = list(np.argsort(net_worths))  # ascending: index 0 = worst
     for rank, pid in enumerate(ranked):
@@ -263,8 +256,14 @@ class MCTSSearch:
         config: MCTSConfig,
         value_network: Any | None = None,
     ) -> None:
-        if config.use_value_network or value_network is not None or config.opponent_policy == "network":
-            raise NotImplementedError("Learned MCTS is disconnected; use experimental rollout-only search")
+        if (
+            config.use_value_network
+            or value_network is not None
+            or config.opponent_policy == "network"
+        ):
+            raise NotImplementedError(
+                "Learned MCTS is disconnected; use experimental rollout-only search"
+            )
         self.config = config
         self.value_network = value_network
         self._encoder = ActionEncoder(enable_trades=False)
@@ -306,9 +305,7 @@ class MCTSSearch:
 
         for action_idx in valid_actions:
             child_game = clone_game_state(game)
-            action = self._encoder.decode(
-                int(action_idx), node.player_to_move, child_game
-            )
+            action = self._encoder.decode(int(action_idx), node.player_to_move, child_game)
             child_game.apply_action(action.player_id, action)
 
             # If the action changed the current player (e.g. EndTurn),
@@ -355,10 +352,7 @@ class MCTSSearch:
         if game.game_over:
             return _terminal_values(game)
 
-        if (
-            self.config.use_value_network
-            and self.value_network is not None
-        ):
+        if self.config.use_value_network and self.value_network is not None:
             return self._value_network_evaluate(game, player_id)
 
         return self._random_rollout(game, self.config.max_rollout_depth)
@@ -427,9 +421,7 @@ class MCTSSearch:
         while current is not None:
             current.visit_count += 1
             for player_id, value in values.items():
-                current.total_value[player_id] = (
-                    current.total_value.get(player_id, 0.0) + value
-                )
+                current.total_value[player_id] = current.total_value.get(player_id, 0.0) + value
             current = current.parent
 
     def search(self, game: MonopolyGame, player_id: int) -> dict[int, int]:
@@ -597,9 +589,7 @@ class MCTSSearch:
             return
 
         num_children = len(root.children)
-        noise = np.random.dirichlet(
-            [self.config.dirichlet_alpha] * num_children
-        )
+        noise = np.random.dirichlet([self.config.dirichlet_alpha] * num_children)
 
         eps = self.config.dirichlet_epsilon
         for i, child in enumerate(root.children.values()):

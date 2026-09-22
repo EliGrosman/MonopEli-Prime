@@ -61,10 +61,7 @@ def print_player_status(game: MonopolyGame) -> None:
             status = f"{Colors.GREEN}[ACTIVE]{Colors.ENDC}"
 
         position = game.board.get_space(player.position).name
-        print(
-            f"  {status} {Colors.BOLD}{player.name}{Colors.ENDC}: "
-            f"${player.money} at {position}"
-        )
+        print(f"  {status} {Colors.BOLD}{player.name}{Colors.ENDC}: ${player.money} at {position}")
     print()
 
 
@@ -242,9 +239,7 @@ def run_batch_games(
 
     for i in range(num_games):
         seed = start_seed + i
-        game = run_demo_game(
-            num_players=num_players, seed=seed, max_turns=max_turns, verbose=False
-        )
+        game = run_demo_game(num_players=num_players, seed=seed, max_turns=max_turns, verbose=False)
 
         if game.state.game_over:
             stats["completed_games"] += 1

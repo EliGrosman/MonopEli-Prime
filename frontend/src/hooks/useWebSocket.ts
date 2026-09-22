@@ -7,6 +7,7 @@ import type {
   ConnectionState,
   ClientMessage,
   IdentityMessage,
+  ActionResultMessage,
 } from '@/types';
 
 function getWsBaseUrl(): string {
@@ -46,7 +47,8 @@ interface UseWebSocketReturn {
  * - Automatic connection management
  * - Heartbeat handling
  * - Auto-reconnection on disconnect
- * - Message queue during disconnect
+ * - Non-action message queue during disconnect
+ * - Revision-bound actions after state synchronization
  * - Type-safe message handling
  */
 export function useWebSocket({
@@ -58,7 +60,7 @@ export function useWebSocket({
   autoConnect = true,
 }: UseWebSocketOptions): UseWebSocketReturn {
   const sessionId = useSessionStore((s) => s.sessionId);
-  const { setConnected, updateGameState, setError } = useGameStore();
+  const { setConnected, updateGameState, setError, setPendingRequest } = useGameStore();
 
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -66,6 +68,8 @@ export function useWebSocket({
   const messageQueueRef = useRef<string[]>([]);
   const isManualDisconnectRef = useRef(false);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateReadyRef = useRef(false);
+  const acknowledgedRevisionRef = useRef<number | null>(null);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
 
@@ -97,8 +101,10 @@ export function useWebSocket({
       return;
     }
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.warn('WebSocket already connected');
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
@@ -109,6 +115,10 @@ export function useWebSocket({
     }
 
     isManualDisconnectRef.current = false;
+    stateReadyRef.current = false;
+    acknowledgedRevisionRef.current = null;
+    setConnected(false);
+    setPendingRequest(null);
     setConnectionState('connecting');
 
     const params = new URLSearchParams({
@@ -119,9 +129,9 @@ export function useWebSocket({
     const ws = new WebSocket(`${WS_BASE_URL}/ws/games/${gameId}?${params}`);
 
     ws.onopen = () => {
+      if (wsRef.current !== ws) return;
       console.log('WebSocket connected');
       setConnectionState('connected');
-      setConnected(true);
       reconnectAttemptsRef.current = 0;
 
       // Flush message queue
@@ -136,6 +146,7 @@ export function useWebSocket({
     };
 
     ws.onmessage = (event) => {
+      if (wsRef.current !== ws) return;
       try {
         const message: WSMessage = JSON.parse(event.data);
 
@@ -151,6 +162,38 @@ export function useWebSocket({
           case 'state_update':
             if (message.data) {
               updateGameState(message.data as Parameters<typeof updateGameState>[0]);
+              stateReadyRef.current = true;
+              setConnected(true);
+              const { gameState } = useGameStore.getState();
+              if (
+                acknowledgedRevisionRef.current !== null &&
+                (gameState?.revision ?? -1) >= acknowledgedRevisionRef.current
+              ) {
+                acknowledgedRevisionRef.current = null;
+                setPendingRequest(null);
+              }
+            }
+            break;
+          case 'action_result':
+            if (message.data && typeof message.data === 'object') {
+              const result = message.data as ActionResultMessage['data'];
+              const { gameState, pendingRequestId } = useGameStore.getState();
+              if (pendingRequestId && result.request_id !== pendingRequestId) break;
+              if (pendingRequestId) {
+                // Successful acknowledgement precedes the corresponding state update.
+                // Keep actions disabled until that revision is available for the next request.
+                if (
+                  result.success &&
+                  typeof result.revision === 'number' &&
+                  result.revision > (gameState?.revision ?? -1)
+                ) {
+                  acknowledgedRevisionRef.current = result.revision;
+                } else {
+                  acknowledgedRevisionRef.current = null;
+                  setPendingRequest(null);
+                }
+              }
+              if (!result.success && result.message) setError(result.message);
             }
             break;
           case 'error':
@@ -171,6 +214,11 @@ export function useWebSocket({
     };
 
     ws.onclose = (event) => {
+      if (wsRef.current !== ws) return;
+      wsRef.current = null;
+      stateReadyRef.current = false;
+      acknowledgedRevisionRef.current = null;
+      setPendingRequest(null);
       console.log('WebSocket closed:', event.code, event.reason);
       setConnectionState('disconnected');
       setConnected(false);
@@ -194,6 +242,7 @@ export function useWebSocket({
     };
 
     ws.onerror = (error) => {
+      if (wsRef.current !== ws) return;
       console.error('WebSocket error:', error);
       setError('Connection error');
     };
@@ -206,6 +255,7 @@ export function useWebSocket({
     setConnected,
     updateGameState,
     setError,
+    setPendingRequest,
     onMessage,
     onConnect,
     onDisconnect,
@@ -220,26 +270,63 @@ export function useWebSocket({
 
   const disconnect = useCallback(() => {
     isManualDisconnectRef.current = true;
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User disconnect');
-      wsRef.current = null;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
+    const ws = wsRef.current;
+    wsRef.current = null;
+    ws?.close(1000, 'User disconnect');
+    stateReadyRef.current = false;
+    acknowledgedRevisionRef.current = null;
+    setPendingRequest(null);
     clearHeartbeat();
     setConnectionState('disconnected');
     setConnected(false);
-  }, [clearHeartbeat, setConnected]);
+  }, [clearHeartbeat, setConnected, setPendingRequest]);
 
   const reconnect = useCallback(() => {
     disconnect();
     reconnectAttemptsRef.current = 0;
-    setTimeout(connect, 100);
+    reconnectTimeoutRef.current = setTimeout(connect, 100);
   }, [disconnect, connect]);
 
   const send = useCallback((message: ClientMessage) => {
-    const data = JSON.stringify(message);
+    let outbound = message;
+    const ws = wsRef.current;
+    const { gameState, isConnected, pendingRequestId, setPendingRequest, setError } =
+      useGameStore.getState();
+    if (message.type === 'action') {
+      // Never queue game decisions: reconnect must first supply fresh state.
+      if (!isConnected || !stateReadyRef.current || ws?.readyState !== WebSocket.OPEN) return;
+      if (gameState?.rules_id === 'foundation-trade-v1') {
+        if (pendingRequestId) return;
+        const requestId = message.data.request_id ?? crypto.randomUUID();
+        outbound = {
+          ...message,
+          data: {
+            ...message.data,
+            contract_version: message.data.contract_version ?? 'decision-contract-v1',
+            expected_revision: message.data.expected_revision ?? gameState.revision,
+            request_id: requestId,
+          },
+        };
+        setPendingRequest(requestId);
+      }
+      setError(null);
+    }
+    const data = JSON.stringify(outbound);
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(data);
+    if (ws?.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(data);
+      } catch (error) {
+        if (message.type === 'action') {
+          acknowledgedRevisionRef.current = null;
+          setPendingRequest(null);
+        }
+        setError(error instanceof Error ? error.message : 'Failed to send message');
+      }
     } else {
       // Queue message for when connection is restored
       messageQueueRef.current.push(data);

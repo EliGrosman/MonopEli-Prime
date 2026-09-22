@@ -19,6 +19,7 @@ from mcts.llm.prompts import (
 # System prompt
 # ---------------------------------------------------------------------------
 
+
 class TestSystemPrompt:
     def test_mentions_monopoly(self) -> None:
         assert "Monopoly" in SYSTEM_PROMPT
@@ -38,6 +39,7 @@ class TestSystemPrompt:
 # ---------------------------------------------------------------------------
 # Template strings
 # ---------------------------------------------------------------------------
+
 
 class TestTemplates:
     def test_propose_template_has_placeholders(self) -> None:
@@ -71,6 +73,7 @@ class TestTemplates:
 # JSON schemas
 # ---------------------------------------------------------------------------
 
+
 class TestSchemas:
     def test_propose_schema_structure(self) -> None:
         assert PROPOSE_TRADE_SCHEMA["type"] == "object"
@@ -88,6 +91,7 @@ class TestSchemas:
 # ---------------------------------------------------------------------------
 # Builder functions
 # ---------------------------------------------------------------------------
+
 
 class TestBuildPropose:
     def test_includes_game_state(self) -> None:

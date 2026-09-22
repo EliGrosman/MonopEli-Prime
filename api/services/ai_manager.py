@@ -29,6 +29,12 @@ AI_TYPES: dict[str, type[Agent]] = {
     "aggressive": AggressiveAgent,
     "conservative": ConservativeAgent,
 }
+TRADING_AI_TYPES = {
+    "trading_random": RandomAgent,
+    "trading_rule_based": RuleBasedAgent,
+    "trading_aggressive": AggressiveAgent,
+    "trading_conservative": ConservativeAgent,
+}
 
 
 class AIManager:
@@ -54,7 +60,6 @@ class AIManager:
         )
         # (game_id, player_id) -> Agent instance
         self._agents: dict[tuple[str, int], Agent] = {}
-        self._encoder = ActionEncoder()
         self._guards: dict[str, ProgressGuard] = {}
         self._processing: set[str] = set()  # Games currently being processed
 
@@ -78,15 +83,22 @@ class AIManager:
         Raises:
             ValueError: If ai_type is not recognized
         """
-        agent_cls = AI_TYPES.get(ai_type)
+        agent_cls = AI_TYPES.get(ai_type) or TRADING_AI_TYPES.get(ai_type)
         if agent_cls is None:
-            raise ValueError(f"Unknown AI type: {ai_type}. Valid types: {list(AI_TYPES.keys())}")
+            valid = list(AI_TYPES) + list(TRADING_AI_TYPES)
+            raise ValueError(f"Unknown AI type: {ai_type}. Valid types: {valid}")
 
         agent = (
             agent_cls(player_id=player_id, seed=seed)
             if agent_cls is RandomAgent
             else agent_cls(player_id=player_id)
         )
+        if ai_type in TRADING_AI_TYPES:
+            from agents.trading_agent import TradingAgent
+
+            wrapped = TradingAgent(agent, response="mutual")
+            self._agents[(game_id, player_id)] = wrapped
+            return wrapped
         self._agents[(game_id, player_id)] = agent
         return agent
 
@@ -188,25 +200,28 @@ class AIManager:
                 await asyncio.sleep(self.think_delay_ms / 1000)
 
             # Get valid actions mask
-            mask = self._encoder.get_action_mask(game, player_id)
+            encoder = ActionEncoder(rules_id=game.rules_id)
+            mask = encoder.get_action_mask(game, player_id)
 
             # Check if any actions are available
             if not mask.any():
                 raise RuntimeError("Live AI decision has no legal actions")
             self._guards.setdefault(game_id, ProgressGuard()).check(game)
 
-            # Get observation (simplified dict for agents)
-            observation = self._get_observation(game, player_id)
-
             # Let agent choose action
-            action_idx = agent.choose_action(
-                observation=observation,
-                action_mask=mask,
-                game=game,
-            )
+            revision = game.state.revision
+            if game.state.phase == "trade_response" and not hasattr(agent, "choose_native_action"):
+                from monopoly_engine import RejectTrade
 
-            action = self._encoder.decode(action_idx, player_id, game)
-            success, message = await game_manager.execute_action(game_id, action)
+                trade_id = next(iter(game.state.pending_trades))
+                action = RejectTrade(player_id, trade_id)
+            elif hasattr(agent, "choose_native_action"):
+                action = agent.choose_native_action(game, encoder)
+            else:
+                action = agent.choose_decision(game.decision_view(player_id))
+            success, message = await game_manager.execute_action(
+                game_id, action, expected_revision=revision
+            )
             actions_taken += 1
             if not success:
                 raise RuntimeError(f"AI action failed: {message}")
@@ -304,6 +319,10 @@ class AIManager:
         for type_name, agent_cls in AI_TYPES.items():
             if isinstance(agent, agent_cls):
                 return type_name
+        if hasattr(agent, "base"):
+            for type_name, agent_cls in TRADING_AI_TYPES.items():
+                if isinstance(agent.base, agent_cls):
+                    return type_name
 
         return "unknown"
 

@@ -16,6 +16,7 @@ from monopoly_engine.types import TradeOfferData
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeLLMClient(LLMClient):
     """LLMClient that returns predetermined JSON dicts from complete_json."""
 
@@ -76,6 +77,7 @@ def _make_trade() -> TradeOfferData:
 # _format_impact
 # ---------------------------------------------------------------------------
 
+
 class TestFormatImpact:
     def test_basic_format(self) -> None:
         impact: dict[str, Any] = {
@@ -122,6 +124,7 @@ class TestFormatImpact:
 # Fast path
 # ---------------------------------------------------------------------------
 
+
 class TestFastPath:
     def test_fast_accept(self) -> None:
         client = _FakeLLMClient([{}])
@@ -155,6 +158,7 @@ class TestFastPath:
 # respond_to_trade
 # ---------------------------------------------------------------------------
 
+
 class TestRespondToTrade:
     def test_fast_path_skips_llm(self) -> None:
         client = _FakeLLMClient([{"should": "not be called"}])
@@ -163,18 +167,25 @@ class TestRespondToTrade:
         trade = _make_trade()
 
         result = responder.respond_to_trade(
-            game, player_id=0, trade=trade,
-            mcts_value_before=0.30, mcts_value_after=0.50,
+            game,
+            player_id=0,
+            trade=trade,
+            mcts_value_before=0.30,
+            mcts_value_after=0.50,
         )
         assert result["decision"] == "accept"
         assert "0.20" in result["reasoning"]
         assert client._call_count == 0  # LLM not called
 
     def test_llm_accept(self) -> None:
-        client = _FakeLLMClient([{
-            "decision": "accept",
-            "reasoning": "Good trade for me",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "decision": "accept",
+                    "reasoning": "Good trade for me",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -184,10 +195,14 @@ class TestRespondToTrade:
         assert client._call_count == 1
 
     def test_llm_reject(self) -> None:
-        client = _FakeLLMClient([{
-            "decision": "reject",
-            "reasoning": "Bad deal",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "decision": "reject",
+                    "reasoning": "Bad deal",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -197,16 +212,20 @@ class TestRespondToTrade:
         assert result["reasoning"] == "Bad deal"
 
     def test_llm_counter_with_proposal(self) -> None:
-        client = _FakeLLMClient([{
-            "decision": "counter",
-            "reasoning": "I want more",
-            "counter_proposal": {
-                "give_properties": [9],
-                "give_money": 0,
-                "want_properties": [6],
-                "want_money": 100,
-            },
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "decision": "counter",
+                    "reasoning": "I want more",
+                    "counter_proposal": {
+                        "give_properties": [9],
+                        "give_money": 0,
+                        "want_properties": [6],
+                        "want_money": 100,
+                    },
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -219,10 +238,14 @@ class TestRespondToTrade:
         assert cp["give_properties"] == [9]
 
     def test_llm_error_defaults_to_reject(self) -> None:
-        client = _FakeLLMClient([{
-            "error": "Failed to parse JSON",
-            "raw": "garbage",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "error": "Failed to parse JSON",
+                    "raw": "garbage",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -231,10 +254,14 @@ class TestRespondToTrade:
         assert result["decision"] == "reject"
 
     def test_invalid_decision_defaults_to_reject(self) -> None:
-        client = _FakeLLMClient([{
-            "decision": "maybe",
-            "reasoning": "I'm not sure",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "decision": "maybe",
+                    "reasoning": "I'm not sure",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -243,10 +270,14 @@ class TestRespondToTrade:
         assert result["decision"] == "reject"
 
     def test_counter_without_proposal_still_works(self) -> None:
-        client = _FakeLLMClient([{
-            "decision": "counter",
-            "reasoning": "I want more but didn't say what",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "decision": "counter",
+                    "reasoning": "I want more but didn't say what",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
@@ -260,25 +291,32 @@ class TestRespondToTrade:
 # generate_counter
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateCounter:
     def test_counter_response(self) -> None:
-        client = _FakeLLMClient([{
-            "action": "counter",
-            "reasoning": "Modified offer",
-            "counter_proposal": {
-                "to_player": 1,
-                "give_properties": [9],
-                "give_money": 50,
-                "want_properties": [6, 8],
-                "want_money": 0,
-            },
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "action": "counter",
+                    "reasoning": "Modified offer",
+                    "counter_proposal": {
+                        "to_player": 1,
+                        "give_properties": [9],
+                        "give_money": 50,
+                        "want_properties": [6, 8],
+                        "want_money": 0,
+                    },
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
 
         result = responder.generate_counter(
-            game, player_id=0, previous_trade=trade,
+            game,
+            player_id=0,
+            previous_trade=trade,
             rejection_reason="Not enough value",
         )
         assert result["action"] == "counter"
@@ -288,46 +326,64 @@ class TestGenerateCounter:
         assert cp["want_properties"] == [6, 8]
 
     def test_stop_response(self) -> None:
-        client = _FakeLLMClient([{
-            "action": "stop",
-            "reasoning": "No good counter available",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "action": "stop",
+                    "reasoning": "No good counter available",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
 
         result = responder.generate_counter(
-            game, player_id=0, previous_trade=trade,
+            game,
+            player_id=0,
+            previous_trade=trade,
             rejection_reason="Bad deal",
         )
         assert result["action"] == "stop"
         assert "counter_proposal" not in result
 
     def test_error_defaults_to_stop(self) -> None:
-        client = _FakeLLMClient([{
-            "error": "Failed to parse JSON",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "error": "Failed to parse JSON",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
 
         result = responder.generate_counter(
-            game, player_id=0, previous_trade=trade,
+            game,
+            player_id=0,
+            previous_trade=trade,
             rejection_reason="Nope",
         )
         assert result["action"] == "stop"
 
     def test_invalid_action_defaults_to_stop(self) -> None:
-        client = _FakeLLMClient([{
-            "action": "negotiate",
-            "reasoning": "Let's talk more",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "action": "negotiate",
+                    "reasoning": "Let's talk more",
+                }
+            ]
+        )
         responder = TradeResponder(client)
         game = _make_game()
         trade = _make_trade()
 
         result = responder.generate_counter(
-            game, player_id=0, previous_trade=trade,
+            game,
+            player_id=0,
+            previous_trade=trade,
             rejection_reason="Bad",
         )
         assert result["action"] == "stop"
@@ -336,6 +392,7 @@ class TestGenerateCounter:
 # ---------------------------------------------------------------------------
 # _normalize_counter
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeCounter:
     def test_basic_normalization(self) -> None:

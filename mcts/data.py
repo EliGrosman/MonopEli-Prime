@@ -35,9 +35,9 @@ class TrainingExample:
         player_id: Which player's perspective this example is from.
     """
 
-    features: NDArray[np.float32]       # shape: (feature_size,)
-    mcts_policy: NDArray[np.float32]    # shape: (149,)
-    outcome: NDArray[np.float32]        # shape: (num_players,)
+    features: NDArray[np.float32]  # shape: (feature_size,)
+    mcts_policy: NDArray[np.float32]  # shape: (149,)
+    outcome: NDArray[np.float32]  # shape: (num_players,)
     player_id: int
 
 
@@ -163,8 +163,7 @@ def compute_outcomes(game: MonopolyGame) -> NDArray[np.float32]:
     else:
         # Truncated -- rank by net worth
         net_worths = [
-            calculate_net_worth(game.players[i], game.property_manager)
-            for i in range(num_players)
+            calculate_net_worth(game.players[i], game.property_manager) for i in range(num_players)
         ]
         ranked = list(np.argsort(net_worths))  # ascending: index 0 = worst
         for rank, pid in enumerate(ranked):
@@ -209,7 +208,9 @@ def generate_training_data(
     Returns:
         ReplayBuffer with collected training examples.
     """
-    raise NotImplementedError("Search data generation is deferred pending chance-aware search certification")
+    raise NotImplementedError(
+        "Search data generation is deferred pending chance-aware search certification"
+    )
     buffer = ReplayBuffer()
     encoder = ActionEncoder(enable_trades=False)
 

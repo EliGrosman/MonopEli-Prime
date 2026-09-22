@@ -8,15 +8,17 @@ from mcts.negotiation import NegotiationManager, NegotiationStatus
 from monopoly_engine.game import MonopolyGame
 
 DEFERRED_NEGOTIATION = pytest.mark.xfail(
+    strict=True,
     reason=(
         "LLM multi-round negotiation is deferred; these tests use the obsolete unrestricted "
         "trade helper rather than foundation-trade-v1 phases"
-    )
+    ),
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _setup_game_with_properties() -> MonopolyGame:
     """Create a 4-player game and assign properties for trading.
@@ -41,6 +43,7 @@ def _setup_game_with_properties() -> MonopolyGame:
 # Initialization
 # ---------------------------------------------------------------------------
 
+
 class TestNegotiationManagerInit:
     def test_default_max_rounds(self) -> None:
         manager = NegotiationManager()
@@ -59,15 +62,19 @@ class TestNegotiationManagerInit:
 # Starting negotiations
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestStartNegotiation:
+    @DEFERRED_NEGOTIATION
     def test_basic_start(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         assert neg_id == 0
@@ -81,13 +88,17 @@ class TestStartNegotiation:
         assert len(record.history) == 1
         assert record.current_trade_id is not None
 
+    @DEFERRED_NEGOTIATION
     def test_creates_engine_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         record = manager.get_negotiation(neg_id)
@@ -99,13 +110,17 @@ class TestStartNegotiation:
         assert trade["give_properties"] == [1]
         assert trade["want_properties"] == [6]
 
+    @DEFERRED_NEGOTIATION
     def test_with_cash(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], give_money=100,
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            give_money=100,
             want_properties=[6],
         )
 
@@ -113,13 +128,17 @@ class TestStartNegotiation:
         assert record is not None
         assert record.history[0]["give_money"] == 100
 
+    @DEFERRED_NEGOTIATION
     def test_cash_only_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            want_properties=[6], give_money=200,
+            game,
+            from_player=0,
+            to_player=1,
+            want_properties=[6],
+            give_money=200,
         )
 
         record = manager.get_negotiation(neg_id)
@@ -134,21 +153,31 @@ class TestStartNegotiation:
         # Player 0 doesn't own property 6
         with pytest.raises(ValueError, match="Invalid trade"):
             manager.start_negotiation(
-                game, from_player=0, to_player=1,
-                give_properties=[6], want_properties=[1],
+                game,
+                from_player=0,
+                to_player=1,
+                give_properties=[6],
+                want_properties=[1],
             )
 
+    @DEFERRED_NEGOTIATION
     def test_sequential_ids(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         id1 = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         id2 = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[3], want_properties=[8],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[3],
+            want_properties=[8],
         )
 
         assert id1 == 0
@@ -159,20 +188,27 @@ class TestStartNegotiation:
 # Counter-proposals
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestCounterPropose:
+    @DEFERRED_NEGOTIATION
     def test_basic_counter(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         result = manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[6], give_money=50,
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[6],
+            give_money=50,
             want_properties=[1, 3],
         )
 
@@ -185,13 +221,17 @@ class TestCounterPropose:
         assert record.status == NegotiationStatus.PENDING
         assert len(record.history) == 2
 
+    @DEFERRED_NEGOTIATION
     def test_counter_rejects_old_engine_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         record = manager.get_negotiation(neg_id)
@@ -203,8 +243,11 @@ class TestCounterPropose:
         assert game.get_pending_trade(old_trade_id) is not None
 
         manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[6], want_properties=[1],
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[6],
+            want_properties=[1],
         )
 
         # After counter, only 1 pending trade should exist (the new one).
@@ -217,18 +260,25 @@ class TestCounterPropose:
         assert new_trade is not None
         assert new_trade["from_player"] == 1  # Counter-proposer
 
+    @DEFERRED_NEGOTIATION
     def test_counter_creates_new_engine_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[6], want_properties=[1],
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[6],
+            want_properties=[1],
         )
 
         record = manager.get_negotiation(neg_id)
@@ -238,42 +288,59 @@ class TestCounterPropose:
         assert new_trade["from_player"] == 1
         assert new_trade["to_player"] == 0
 
+    @DEFERRED_NEGOTIATION
     def test_wrong_player_cannot_counter(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         # Player 0 is proposer, not responder
         result = manager.counter_propose(
-            game, neg_id, player_id=0,
-            give_properties=[1], want_properties=[6],
+            game,
+            neg_id,
+            player_id=0,
+            give_properties=[1],
+            want_properties=[6],
         )
         assert result is False
 
+    @DEFERRED_NEGOTIATION
     def test_max_rounds_enforced(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager(max_rounds=2)
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         # Round 1 -> 2 (OK, max_rounds=2)
         result = manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[6], want_properties=[1],
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[6],
+            want_properties=[1],
         )
         assert result is True
 
         # Round 2 -> 3 (exceeds max_rounds=2, should fail)
         result = manager.counter_propose(
-            game, neg_id, player_id=0,
-            give_properties=[1], want_properties=[6],
+            game,
+            neg_id,
+            player_id=0,
+            give_properties=[1],
+            want_properties=[6],
         )
         assert result is False
 
@@ -286,40 +353,57 @@ class TestCounterPropose:
         manager = NegotiationManager()
 
         result = manager.counter_propose(
-            game, 999, player_id=1,
-            give_properties=[6], want_properties=[1],
+            game,
+            999,
+            player_id=1,
+            give_properties=[6],
+            want_properties=[1],
         )
         assert result is False
 
+    @DEFERRED_NEGOTIATION
     def test_counter_on_closed_negotiation(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.accept(game, neg_id, player_id=1)
 
         result = manager.counter_propose(
-            game, neg_id, player_id=0,
-            give_properties=[1], want_properties=[6],
+            game,
+            neg_id,
+            player_id=0,
+            give_properties=[1],
+            want_properties=[6],
         )
         assert result is False
 
+    @DEFERRED_NEGOTIATION
     def test_invalid_counter_proposal(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         # Player 1 tries to give property 11 which they don't own
         result = manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[11], want_properties=[1],
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[11],
+            want_properties=[1],
         )
         assert result is False
 
@@ -328,15 +412,19 @@ class TestCounterPropose:
 # Accept
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestAccept:
+    @DEFERRED_NEGOTIATION
     def test_accept_executes_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         result = manager.accept(game, neg_id, player_id=1)
@@ -350,17 +438,24 @@ class TestAccept:
         assert record is not None
         assert record.status == NegotiationStatus.ACCEPTED
 
+    @DEFERRED_NEGOTIATION
     def test_accept_counter_proposal(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.counter_propose(
-            game, neg_id, player_id=1,
-            give_properties=[6], give_money=50,
+            game,
+            neg_id,
+            player_id=1,
+            give_properties=[6],
+            give_money=50,
             want_properties=[1, 3],
         )
 
@@ -376,13 +471,17 @@ class TestAccept:
         assert record is not None
         assert record.status == NegotiationStatus.ACCEPTED
 
+    @DEFERRED_NEGOTIATION
     def test_wrong_player_cannot_accept(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         # Player 2 is not involved
@@ -396,13 +495,17 @@ class TestAccept:
         result = manager.accept(game, 999, player_id=0)
         assert result is False
 
+    @DEFERRED_NEGOTIATION
     def test_accept_already_closed(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.reject(game, neg_id, player_id=1)
 
@@ -414,15 +517,19 @@ class TestAccept:
 # Reject
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestReject:
+    @DEFERRED_NEGOTIATION
     def test_basic_reject(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         result = manager.reject(game, neg_id, player_id=1)
@@ -435,13 +542,17 @@ class TestReject:
         # Engine trade should be cleaned up
         assert record.current_trade_id is None
 
+    @DEFERRED_NEGOTIATION
     def test_reject_removes_engine_trade(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         record = manager.get_negotiation(neg_id)
@@ -452,25 +563,33 @@ class TestReject:
 
         assert game.get_pending_trade(trade_id) is None  # type: ignore[arg-type]
 
+    @DEFERRED_NEGOTIATION
     def test_wrong_player_cannot_reject(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         result = manager.reject(game, neg_id, player_id=0)
         assert result is False
 
+    @DEFERRED_NEGOTIATION
     def test_no_ownership_change_after_reject(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.reject(game, neg_id, player_id=1)
 
@@ -483,19 +602,26 @@ class TestReject:
 # Query methods
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestQueryMethods:
+    @DEFERRED_NEGOTIATION
     def test_get_pending_for_player(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[3], want_properties=[8],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[3],
+            want_properties=[8],
         )
 
         pending = manager.get_pending_for_player(1)
@@ -504,13 +630,17 @@ class TestQueryMethods:
         pending_0 = manager.get_pending_for_player(0)
         assert len(pending_0) == 0
 
+    @DEFERRED_NEGOTIATION
     def test_get_pending_excludes_closed(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.reject(game, neg_id, player_id=1)
 
@@ -521,17 +651,24 @@ class TestQueryMethods:
         manager = NegotiationManager()
         assert manager.get_negotiation(999) is None
 
+    @DEFERRED_NEGOTIATION
     def test_get_active_negotiations(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg1 = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[3], want_properties=[8],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[3],
+            want_properties=[8],
         )
 
         assert len(manager.get_active_negotiations()) == 2
@@ -544,15 +681,19 @@ class TestQueryMethods:
 # Reset
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestReset:
+    @DEFERRED_NEGOTIATION
     def test_reset_clears_all(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
 
         manager.reset()
@@ -560,19 +701,26 @@ class TestReset:
         assert manager.get_active_negotiations() == []
         assert manager.get_negotiation(0) is None
 
+    @DEFERRED_NEGOTIATION
     def test_reset_resets_id_counter(self) -> None:
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         manager.reset()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         assert neg_id == 0
 
@@ -581,8 +729,9 @@ class TestReset:
 # Full negotiation flows
 # ---------------------------------------------------------------------------
 
-@DEFERRED_NEGOTIATION
+
 class TestFullNegotiationFlow:
+    @DEFERRED_NEGOTIATION
     def test_propose_counter_accept(self) -> None:
         """Full 3-step negotiation: propose -> counter -> accept."""
         game = _setup_game_with_properties()
@@ -590,13 +739,18 @@ class TestFullNegotiationFlow:
 
         # Player 0 proposes: give Baltic(3) for Oriental(6)
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[3], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[3],
+            want_properties=[6],
         )
 
         # Player 1 counters: wants both brown props for Oriental
         manager.counter_propose(
-            game, neg_id, player_id=1,
+            game,
+            neg_id,
+            player_id=1,
             give_properties=[6],
             want_properties=[1, 3],
         )
@@ -616,6 +770,7 @@ class TestFullNegotiationFlow:
         assert game.property_manager.properties[3].owner == 1
         assert game.property_manager.properties[6].owner == 0
 
+    @DEFERRED_NEGOTIATION
     def test_propose_counter_counter_accept(self) -> None:
         """4-step: propose -> counter -> counter -> accept."""
         game = _setup_game_with_properties()
@@ -623,21 +778,30 @@ class TestFullNegotiationFlow:
 
         # Round 1: P0 proposes Baltic(3) for Oriental(6)
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[3], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[3],
+            want_properties=[6],
         )
 
         # Round 2: P1 counters: wants both browns + $100
         manager.counter_propose(
-            game, neg_id, player_id=1,
+            game,
+            neg_id,
+            player_id=1,
             give_properties=[6],
-            want_properties=[1, 3], want_money=100,
+            want_properties=[1, 3],
+            want_money=100,
         )
 
         # Round 3: P0 re-counters: both browns but only $50
         manager.counter_propose(
-            game, neg_id, player_id=0,
-            give_properties=[1, 3], give_money=50,
+            game,
+            neg_id,
+            player_id=0,
+            give_properties=[1, 3],
+            give_money=50,
             want_properties=[6],
         )
 
@@ -650,14 +814,18 @@ class TestFullNegotiationFlow:
         assert record.round_number == 3
         assert len(record.history) == 3
 
+    @DEFERRED_NEGOTIATION
     def test_propose_reject(self) -> None:
         """Simple 2-step: propose -> reject."""
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg_id = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         result = manager.reject(game, neg_id, player_id=1)
         assert result is True
@@ -670,18 +838,25 @@ class TestFullNegotiationFlow:
         assert game.property_manager.properties[1].owner == 0
         assert game.property_manager.properties[6].owner == 1
 
+    @DEFERRED_NEGOTIATION
     def test_multiple_concurrent_negotiations(self) -> None:
         """Two negotiations happening at the same time."""
         game = _setup_game_with_properties()
         manager = NegotiationManager()
 
         neg1 = manager.start_negotiation(
-            game, from_player=0, to_player=1,
-            give_properties=[1], want_properties=[6],
+            game,
+            from_player=0,
+            to_player=1,
+            give_properties=[1],
+            want_properties=[6],
         )
         neg2 = manager.start_negotiation(
-            game, from_player=0, to_player=2,
-            give_properties=[3], want_properties=[11],
+            game,
+            from_player=0,
+            to_player=2,
+            give_properties=[3],
+            want_properties=[11],
         )
 
         # Reject first, accept second

@@ -36,6 +36,7 @@ class ActiveGame:
     player_slots: dict[int, PlayerSlot] = field(default_factory=dict)
     spectator_count: int = 0
     root_seed: int | None = None
+    processed_request_ids: set[str] = field(default_factory=set)
 
     def is_expired(self, timeout_minutes: int) -> bool:
         """Check if game has exceeded timeout."""
@@ -83,6 +84,7 @@ class GameManager:
         num_players: int = 4,
         player_names: list[str] | None = None,
         seed: int | None = None,
+        rules_id: str = "foundation-v1",
     ) -> str:
         """Create a new game session.
 
@@ -118,6 +120,7 @@ class GameManager:
                 num_players=num_players,
                 player_names=player_names,
                 seed=seed,
+                rules_id=rules_id,
             )
 
             # Create player slots (initially empty - no sessions assigned)
@@ -176,6 +179,9 @@ class GameManager:
         action: "Action",
         broadcast: bool = True,
         exclude_session: str | None = None,
+        expected_revision: int | None = None,
+        request_id: str | None = None,
+        actor_session_id: str | None = None,
     ) -> tuple[bool, str]:
         """Execute a game action.
 
@@ -192,6 +198,20 @@ class GameManager:
             active_game = self.games.get(game_id)
             if active_game is None:
                 return False, "Game not found"
+            if request_id is not None and request_id in active_game.processed_request_ids:
+                return False, "Duplicate request ID"
+            if actor_session_id is not None:
+                slot = active_game.player_slots.get(action.player_id)
+                if slot is None or slot.session_id != actor_session_id:
+                    return False, "Session no longer owns this player slot"
+            if (
+                expected_revision is not None
+                and expected_revision != active_game.game.state.revision
+            ):
+                return False, (
+                    f"Stale decision revision: expected {expected_revision}, "
+                    f"current {active_game.game.state.revision}"
+                )
 
             # Validate action
             is_valid, error = action.validate(active_game.game)
@@ -200,22 +220,25 @@ class GameManager:
 
             # Execute action
             try:
-                active_game.game.apply_action(action.player_id, action)
+                active_game.game.apply_action(
+                    action.player_id, action, expected_revision=expected_revision
+                )
+                if request_id is not None:
+                    active_game.processed_request_ids.add(request_id)
+                captured_state = GameState.from_engine(active_game.game, active_game.player_slots)
             except Exception as e:
                 return False, f"Action execution failed: {e}"
 
         # Broadcast state update to other players (outside lock)
         if broadcast and self._connection_manager:
-            state = await self.get_game_state(game_id)
-            if state:
-                await self._connection_manager.broadcast_to_game(
-                    game_id,
-                    WSMessage(
-                        type=WSMessageType.STATE_UPDATE,
-                        data=state.model_dump(),
-                    ),
-                    exclude_session=exclude_session,
-                )
+            await self._connection_manager.broadcast_to_game(
+                game_id,
+                WSMessage(
+                    type=WSMessageType.STATE_UPDATE,
+                    data=captured_state.model_dump(),
+                ),
+                exclude_session=exclude_session,
+            )
 
         # Check if we should trigger AI turns
         await self._maybe_process_ai_turns(game_id)

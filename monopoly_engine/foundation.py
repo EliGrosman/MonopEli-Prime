@@ -83,6 +83,8 @@ def validate_phase(game: MonopolyGame, action: Action) -> tuple[bool, str]:
     if pid != s.decision_player or game.players[pid].bankrupt:
         return False, "Not your turn: another player owns this decision"
     name = type(action).__name__
+    if s.phase == "trade_response" and name not in ("AcceptTrade", "RejectTrade"):
+        return False, "Respond to the pending trade before other actions"
     if name == "ProposeTrade":
         return (
             game.rules_id == TRADE_RULES_ID
@@ -127,7 +129,17 @@ def validate_phase(game: MonopolyGame, action: Action) -> tuple[bool, str]:
     return False, "Unsupported foundation action"
 
 
-def apply_action(game: MonopolyGame, pid: int, action: Action) -> TransitionResult:
+def apply_action(
+    game: MonopolyGame,
+    pid: int,
+    action: Action,
+    *,
+    expected_revision: int | None = None,
+) -> TransitionResult:
+    if expected_revision is not None and expected_revision != game.state.revision:
+        raise ValueError(
+            f"Stale decision revision: expected {expected_revision}, current {game.state.revision}"
+        )
     if pid != action.player_id:
         raise ValueError("Action actor mismatch")
     valid, reason = action.validate(game)

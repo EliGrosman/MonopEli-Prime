@@ -21,7 +21,7 @@ def _terms(action: Any) -> TradeOfferData:
     )
 
 
-def _tradeable_property(game: MonopolyGame, position: int, owner: int) -> tuple[bool, str]:
+def tradeable_property(game: MonopolyGame, position: int, owner: int) -> tuple[bool, str]:
     prop = game.property_manager.get(position)
     if prop is None or prop.owner != owner:
         return False, f"Player {owner} does not own property {position}"
@@ -66,11 +66,11 @@ def validate_terms(game: MonopolyGame, offer: TradeOfferData) -> tuple[bool, str
         return False, "Recipient has insufficient cash"
 
     for position in give:
-        valid, reason = _tradeable_property(game, position, proposer)
+        valid, reason = tradeable_property(game, position, proposer)
         if not valid:
             return valid, reason
     for position in want:
-        valid, reason = _tradeable_property(game, position, recipient)
+        valid, reason = tradeable_property(game, position, recipient)
         if not valid:
             return valid, reason
     return True, ""

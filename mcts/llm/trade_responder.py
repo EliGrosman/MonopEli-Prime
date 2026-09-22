@@ -32,10 +32,8 @@ def _format_impact(impact: dict[str, Any]) -> str:
     to_id = impact["to_player_id"]
     lines: list[str] = []
 
-    lines.append(f"Net worth change for Player {from_id}: "
-                 f"{impact['from_player_net_change']:+d}")
-    lines.append(f"Net worth change for Player {to_id}: "
-                 f"{impact['to_player_net_change']:+d}")
+    lines.append(f"Net worth change for Player {from_id}: {impact['from_player_net_change']:+d}")
+    lines.append(f"Net worth change for Player {to_id}: {impact['to_player_net_change']:+d}")
 
     created = impact.get("monopolies_created", [])
     if created:
@@ -136,7 +134,9 @@ class TradeResponder:
         trade_text = serialize_trade_proposal(previous_trade, game)
 
         user_prompt = build_counter_prompt(
-            state_text, trade_text, rejection_reason,
+            state_text,
+            trade_text,
+            rejection_reason,
         )
         response = self.client.complete_json(SYSTEM_PROMPT, user_prompt)
 
@@ -192,7 +192,8 @@ class TradeResponder:
         if decision == "counter" and "counter_proposal" in response:
             cp = response["counter_proposal"]
             result["counter_proposal"] = self._normalize_counter(
-                cp, player_id,
+                cp,
+                player_id,
             )
 
         return result

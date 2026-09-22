@@ -1,9 +1,9 @@
 # foundation-trade-v1 headless contract
 
-`foundation-trade-v1` is an opt-in experimental extension of corrected `foundation-v1`.
-It exists to test whether mutually beneficial property trading reduces persistent split ownership.
-The default engine rules ID remains `foundation-v1`; Gym/AEC, API and browser games continue to
-reject trading. Auctions, counteroffers, LLM negotiation and training encodings remain deferred.
+`foundation-trade-v1` is an opt-in extension of corrected `foundation-v1`. The default engine,
+Gym, API, lobby, and browser rules ID remains `foundation-v1`. Trading games use the same
+authoritative engine through the AEC environment, learner adapter, API, bots, and browser.
+Auctions, counteroffers, LLM negotiation, and model training remain deferred.
 
 ## Authoritative decisions
 
@@ -49,10 +49,23 @@ does not prove that trading in general is ineffective.
 
 ## Compatibility and versions
 
-Parameterized trades use `native-action-v1` in headless traces. Existing ordinary decisions
-retain `action-v2`; `observation-v2` and `terminal-v1` are unchanged. The obsolete 907-action
-experimental encoding is not revived. Checkpoints and learning environments remain no-trade.
-The engine rejects unknown rules IDs and snapshots always record the selected rules ID.
+`decision-contract-v1` is the immutable public decision view. It identifies the turn owner and
+decision player separately, carries the exact revision, phase-specific legal actions, public
+balances and board state, proposal capability, and complete pending terms. It omits deck order,
+RNG state, seeds, valuations, and agent internals. Consumer commands carry an expected revision;
+stale commands fail before validation or mutation.
+
+Parameterized native decisions and replays remain `native-action-v1`. No-trade learners retain
+`action-v2`/`observation-v2`. Trading learners use `action-v3`/`observation-v3`: ordinary indices
+0–157, accept/reject at 158–159, and 32 revision-bound proposal slots at 160–191. Candidate rows
+contain the complete bundles, mortgage masks, identities, and cash terms. The named
+`foundation-benefit-candidates-v1` provider is a learner shortlist, not an engine legality rule.
+The obsolete 907-action encoding remains rejected.
+
+Checkpoint sidecars record the rules ID, action and observation versions, player count, candidate
+provider, and capacity. A missing or mismatched sidecar is rejected before trading inference;
+legacy v2 loading requires an explicit compatibility option. The engine rejects unknown rules IDs
+and snapshots always record the selected rules ID.
 
 Generated experiments must report actual engine winners, cutoffs, errors and stalls; never infer
 a winner from wealth. The production horizon remains 1,000 completed player turns and the

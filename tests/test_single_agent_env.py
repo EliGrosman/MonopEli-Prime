@@ -6,23 +6,21 @@ like Stable-Baselines3.
 """
 
 import io
-import sys
-from typing import Any
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 from gymnasium import spaces
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from monopoly_gym import (
-    ACTION_SPACE_SIZE,
     GAMEPLAY_ACTION_SPACE_SIZE,
+    OFFSET_BUY_PROPERTY,
+    OFFSET_END_TURN,
+    OFFSET_PASS_BUY,
     MonopolyEnv,
     SingleAgentMonopolyEnv,
-    OFFSET_END_TURN,
-    OFFSET_BUY_PROPERTY,
-    OFFSET_PASS_BUY,
 )
 from monopoly_gym.observation import get_flat_observation_size
 
@@ -79,6 +77,7 @@ class TestSingleAgentEnvInit:
         assert env.opponent_type == "random"
         # Verify opponent is RandomAgent
         from agents import RandomAgent
+
         for agent in env._opponents.values():
             assert isinstance(agent, RandomAgent)
 
@@ -215,7 +214,14 @@ class TestSingleAgentEnvSpaces:
         """Test observation space Dict has expected keys when flatten_obs=False."""
         env = SingleAgentMonopolyEnv(flatten_obs=False)
         env.reset(seed=42)
-        expected_keys = {"player_state", "opponent_states", "board_state", "game_state", "action_mask", "decision_state"}
+        expected_keys = {
+            "player_state",
+            "opponent_states",
+            "board_state",
+            "game_state",
+            "action_mask",
+            "decision_state",
+        }
         assert set(env.observation_space.spaces.keys()) == expected_keys
 
     @given(num_players=st.integers(min_value=2, max_value=4))
@@ -358,7 +364,9 @@ class TestSingleAgentEnvStep:
         env = SingleAgentMonopolyEnv()
         env.reset(seed=42)
         env.reset(seed=42)
-        obs, reward, terminated, truncated, info = env.step(int(np.flatnonzero(env.action_masks())[0]))
+        obs, reward, terminated, truncated, info = env.step(
+            int(np.flatnonzero(env.action_masks())[0])
+        )
 
         assert isinstance(obs, np.ndarray)
         assert isinstance(reward, float)
@@ -388,7 +396,9 @@ class TestSingleAgentEnvStep:
         env.reset(seed=42)
         env.reset(seed=42)
         # OFFSET_END_TURN should always be valid
-        obs, reward, terminated, truncated, info = env.step(int(np.flatnonzero(env.action_masks())[0]))
+        obs, reward, terminated, truncated, info = env.step(
+            int(np.flatnonzero(env.action_masks())[0])
+        )
         assert obs is not None
 
     def test_step_with_masked_action(self) -> None:
@@ -417,7 +427,11 @@ class TestSingleAgentEnvStep:
         max_steps = 500
 
         while not (terminated or truncated) and steps < max_steps:
-            _, info = env.reset(seed=42 + steps) if steps == 0 else (None, {"action_mask": env.action_masks()})
+            _, info = (
+                env.reset(seed=42 + steps)
+                if steps == 0
+                else (None, {"action_mask": env.action_masks()})
+            )
             mask = env.action_masks()
             valid_actions = np.where(mask)[0]
             action = valid_actions[0] if len(valid_actions) > 0 else OFFSET_END_TURN
@@ -454,9 +468,6 @@ class TestSingleAgentEnvStep:
         env = SingleAgentMonopolyEnv()
         env.reset(seed=42)
         env.reset(seed=42)
-
-        initial_game = env._env.game
-        initial_turn = initial_game.turn_number if initial_game else 0
 
         # Take action
         env.step(int(np.flatnonzero(env.action_masks())[0]))
@@ -577,8 +588,10 @@ class TestSingleAgentEnvOpponents:
         env.step(action)
 
         # If game hasn't ended, learning agent should be ready to act again
-        if not (env._env.terminations.get(env._agent_id, False) or
-                env._env.truncations.get(env._agent_id, False)):
+        if not (
+            env._env.terminations.get(env._agent_id, False)
+            or env._env.truncations.get(env._agent_id, False)
+        ):
             mask = env.action_masks()
             assert mask.sum() > 0  # Should have valid actions
 
@@ -675,7 +688,7 @@ class TestSingleAgentEnvRender:
 
         # Capture stdout
         captured = io.StringIO()
-        with patch('sys.stdout', captured):
+        with patch("sys.stdout", captured):
             env.render()
         # Human mode typically prints and returns None or string
 
@@ -705,6 +718,7 @@ class TestSingleAgentEnvCompliance:
         """Test gymnasium check_env passes if available."""
         try:
             from gymnasium.utils.env_checker import check_env
+
             env = SingleAgentMonopolyEnv()
             # This may raise if there are issues
             try:
@@ -890,9 +904,7 @@ class TestSingleAgentEnvPropertyTests:
         seed=st.integers(min_value=0, max_value=10000),
     )
     @settings(max_examples=20)
-    def test_reset_always_returns_valid_observation(
-        self, num_players: int, seed: int
-    ) -> None:
+    def test_reset_always_returns_valid_observation(self, num_players: int, seed: int) -> None:
         """Test reset always returns valid observation."""
         env = SingleAgentMonopolyEnv(num_players=num_players, flatten_obs=True)
         env.reset(seed=42)
@@ -907,9 +919,7 @@ class TestSingleAgentEnvPropertyTests:
         seed=st.integers(min_value=0, max_value=10000),
     )
     @settings(max_examples=20)
-    def test_step_always_returns_valid_structure(
-        self, num_players: int, seed: int
-    ) -> None:
+    def test_step_always_returns_valid_structure(self, num_players: int, seed: int) -> None:
         """Test step always returns valid structure."""
         env = SingleAgentMonopolyEnv(num_players=num_players, flatten_obs=True)
         env.reset(seed=42)
@@ -1030,8 +1040,7 @@ class TestSingleAgentEnvIntegration:
         info_mask = info["action_mask"]
 
         np.testing.assert_array_equal(
-            method_mask, info_mask,
-            "action_masks() and info['action_mask'] should be equal"
+            method_mask, info_mask, "action_masks() and info['action_mask'] should be equal"
         )
 
         # Take a step and check again
@@ -1042,7 +1051,4 @@ class TestSingleAgentEnvIntegration:
         method_mask = env.action_masks()
         info_mask = info["action_mask"]
 
-        np.testing.assert_array_equal(
-            method_mask, info_mask,
-            "Masks should be equal after step"
-        )
+        np.testing.assert_array_equal(method_mask, info_mask, "Masks should be equal after step")
