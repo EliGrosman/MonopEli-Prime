@@ -31,8 +31,9 @@ def app(settings: Settings):
 @pytest.fixture
 def client(app) -> TestClient:
     """Create synchronous test client with lifespan context."""
-    # Use context manager to ensure lifespan events fire
-    with TestClient(app) as client:
+    # Starlette 1.x can stall its default asyncio portal after NumPy initializes
+    # native worker threads. uvloop keeps the blocking test portal responsive.
+    with TestClient(app, backend_options={"use_uvloop": True}) as client:
         yield client
 
 
