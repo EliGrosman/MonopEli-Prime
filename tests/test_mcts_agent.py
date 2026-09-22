@@ -122,7 +122,7 @@ class TestMCTSAgentChooseAction:
         action = agent.choose_action(obs, mask, game)
 
         assert isinstance(action, int)
-        assert 0 <= action < 149
+        assert 0 <= action < 158
         assert mask[action], f"Action {action} should be valid per mask"
 
     def test_works_without_network(self) -> None:
@@ -186,6 +186,11 @@ class TestMCTSAgentChooseAction:
         # All calls on the same state with temperature=0 should agree
         assert len(set(actions)) == 1
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_with_network(self, tmp_path: pytest.TempPathFactory) -> None:
         """Agent loaded with a network checkpoint should return valid action."""
         from mcts.features import get_feature_size

@@ -27,17 +27,21 @@ def serialize_game_state(game: MonopolyGame, perspective_player: int) -> str:
     lines: list[str] = []
 
     # Header
-    lines.append(f"You are Player {perspective_player} ({player.name}). "
-                 f"You have ${player.money}.")
+    lines.append(f"You are Player {perspective_player} ({player.name}). You have ${player.money}.")
     lines.append("")
 
     # Our properties
     our_props = pm.get_owned_by(perspective_player)
     if our_props:
         lines.append("YOUR PROPERTIES:")
-        lines.extend(_format_player_properties(
-            game, perspective_player, our_props, show_near_monopoly=True,
-        ))
+        lines.extend(
+            _format_player_properties(
+                game,
+                perspective_player,
+                our_props,
+                show_near_monopoly=True,
+            )
+        )
     else:
         lines.append("YOUR PROPERTIES: (none)")
     lines.append("")
@@ -73,8 +77,7 @@ def serialize_game_state(game: MonopolyGame, perspective_player: int) -> str:
     )
     lines.append("")
     lines.append(
-        "Use position numbers (in brackets) when specifying "
-        "properties in trade proposals."
+        "Use position numbers (in brackets) when specifying properties in trade proposals."
     )
 
     return "\n".join(lines)
@@ -89,12 +92,12 @@ def serialize_player_summary(game: MonopolyGame, player_id: int) -> str:
     monopolies = pm.get_monopolies(player_id)
 
     prop_strs = [f"{Board.get_space(p).name} [{p}]" for p in sorted(props)]
-    mono_strs = [c.name for c in monopolies
-                 if c not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)]
+    mono_strs = [
+        c.name for c in monopolies if c not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)
+    ]
 
     parts = [
-        f"Player {player_id} ({player.name}): ${player.money} "
-        f"(net worth ${nw})",
+        f"Player {player_id} ({player.name}): ${player.money} (net worth ${nw})",
     ]
     if prop_strs:
         parts.append(f"  Properties: {', '.join(prop_strs)}")
@@ -132,14 +135,10 @@ def serialize_property_landscape(game: MonopolyGame) -> str:
                 owner_name = game.players[prop.owner].name
                 houses_str = ""
                 if isinstance(space, PropertySpace) and prop.houses > 0:
-                    houses_str = (
-                        " (HOTEL)" if prop.houses == 5
-                        else f" ({prop.houses}h)"
-                    )
+                    houses_str = " (HOTEL)" if prop.houses == 5 else f" ({prop.houses}h)"
                 mort_str = " [M]" if prop.mortgaged else ""
                 group_entries.append(
-                    f"{space.name} [{pos}] -> P{prop.owner} "
-                    f"({owner_name}){houses_str}{mort_str}"
+                    f"{space.name} [{pos}] -> P{prop.owner} ({owner_name}){houses_str}{mort_str}"
                 )
                 owners[prop.owner] = owners.get(prop.owner, 0) + 1
             else:
@@ -194,6 +193,7 @@ def serialize_trade_proposal(trade: TradeOfferData, game: MonopolyGame) -> str:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _format_player_properties(
     game: MonopolyGame,
     player_id: int,
@@ -213,15 +213,14 @@ def _format_player_properties(
         if isinstance(space, PropertySpace):
             color = space.color
             houses_str = (
-                "hotel" if prop.houses == 5
-                else f"{prop.houses} houses" if prop.houses > 0
+                "hotel"
+                if prop.houses == 5
+                else f"{prop.houses} houses"
+                if prop.houses > 0
                 else "0 houses"
             )
             mort_str = "mortgaged" if prop.mortgaged else "unmortgaged"
-            lines.append(
-                f"- {space.name} [{pos}] ({color.name}) "
-                f"- {mort_str}, {houses_str}"
-            )
+            lines.append(f"- {space.name} [{pos}] ({color.name}) - {mort_str}, {houses_str}")
 
             # Near-monopoly hint (once per color)
             if show_near_monopoly and color not in seen_colors:
@@ -242,7 +241,9 @@ def _format_player_properties(
 
 
 def _color_group_hint(
-    game: MonopolyGame, player_id: int, color: PropertyColor,
+    game: MonopolyGame,
+    player_id: int,
+    color: PropertyColor,
 ) -> str:
     """Generate a hint about a player's progress in a color group."""
     pm = game.property_manager
@@ -250,8 +251,11 @@ def _color_group_hint(
     if not positions:
         return ""
 
-    owned = [p for p in positions if pm.properties.get(p) is not None
-             and pm.properties[p].owner == player_id]
+    owned = [
+        p
+        for p in positions
+        if pm.properties.get(p) is not None and pm.properties[p].owner == player_id
+    ]
     missing = [p for p in positions if p not in owned]
 
     if len(owned) == len(positions):
@@ -265,16 +269,11 @@ def _color_group_hint(
         space = Board.get_space(pos)
         prop = pm.properties.get(pos)
         if prop is not None and prop.owner is not None:
-            missing_strs.append(
-                f"{space.name} [{pos}] owned by Player {prop.owner}"
-            )
+            missing_strs.append(f"{space.name} [{pos}] owned by Player {prop.owner}")
         else:
             missing_strs.append(f"{space.name} [{pos}] (unowned)")
 
-    return (
-        f"[{color.name}: you own {len(owned)}/{total}, "
-        f"{', '.join(missing_strs)}]"
-    )
+    return f"[{color.name}: you own {len(owned)}/{total}, {', '.join(missing_strs)}]"
 
 
 def _format_opponent_summary(game: MonopolyGame, player_id: int) -> str:
@@ -282,8 +281,11 @@ def _format_opponent_summary(game: MonopolyGame, player_id: int) -> str:
     player = game.players[player_id]
     pm = game.property_manager
     props = pm.get_owned_by(player_id)
-    monopolies = [c for c in pm.get_monopolies(player_id)
-                  if c not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)]
+    monopolies = [
+        c
+        for c in pm.get_monopolies(player_id)
+        if c not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)
+    ]
 
     prop_strs = [f"{Board.get_space(p).name} [{p}]" for p in sorted(props)]
     props_text = ", ".join(prop_strs) if prop_strs else "(no properties)"
@@ -309,9 +311,11 @@ def _near_monopoly_hints(game: MonopolyGame, player_id: int) -> list[str]:
         if not positions:
             continue
 
-        owned = [p for p in positions
-                 if pm.properties.get(p) is not None
-                 and pm.properties[p].owner == player_id]
+        owned = [
+            p
+            for p in positions
+            if pm.properties.get(p) is not None and pm.properties[p].owner == player_id
+        ]
         total = len(positions)
 
         if 0 < len(owned) < total:
@@ -327,8 +331,7 @@ def _near_monopoly_hints(game: MonopolyGame, player_id: int) -> list[str]:
 
             if len(owned) == total - 1:
                 hints.append(
-                    f"[{color.name}: owns {len(owned)}/{total}, "
-                    f"missing {', '.join(missing_strs)}]"
+                    f"[{color.name}: owns {len(owned)}/{total}, missing {', '.join(missing_strs)}]"
                 )
 
     return hints

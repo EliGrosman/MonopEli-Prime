@@ -20,7 +20,6 @@ from mcts.search import MCTSConfig, MCTSSearch
 from .base import Agent
 
 if TYPE_CHECKING:
-    from mcts.network import ValueNetwork
     from monopoly_engine.game import MonopolyGame
 
 

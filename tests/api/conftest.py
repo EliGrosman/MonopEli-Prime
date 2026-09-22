@@ -4,7 +4,7 @@ Pytest fixtures for API tests.
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from api.config import Settings
 from api.main import create_app

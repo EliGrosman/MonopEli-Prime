@@ -64,6 +64,9 @@ class WSActionResult(BaseModel):
 
     success: bool
     message: str = ""
+    request_id: str | None = None
+    revision: int | None = None
+    error_code: str | None = None
 
 
 class WSError(BaseModel):

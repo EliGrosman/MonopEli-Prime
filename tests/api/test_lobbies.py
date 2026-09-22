@@ -15,7 +15,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
-from api.models.lobby import LobbySettings, LobbyStatus
 
 
 @pytest.fixture
@@ -741,9 +740,7 @@ class TestLobbyWebSocket:
         lobby_id = create_response.json()["id"]
         session_id = create_response.json()["session_id"]
 
-        with client.websocket_connect(
-            f"/api/lobbies/ws/{lobby_id}?session_id={session_id}"
-        ) as ws:
+        with client.websocket_connect(f"/api/lobbies/ws/{lobby_id}?session_id={session_id}") as ws:
             msg = ws.receive_json()
             assert msg["type"] == "lobby_update"
             assert msg["data"]["id"] == lobby_id
@@ -751,9 +748,7 @@ class TestLobbyWebSocket:
 
     def test_websocket_connect_invalid_lobby(self, client: TestClient) -> None:
         """WebSocket connection returns error for invalid lobby."""
-        with client.websocket_connect(
-            "/api/lobbies/ws/nonexistent?session_id=test"
-        ) as ws:
+        with client.websocket_connect("/api/lobbies/ws/nonexistent?session_id=test") as ws:
             msg = ws.receive_json()
             assert msg["type"] == "error"
             assert "not found" in msg["data"]["message"].lower()
@@ -766,9 +761,7 @@ class TestLobbyWebSocket:
         )
         lobby_id = create_response.json()["id"]
 
-        with client.websocket_connect(
-            f"/api/lobbies/ws/{lobby_id}?session_id=not-a-member"
-        ) as ws:
+        with client.websocket_connect(f"/api/lobbies/ws/{lobby_id}?session_id=not-a-member") as ws:
             msg = ws.receive_json()
             assert msg["type"] == "error"
             assert "not a member" in msg["data"]["message"].lower()
@@ -782,9 +775,7 @@ class TestLobbyWebSocket:
         lobby_id = create_response.json()["id"]
         session_id = create_response.json()["session_id"]
 
-        with client.websocket_connect(
-            f"/api/lobbies/ws/{lobby_id}?session_id={session_id}"
-        ) as ws:
+        with client.websocket_connect(f"/api/lobbies/ws/{lobby_id}?session_id={session_id}") as ws:
             # Receive initial state
             ws.receive_json()
 
@@ -809,9 +800,7 @@ class TestLobbyWebSocket:
             headers={"X-Session-Id": bob_session},
         )
 
-        with client.websocket_connect(
-            f"/api/lobbies/ws/{lobby_id}?session_id={bob_session}"
-        ) as ws:
+        with client.websocket_connect(f"/api/lobbies/ws/{lobby_id}?session_id={bob_session}") as ws:
             # Receive initial state
             ws.receive_json()
 

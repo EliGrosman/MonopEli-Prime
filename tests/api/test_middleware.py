@@ -29,7 +29,6 @@ from api.middleware.logging import (
 )
 from api.middleware.rate_limit import RateLimiter, RateLimitMiddleware, TokenBucket
 
-
 # =============================================================================
 # Logging Middleware Tests
 # =============================================================================

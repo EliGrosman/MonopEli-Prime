@@ -6,28 +6,24 @@ this class's methods, not by directly modifying state objects.
 """
 
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .actions import Action
+    from .decision import DecisionView
+    from .foundation import TransitionResult
 
 from .board import Board
-from .cards import CHANCE_CARDS, COMMUNITY_CHEST_CARDS, Card, CardDeck
+from .cards import Card, CardDeck
 from .exceptions import (
     InvalidPlayerError,
     InvalidPropertyError,
 )
 from .player import Player
 from .property import Property, PropertyManager
-from .rules import (
-    calculate_rent,
-)
 from .state import GameState
 from .types import (
     GO_SALARY,
-    INCOME_TAX_AMOUNT,
-    JAIL_FINE,
-    LUXURY_TAX_AMOUNT,
-    MAX_JAIL_TURNS,
-    CardType,
-    SpaceType,
     TradeOfferData,
 )
 
@@ -59,6 +55,7 @@ class MonopolyGame:
         num_players: int = 2,
         player_names: list[str] | None = None,
         seed: int | None = None,
+        rules_id: str = "foundation-v1",
     ) -> None:
         """Initialize a new Monopoly game.
 
@@ -70,13 +67,16 @@ class MonopolyGame:
         Raises:
             ValueError: If num_players is invalid or player_names length doesn't match
         """
+        from .foundation import RULES_IDS
+
+        if rules_id not in RULES_IDS:
+            raise ValueError(f"Unknown rules ID: {rules_id}")
+        self.rules_id = rules_id
         if not 2 <= num_players <= 8:
             raise ValueError("Number of players must be between 2 and 8")
 
         if player_names is not None and len(player_names) != num_players:
-            raise ValueError(
-                f"Expected {num_players} player names, got {len(player_names)}"
-            )
+            raise ValueError(f"Expected {num_players} player names, got {len(player_names)}")
 
         # Initialize random number generator
         self.rng = random.Random(seed)
@@ -92,9 +92,7 @@ class MonopolyGame:
 
         # Create card decks with the same seed for determinism
         chance_deck = CardDeck.create_chance_deck(seed=self.rng.randint(0, 1000000))
-        chest_deck = CardDeck.create_community_chest_deck(
-            seed=self.rng.randint(0, 1000000)
-        )
+        chest_deck = CardDeck.create_community_chest_deck(seed=self.rng.randint(0, 1000000))
 
         # Initialize game state
         self.state = GameState(
@@ -110,6 +108,32 @@ class MonopolyGame:
         self.board = Board()
 
         self.log_event(f"Game initialized with {num_players} players")
+
+    @property
+    def decision_player(self) -> int:
+        return self.state.decision_player
+
+    def apply_action(
+        self,
+        player_id: int,
+        action: "Action",
+        *,
+        expected_revision: int | None = None,
+    ) -> "TransitionResult":
+        from .foundation import apply_action
+
+        return apply_action(self, player_id, action, expected_revision=expected_revision)
+
+    def decision_view(self, viewer_id: int | None) -> "DecisionView":
+        """Return the immutable public decision contract for a viewer."""
+        from .decision import build_decision_view
+
+        return build_decision_view(self, viewer_id)
+
+    def validate_phase(self, action: "Action") -> tuple[bool, str]:
+        from .foundation import validate_phase
+
+        return validate_phase(self, action)
 
     # Convenience properties
 
@@ -224,9 +248,7 @@ class MonopolyGame:
             player.add_money(GO_SALARY)
             self.log_event(f"{player.name} passed GO and collected ${GO_SALARY}")
 
-        self.log_event(
-            f"{player.name} moved from {old_pos} to {new_pos} ({spaces} spaces)"
-        )
+        self.log_event(f"{player.name} moved from {old_pos} to {new_pos} ({spaces} spaces)")
 
         return new_pos, passed_go
 
@@ -256,9 +278,7 @@ class MonopolyGame:
             self.log_event(f"{player.name} passed GO and collected ${GO_SALARY}")
 
         space = Board.get_space(position)
-        self.log_event(
-            f"{player.name} moved from {old_pos} to {position} ({space.name})"
-        )
+        self.log_event(f"{player.name} moved from {old_pos} to {position} ({space.name})")
 
         return passed_go
 
@@ -327,9 +347,7 @@ class MonopolyGame:
             raise ValueError(f"Property {property_id} has no houses to return")
 
         if prop.houses == 5:
-            raise ValueError(
-                f"Property {property_id} has a hotel, use return_hotel() instead"
-            )
+            raise ValueError(f"Property {property_id} has a hotel, use return_hotel() instead")
 
         prop.houses -= 1
         self.state.houses_remaining += 1
@@ -359,9 +377,7 @@ class MonopolyGame:
         prop = self._get_property(property_id)
 
         if prop.houses != 4:
-            raise ValueError(
-                f"Property {property_id} must have exactly 4 houses to build hotel"
-            )
+            raise ValueError(f"Property {property_id} must have exactly 4 houses to build hotel")
 
         if self.state.hotels_remaining <= 0:
             return False
@@ -509,113 +525,34 @@ class MonopolyGame:
         want_properties: list[int],
         want_money: int,
     ) -> int:
-        """Propose a trade between players.
+        """Submit a proposal through the authoritative transition boundary."""
+        from .actions import ProposeTrade
 
-        Creates a TradeOfferData and stores it in state.pending_trades.
-
-        Args:
-            from_player: Player initiating the trade
-            to_player: Player receiving the trade offer
-            give_properties: Properties the initiator is offering
-            give_money: Money the initiator is offering
-            want_properties: Properties the initiator wants
-            want_money: Money the initiator wants
-
-        Returns:
-            The trade ID
-
-        Raises:
-            InvalidPlayerError: If player IDs are invalid
-        """
-        # Validate players
-        from_p = self._get_player(from_player)
-        to_p = self._get_player(to_player)
-
-        # Generate unique trade ID
-        trade_id = len(self.state.pending_trades)
-
-        # Create trade offer
-        trade_offer: TradeOfferData = {
-            "from_player": from_player,
-            "to_player": to_player,
-            "give_properties": give_properties,
-            "give_money": give_money,
-            "want_properties": want_properties,
-            "want_money": want_money,
-        }
-
-        self.state.pending_trades[trade_id] = trade_offer
-
-        self.log_event(f"{from_p.name} proposed trade #{trade_id} to {to_p.name}")
-
+        trade_id = self.state.next_trade_id
+        self.apply_action(
+            from_player,
+            ProposeTrade(
+                from_player,
+                to_player,
+                give_properties,
+                give_money,
+                want_properties,
+                want_money,
+            ),
+        )
         return trade_id
 
     def accept_trade(self, trade_id: int) -> None:
-        """Accept and execute a trade.
+        """Accept a pending offer through the authoritative transition boundary."""
+        from .actions import AcceptTrade
 
-        Transfers properties and money, then removes trade from pending.
-
-        Args:
-            trade_id: The trade ID
-
-        Raises:
-            ValueError: If trade_id is invalid or trade cannot be executed
-        """
-        if trade_id not in self.state.pending_trades:
-            raise ValueError(f"Trade {trade_id} not found")
-
-        trade = self.state.pending_trades[trade_id]
-
-        from_player = self._get_player(trade["from_player"])
-        to_player = self._get_player(trade["to_player"])
-
-        # Validate funds
-        if from_player.money < trade["give_money"]:
-            raise ValueError(f"{from_player.name} doesn't have ${trade['give_money']}")
-        if to_player.money < trade["want_money"]:
-            raise ValueError(f"{to_player.name} doesn't have ${trade['want_money']}")
-
-        # Transfer money
-        if trade["give_money"] > 0:
-            from_player.remove_money(trade["give_money"])
-            to_player.add_money(trade["give_money"])
-
-        if trade["want_money"] > 0:
-            to_player.remove_money(trade["want_money"])
-            from_player.add_money(trade["want_money"])
-
-        # Transfer properties
-        for prop_id in trade["give_properties"]:
-            self.transfer_property(prop_id, trade["from_player"], trade["to_player"])
-
-        for prop_id in trade["want_properties"]:
-            self.transfer_property(prop_id, trade["to_player"], trade["from_player"])
-
-        # Remove from pending
-        del self.state.pending_trades[trade_id]
-
-        self.log_event(
-            f"Trade #{trade_id} executed: {from_player.name} <-> {to_player.name}"
-        )
+        self.apply_action(self.decision_player, AcceptTrade(self.decision_player, trade_id))
 
     def reject_trade(self, trade_id: int) -> None:
-        """Reject a trade offer.
+        """Reject a pending offer through the authoritative transition boundary."""
+        from .actions import RejectTrade
 
-        Args:
-            trade_id: The trade ID
-
-        Raises:
-            ValueError: If trade_id is invalid
-        """
-        if trade_id not in self.state.pending_trades:
-            raise ValueError(f"Trade {trade_id} not found")
-
-        trade = self.state.pending_trades[trade_id]
-        to_player = self._get_player(trade["to_player"])
-
-        del self.state.pending_trades[trade_id]
-
-        self.log_event(f"Trade #{trade_id} rejected by {to_player.name}")
+        self.apply_action(self.decision_player, RejectTrade(self.decision_player, trade_id))
 
     def get_pending_trade(self, trade_id: int) -> TradeOfferData | None:
         """Get a pending trade offer.
@@ -630,102 +567,19 @@ class MonopolyGame:
 
     # Bankruptcy handling
 
-    def handle_bankruptcy(
-        self,
-        player_id: int,
-        creditor_id: int | None = None,
-    ) -> None:
-        """Handle player bankruptcy.
+    def handle_bankruptcy(self, player_id: int, creditor_id: int | None = None) -> None:
+        from .foundation import bankrupt
 
-        Orchestrates:
-        - Clearing all property ownership
-        - Returning houses/hotels to bank
-        - Transferring assets to creditor or bank
-        - Marking player as bankrupt
-        - Checking for winner
-        - Event logging
-
-        Args:
-            player_id: The bankrupt player
-            creditor_id: The creditor (None if bank)
-
-        Raises:
-            InvalidPlayerError: If player IDs are invalid
-        """
-        player = self._get_player(player_id)
-
-        if creditor_id is not None:
-            creditor = self._get_player(creditor_id)
-            creditor_name = creditor.name
-        else:
-            creditor = None
-            creditor_name = "Bank"
-
-        self.log_event(f"{player.name} declared bankruptcy to {creditor_name}")
-
-        # Get all properties owned by the player
-        owned_properties = self.property_manager.get_owned_by(player_id)
-
-        # Return all buildings and transfer properties
-        for prop_id in owned_properties:
-            prop = self.property_manager.get(prop_id)
-            assert prop is not None
-
-            # Return buildings to bank
-            if prop.houses == 5:
-                self.state.hotels_remaining += 1
-            elif prop.houses > 0:
-                self.state.houses_remaining += prop.houses
-
-            # Transfer property to creditor or reset to unowned
-            if creditor_id is not None:
-                # Creditor gets property (unmortgaged)
-                prop.owner = creditor_id
-                prop.houses = 0
-                prop.mortgaged = False
-
-                space = Board.get_space(prop_id)
-                self.log_event(f"{space.name} transferred to {creditor_name}")
-            else:
-                # Bank gets property (reset to unowned)
-                self.reset_property(prop_id)
-
-        # Transfer money to creditor
-        if player.money > 0:
-            if creditor is not None:
-                creditor.add_money(player.money)
-                self.log_event(f"${player.money} transferred to {creditor_name}")
-
-        # Mark player as bankrupt
-        player.declare_bankrupt()
-
-        # Check for winner
-        winner_id = self.state.check_winner()
-        if winner_id is not None:
-            self.state.game_over = True
-            self.state.winner = winner_id
-            winner = self._get_player(winner_id)
-            self.log_event(f"GAME OVER: {winner.name} wins!")
+        bankrupt(self, player_id, creditor_id)
 
     # Turn management
 
-    def end_turn(self) -> None:
-        """End the current turn and advance to the next player.
+    def end_turn(
+        self,
+    ) -> None:
+        from .foundation import end_turn
 
-        Resets turn-specific state like doubles count and advances
-        to the next active player.
-        """
-        current = self.state.get_current_player()
-
-        # Reset turn-specific state
-        self.state.doubles_count = 0
-        self.state.last_roll = None
-
-        # Advance to next player
-        next_player = self.state.next_player()
-        self.state.turn_number += 1
-
-        self.log_event(f"{current.name} ended turn. {next_player.name}'s turn begins.")
+        end_turn(self)
 
     def next_player(self) -> Player:
         """Advance to the next active player.
@@ -750,155 +604,19 @@ class MonopolyGame:
         return die1, die2
 
     def _handle_dice_roll(self, player_id: int) -> None:
-        """Handle dice roll logic.
+        from .foundation import roll
 
-        Orchestrates:
-        - Dice rolling
-        - Doubles detection (3 in a row = jail)
-        - Jail release on doubles
-        - Player movement
-        - Landing logic
-
-        Args:
-            player_id: The player rolling dice
-        """
-        player = self._get_player(player_id)
-
-        # Roll dice
-        die1, die2 = self.roll_dice()
-        is_doubles = die1 == die2
-        total = die1 + die2
-
-        self.state.last_roll = (die1, die2)
-
-        self.log_event(
-            f"{player.name} rolled {die1} + {die2} = {total}"
-            + (" (DOUBLES)" if is_doubles else "")
-        )
-
-        # Handle jail
-        if player.in_jail:
-            if is_doubles:
-                # Doubles releases from jail
-                player.leave_jail()
-                self.state.doubles_count = 0
-                self.log_event(f"{player.name} rolled doubles and got out of jail!")
-
-                # Move normally
-                self.move_player(player_id, total)
-                self._handle_landing(player_id)
-            else:
-                # Increment jail turns
-                jail_turns = player.increment_jail_turns()
-
-                if jail_turns >= MAX_JAIL_TURNS:
-                    # Must pay fine after 3 turns
-                    if player.money >= JAIL_FINE:
-                        player.remove_money(JAIL_FINE)
-                        player.leave_jail()
-                        self.log_event(
-                            f"{player.name} paid ${JAIL_FINE} fine after 3 turns in jail"
-                        )
-
-                        # Move normally
-                        self.move_player(player_id, total)
-                        self._handle_landing(player_id)
-                    else:
-                        # Can't pay fine, bankruptcy
-                        self.log_event(f"{player.name} cannot afford jail fine")
-                        self.handle_bankruptcy(player_id)
-                else:
-                    self.log_event(
-                        f"{player.name} stays in jail (turn {jail_turns}/{MAX_JAIL_TURNS})"
-                    )
-            return
-
-        # Handle doubles
-        if is_doubles:
-            self.state.doubles_count += 1
-
-            if self.state.doubles_count >= 3:
-                # Three doubles in a row = jail
-                self.log_event(f"{player.name} rolled 3 doubles in a row!")
-                self.send_to_jail(player_id)
-                return
-        else:
-            self.state.doubles_count = 0
-
-        # Move player
-        self.move_player(player_id, total)
-
-        # Handle landing
-        self._handle_landing(player_id)
+        roll(self, player_id)
 
     def _handle_landing(self, player_id: int) -> None:
-        """Handle landing on a space.
+        from .foundation import land
 
-        Orchestrates:
-        - Rent payment
-        - Card drawing
-        - Tax payment
-        - GO TO JAIL
-        - Bankruptcy checks
-
-        Args:
-            player_id: The player who landed
-        """
-        player = self._get_player(player_id)
-        space = Board.get_space(player.position)
-
-        self.log_event(f"{player.name} landed on {space.name}")
-
-        # Handle different space types
-        if space.space_type == SpaceType.PROPERTY:
-            self._handle_property_landing(player_id)
-
-        elif space.space_type == SpaceType.RAILROAD:
-            self._handle_railroad_landing(player_id)
-
-        elif space.space_type == SpaceType.UTILITY:
-            self._handle_utility_landing(player_id)
-
-        elif space.space_type == SpaceType.CHANCE:
-            self._handle_chance_card(player_id)
-
-        elif space.space_type == SpaceType.COMMUNITY_CHEST:
-            self._handle_community_chest_card(player_id)
-
-        elif space.space_type == SpaceType.INCOME_TAX:
-            self._handle_tax(player_id, INCOME_TAX_AMOUNT, "Income Tax")
-
-        elif space.space_type == SpaceType.LUXURY_TAX:
-            self._handle_tax(player_id, LUXURY_TAX_AMOUNT, "Luxury Tax")
-
-        elif space.space_type == SpaceType.GO_TO_JAIL:
-            self.send_to_jail(player_id)
+        land(self, player_id)
 
     def _handle_property_landing(self, player_id: int) -> None:
-        """Handle landing on a property."""
-        player = self._get_player(player_id)
-        prop = self.property_manager.get(player.position)
+        from .foundation import property_landing
 
-        if prop is None or not prop.is_owned or prop.owner == player_id:
-            return
-
-        # Calculate and pay rent
-        rent = calculate_rent(
-            self.property_manager,
-            player.position,
-            dice_roll=sum(self.state.last_roll) if self.state.last_roll else 0,
-        )
-
-        if rent > 0:
-            owner = self._get_player(prop.owner)  # type: ignore
-
-            if not player.remove_money(rent):
-                # Can't afford rent, bankruptcy
-                self.log_event(f"{player.name} cannot afford ${rent} rent")
-                self.handle_bankruptcy(player_id, prop.owner)
-            else:
-                owner.add_money(rent)
-                self.log_event(f"{player.name} paid ${rent} rent to {owner.name}")
+        property_landing(self, player_id)
 
     def _handle_railroad_landing(self, player_id: int) -> None:
         """Handle landing on a railroad."""
@@ -929,79 +647,9 @@ class MonopolyGame:
         self._execute_card(player_id, card)
 
     def _execute_card(self, player_id: int, card: Card) -> None:
-        """Execute a card's effect."""
-        player = self._get_player(player_id)
+        from .foundation import execute_card
 
-        if card.card_type == CardType.MOVE:
-            if card.move_to is not None:
-                self.move_player_to(player_id, card.move_to)
-                self._handle_landing(player_id)
-
-        elif card.card_type == CardType.MOVE_NEAREST:
-            if card.move_to_nearest == "railroad":
-                self._move_to_nearest_railroad(player_id, from_card=True)
-            elif card.move_to_nearest == "utility":
-                self._move_to_nearest_utility(player_id, from_card=True)
-
-        elif card.card_type == CardType.MOVE_BACK:
-            if card.move_spaces is not None:
-                self.move_player(player_id, card.move_spaces)
-                self._handle_landing(player_id)
-
-        elif card.card_type == CardType.COLLECT:
-            if card.amount is not None:
-                player.add_money(card.amount)
-                self.log_event(f"{player.name} collected ${card.amount}")
-
-        elif card.card_type == CardType.PAY:
-            if card.amount is not None:
-                if not player.remove_money(card.amount):
-                    self.log_event(f"{player.name} cannot afford ${card.amount}")
-                    self.handle_bankruptcy(player_id)
-                else:
-                    self.log_event(f"{player.name} paid ${card.amount}")
-
-        elif card.card_type == CardType.PAY_PER_BUILDING:
-            if card.per_house is not None and card.per_hotel is not None:
-                self.pay_house_hotel_repairs(
-                    player_id,
-                    card.per_house,
-                    card.per_hotel,
-                )
-
-        elif card.card_type == CardType.COLLECT_FROM_PLAYERS:
-            if card.amount is not None:
-                total = 0
-                for other in self.state.players:
-                    if other.id != player_id and not other.bankrupt:
-                        if other.remove_money(card.amount):
-                            total += card.amount
-                            player.add_money(card.amount)
-                        else:
-                            # Other player bankrupt to this player
-                            self.handle_bankruptcy(other.id, player_id)
-
-                self.log_event(f"{player.name} collected ${total} from other players")
-
-        elif card.card_type == CardType.PAY_TO_PLAYERS:
-            if card.amount is not None:
-                for other in self.state.players:
-                    if other.id != player_id and not other.bankrupt:
-                        if not player.remove_money(card.amount):
-                            # Player bankrupt
-                            self.handle_bankruptcy(player_id)
-                            return
-                        other.add_money(card.amount)
-
-                total = card.amount * (len(self.state.get_active_players()) - 1)
-                self.log_event(f"{player.name} paid ${total} to other players")
-
-        elif card.card_type == CardType.GET_OUT_OF_JAIL:
-            player.add_jail_card()
-            self.log_event(f"{player.name} received Get Out of Jail Free card")
-
-        elif card.card_type == CardType.GO_TO_JAIL:
-            self.send_to_jail(player_id)
+        execute_card(self, player_id, card)
 
     def _move_to_nearest_railroad(
         self,
@@ -1044,14 +692,9 @@ class MonopolyGame:
         self._handle_landing(player_id)
 
     def _handle_tax(self, player_id: int, amount: int, tax_name: str) -> None:
-        """Handle tax payment."""
-        player = self._get_player(player_id)
+        from .foundation import charge
 
-        if not player.remove_money(amount):
-            self.log_event(f"{player.name} cannot afford ${amount} {tax_name}")
-            self.handle_bankruptcy(player_id)
-        else:
-            self.log_event(f"{player.name} paid ${amount} {tax_name}")
+        charge(self, player_id, amount, None)
 
     def pay_house_hotel_repairs(
         self,
@@ -1098,12 +741,16 @@ class MonopolyGame:
     # Serialization
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize complete game state to JSON-compatible dict.
+        from copy import deepcopy
 
-        Returns:
-            Dictionary with all game state fields
-        """
-        return self.state.to_dict()
+        result = self.state.to_dict()
+        result["rules_id"] = self.rules_id
+        result["rng_states"] = [
+            self.rng.getstate(),
+            self.state.chance_deck._rng.getstate(),
+            self.state.chest_deck._rng.getstate(),
+        ]
+        return deepcopy(result)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "MonopolyGame":
@@ -1115,8 +762,18 @@ class MonopolyGame:
         Returns:
             Reconstructed MonopolyGame instance
         """
+        # Restored games must not retain references into the serialized snapshot.
+        from copy import deepcopy
+
+        data = deepcopy(data)
+
         # Create game with minimal initialization
         game = cls.__new__(cls)
+        from .foundation import RULES_IDS
+
+        game.rules_id = data.get("rules_id", "foundation-v1")
+        if game.rules_id not in RULES_IDS:
+            raise ValueError(f"Unknown rules ID: {game.rules_id}")
 
         # Reconstruct state
         game.state = GameState.from_dict(data)
@@ -1129,6 +786,13 @@ class MonopolyGame:
         # Create RNG (state is already deterministic from serialization)
         game.rng = random.Random()
 
+        from .foundation import tuples
+
+        states = data.get("rng_states")
+        if states is not None:
+            game.rng.setstate(tuples(states[0]))
+            game.state.chance_deck._rng.setstate(tuples(states[1]))
+            game.state.chest_deck._rng.setstate(tuples(states[2]))
         return game
 
     # Logging
@@ -1140,6 +804,10 @@ class MonopolyGame:
             message: Description of the game event
         """
         self.state.log_event(message)
+
+    def log_structured_event(self, event: dict[str, Any]) -> None:
+        """Append a deterministic public event without changing game state."""
+        self.state.structured_event_log.append(event)
 
     # Helper methods for actions.py compatibility
     # TODO: Refactor actions.py to use public orchestration methods directly
@@ -1153,53 +821,28 @@ class MonopolyGame:
         want_properties: list[int],
         want_money: int,
     ) -> int:
-        """Add a pending trade (compatibility method for actions.py)."""
-        return self.propose_trade(
-            from_player,
-            to_player,
-            give_properties,
-            give_money,
-            want_properties,
-            want_money,
-        )
+        """Reject mutation outside the authoritative action boundary."""
+        raise RuntimeError("Use ProposeTrade through apply_action")
 
     def _get_pending_trade(self, trade_id: int) -> TradeOfferData | None:
         """Get a pending trade (compatibility method for actions.py)."""
         return self.get_pending_trade(trade_id)
 
     def _remove_pending_trade(self, trade_id: int) -> None:
-        """Remove a pending trade (compatibility method for actions.py)."""
-        if trade_id in self.state.pending_trades:
-            del self.state.pending_trades[trade_id]
+        """Reject mutation outside the authoritative action boundary."""
+        raise RuntimeError("Use AcceptTrade or RejectTrade through apply_action")
 
     def _return_jail_card(self, player_id: int | None = None) -> None:
-        """Return a jail card to the deck (compatibility method for actions.py).
+        from .foundation import return_jail_card
 
-        Args:
-            player_id: Optional player ID (for compatibility with different calling conventions)
-        """
-        # Return card to appropriate deck
-        # In Monopoly, there are 2 Get Out of Jail Free cards (1 Chance, 1 Community Chest)
-        # For simplicity, we return to the deck with fewer cards
-        if len(self.state.chance_deck.cards) < len(self.state.chest_deck.cards):
-            # Return to Chance deck
-            for card in CHANCE_CARDS:
-                if card.card_type == CardType.GET_OUT_OF_JAIL:
-                    self.state.chance_deck.return_jail_card(card)
-                    break
-        else:
-            # Return to Community Chest deck
-            for card in COMMUNITY_CHEST_CARDS:
-                if card.card_type == CardType.GET_OUT_OF_JAIL:
-                    self.state.chest_deck.return_jail_card(card)
-                    break
+        return_jail_card(self, self.current_player if player_id is None else player_id)
 
     def _return_jail_cards(self, player_id: int) -> None:
         """Return all jail cards to decks (compatibility method for actions.py)."""
         player = self._get_player(player_id)
         while player.jail_cards > 0:
             player.jail_cards -= 1
-            self._return_jail_card()
+            self._return_jail_card(player_id)
 
     # Core helper methods
 

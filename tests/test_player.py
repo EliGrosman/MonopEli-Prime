@@ -2,7 +2,7 @@
 
 import pytest
 
-from monopoly_engine import Player, STARTING_MONEY, JAIL_POSITION
+from monopoly_engine import JAIL_POSITION, STARTING_MONEY, Player
 
 
 class TestPlayerBasics:

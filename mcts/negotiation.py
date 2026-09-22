@@ -116,17 +116,25 @@ class NegotiationManager:
         from_p = game.players[from_player]
         to_p = game.players[to_player]
         valid, reason = validate_trade(
-            from_p, to_p, game.property_manager,
-            give_props, give_money, want_props, want_money,
+            from_p,
+            to_p,
+            game.property_manager,
+            give_props,
+            give_money,
+            want_props,
+            want_money,
         )
         if not valid:
             raise ValueError(f"Invalid trade: {reason}")
 
         # Execute on engine
         trade_id = game.propose_trade(
-            from_player, to_player,
-            give_props, give_money,
-            want_props, want_money,
+            from_player,
+            to_player,
+            give_props,
+            give_money,
+            want_props,
+            want_money,
         )
 
         # Build the trade data for history tracking
@@ -214,8 +222,13 @@ class NegotiationManager:
         from_p = game.players[player_id]
         to_p = game.players[other_player]
         valid, reason = validate_trade(
-            from_p, to_p, game.property_manager,
-            give_props, give_money, want_props, want_money,
+            from_p,
+            to_p,
+            game.property_manager,
+            give_props,
+            give_money,
+            want_props,
+            want_money,
         )
         if not valid:
             return False
@@ -228,9 +241,12 @@ class NegotiationManager:
 
         # Step 2: Propose new trade on the engine
         new_trade_id = game.propose_trade(
-            player_id, other_player,
-            give_props, give_money,
-            want_props, want_money,
+            player_id,
+            other_player,
+            give_props,
+            give_money,
+            want_props,
+            want_money,
         )
 
         # Build trade data for history
@@ -254,7 +270,10 @@ class NegotiationManager:
         return True
 
     def accept(
-        self, game: MonopolyGame, negotiation_id: int, player_id: int,
+        self,
+        game: MonopolyGame,
+        negotiation_id: int,
+        player_id: int,
     ) -> bool:
         """Accept the current proposal. Executes accept_trade on the engine.
 
@@ -297,7 +316,10 @@ class NegotiationManager:
         return True
 
     def reject(
-        self, game: MonopolyGame, negotiation_id: int, player_id: int,
+        self,
+        game: MonopolyGame,
+        negotiation_id: int,
+        player_id: int,
     ) -> bool:
         """Reject the current proposal. Executes reject_trade on the engine.
 
@@ -335,15 +357,16 @@ class NegotiationManager:
     def get_pending_for_player(self, player_id: int) -> list[NegotiationRecord]:
         """Get all negotiations awaiting this player's response."""
         return [
-            record for record in self._negotiations.values()
-            if record.status == NegotiationStatus.PENDING
-            and record.current_responder == player_id
+            record
+            for record in self._negotiations.values()
+            if record.status == NegotiationStatus.PENDING and record.current_responder == player_id
         ]
 
     def get_active_negotiations(self) -> list[NegotiationRecord]:
         """Get all negotiations that are still pending."""
         return [
-            record for record in self._negotiations.values()
+            record
+            for record in self._negotiations.values()
             if record.status == NegotiationStatus.PENDING
         ]
 

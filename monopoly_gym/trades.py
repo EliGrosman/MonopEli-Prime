@@ -27,17 +27,39 @@ if TYPE_CHECKING:
 
 # All 28 buyable property positions (must match action_space.py)
 BUYABLE_POSITIONS: tuple[int, ...] = (
-    1, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 18, 19,
-    21, 23, 24, 25, 26, 27, 28, 29, 31, 32, 34, 35, 37, 39
+    1,
+    3,
+    5,
+    6,
+    8,
+    9,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    31,
+    32,
+    34,
+    35,
+    37,
+    39,
 )
 
 # Position to index mappings
-POSITION_TO_BUYABLE_IDX: dict[int, int] = {
-    pos: idx for idx, pos in enumerate(BUYABLE_POSITIONS)
-}
-BUYABLE_IDX_TO_POSITION: dict[int, int] = {
-    idx: pos for idx, pos in enumerate(BUYABLE_POSITIONS)
-}
+POSITION_TO_BUYABLE_IDX: dict[int, int] = {pos: idx for idx, pos in enumerate(BUYABLE_POSITIONS)}
+BUYABLE_IDX_TO_POSITION: dict[int, int] = {idx: pos for idx, pos in enumerate(BUYABLE_POSITIONS)}
 
 # Trade action space dimensions
 NUM_BUYABLE = len(BUYABLE_POSITIONS)  # 28
@@ -234,7 +256,7 @@ def calculate_trade_rewards(
     proposer_id: int,
     responder_id: int,
     proposer_gave: int,  # Property position proposer gave
-    proposer_got: int,   # Property position proposer received
+    proposer_got: int,  # Property position proposer received
     accepted: bool,
     config: TradeRewardConfig | None = None,
 ) -> dict[int, float]:
@@ -335,7 +357,7 @@ def get_strategic_property_value(
     space = Board.get_space(prop_position)
 
     # Base value is the purchase price
-    if hasattr(space, 'cost'):
+    if hasattr(space, "cost"):
         base_value = float(space.cost)
     else:
         base_value = 100.0  # Default for non-standard spaces
@@ -350,6 +372,7 @@ def get_strategic_property_value(
         color = prop.color
         if color is not None:
             from monopoly_engine.types import PROPERTY_GROUPS
+
             color_props = PROPERTY_GROUPS.get(color, ())
             owned_count = 0
             for p in color_props:
@@ -370,50 +393,41 @@ def get_strategic_property_value(
 # Based on distance from Jail (position 10) and Go To Jail (position 30)
 LANDING_FREQUENCY: dict[int, float] = {
     # Brown - low frequency
-    1: 0.95,   # Mediterranean
-    3: 0.95,   # Baltic
-
+    1: 0.95,  # Mediterranean
+    3: 0.95,  # Baltic
     # Light Blue - moderate (6-9 from Jail)
-    6: 1.1,    # Oriental
-    8: 1.1,    # Vermont
-    9: 1.1,    # Connecticut
-
+    6: 1.1,  # Oriental
+    8: 1.1,  # Vermont
+    9: 1.1,  # Connecticut
     # Magenta - moderate
     11: 1.05,  # St. Charles
     13: 1.05,  # States
     14: 1.05,  # Virginia
-
     # Orange - highest frequency! (6-9 from Jail)
-    16: 1.2,   # St. James
-    18: 1.2,   # Tennessee
-    19: 1.2,   # New York
-
+    16: 1.2,  # St. James
+    18: 1.2,  # Tennessee
+    19: 1.2,  # New York
     # Red - high frequency
     21: 1.15,  # Kentucky
     23: 1.15,  # Indiana
     24: 1.15,  # Illinois
-
     # Yellow - moderate
     26: 1.05,  # Atlantic
     27: 1.05,  # Ventnor
     29: 1.05,  # Marvin Gardens
-
     # Green - lower (far from Jail)
-    31: 1.0,   # Pacific
-    32: 1.0,   # North Carolina
-    34: 1.0,   # Pennsylvania
-
+    31: 1.0,  # Pacific
+    32: 1.0,  # North Carolina
+    34: 1.0,  # Pennsylvania
     # Dark Blue - low frequency but high rent
     37: 0.95,  # Park Place
     39: 0.95,  # Boardwalk
-
     # Railroads - moderate
-    5: 1.1,    # Reading
-    15: 1.1,   # Pennsylvania RR
-    25: 1.1,   # B&O
+    5: 1.1,  # Reading
+    15: 1.1,  # Pennsylvania RR
+    25: 1.1,  # B&O
     35: 1.05,  # Short Line
-
     # Utilities - moderate
-    12: 1.0,   # Electric Company
-    28: 1.0,   # Water Works
+    12: 1.0,  # Electric Company
+    28: 1.0,  # Water Works
 }

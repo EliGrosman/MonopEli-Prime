@@ -4,10 +4,10 @@ Tests for AI Manager service.
 
 import pytest
 
-from api.services.ai_manager import AIManager, AI_TYPES
-from api.services.game_manager import GameManager
 from agents.random_agent import RandomAgent
 from agents.rule_based import AggressiveAgent, ConservativeAgent, RuleBasedAgent
+from api.services.ai_manager import AI_TYPES, AIManager
+from api.services.game_manager import GameManager
 
 
 @pytest.fixture

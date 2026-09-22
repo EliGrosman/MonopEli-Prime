@@ -20,8 +20,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, SupportsFloat
 
@@ -42,7 +41,7 @@ from monopoly_gym import (
     SIMPLE_TRADE_DIM,
     MonopolyEnv,
 )
-from monopoly_gym.observation import flatten_observation, get_flat_observation_size
+from monopoly_gym.observation import flatten_observation
 from monopoly_gym.trades import TradeRewardConfig
 
 
@@ -199,8 +198,9 @@ class SelfPlayTradingEnv(gym.Env[NDArray[np.float32], int]):
             return obs, 0.0, True, False, info
 
         # Check if learning agent is terminated
-        if self._env.terminations.get(self._learning_agent, False) or \
-           self._env.truncations.get(self._learning_agent, False):
+        if self._env.terminations.get(self._learning_agent, False) or self._env.truncations.get(
+            self._learning_agent, False
+        ):
             # Process dead step for learning agent
             if self._env.agent_selection == self._learning_agent:
                 self._env.step(None)
@@ -224,8 +224,9 @@ class SelfPlayTradingEnv(gym.Env[NDArray[np.float32], int]):
             return obs, reward, True, False, info
 
         # Final check - if learning agent became terminated, don't step with action
-        if self._env.terminations.get(self._learning_agent, False) or \
-           self._env.truncations.get(self._learning_agent, False):
+        if self._env.terminations.get(self._learning_agent, False) or self._env.truncations.get(
+            self._learning_agent, False
+        ):
             if self._env.agent_selection == self._learning_agent:
                 self._env.step(None)
             obs = self._get_observation()
@@ -241,8 +242,7 @@ class SelfPlayTradingEnv(gym.Env[NDArray[np.float32], int]):
         if current != self._learning_agent:
             # Wrong agent selected - play until learning agent
             self._play_until_learning_agent()
-            if self._env.game.game_over or \
-               self._env.terminations.get(self._learning_agent, True):
+            if self._env.game.game_over or self._env.terminations.get(self._learning_agent, True):
                 obs = self._get_observation()
                 info = self._get_info()
                 return obs, 0.0, True, False, info
@@ -312,9 +312,7 @@ class SelfPlayTradingEnv(gym.Env[NDArray[np.float32], int]):
 
             # Get action mask from infos
             info = self._env.infos.get(current_agent, {})
-            action_mask = info.get(
-                "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
-            )
+            action_mask = info.get("action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_))
 
             # Select action from valid ones
             valid_actions = np.where(action_mask)[0]
@@ -353,9 +351,7 @@ class SelfPlayTradingEnv(gym.Env[NDArray[np.float32], int]):
     def _get_info(self) -> dict[str, Any]:
         """Get info dict with action mask."""
         agent_info = self._env.infos.get(self._learning_agent, {})
-        action_mask = agent_info.get(
-            "action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_)
-        )
+        action_mask = agent_info.get("action_mask", np.ones(ACTION_SPACE_SIZE, dtype=np.bool_))
         return {
             "action_mask": action_mask,
             "metrics": self.metrics.to_dict(),
@@ -413,9 +409,8 @@ def train_with_trades(
     """
     try:
         from sb3_contrib import MaskablePPO
-        from sb3_contrib.common.wrappers import ActionMasker
         from stable_baselines3.common.callbacks import BaseCallback
-        from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+        from stable_baselines3.common.vec_env import DummyVecEnv
     except ImportError as e:
         print(f"Error: {e}")
         print("Install training dependencies: uv sync --extra training")
@@ -426,8 +421,6 @@ def train_with_trades(
     save_path.mkdir(parents=True, exist_ok=True)
 
     # Aggregated metrics across all envs
-    global_metrics = TradeMetrics()
-
     class TradeMetricsCallback(BaseCallback):
         """Callback to track and log trade metrics."""
 
@@ -482,13 +475,19 @@ def train_with_trades(
             self.logger.record("time/elapsed_minutes", elapsed / 60)
 
             if verbose:
-                print(f"\n{'='*60}")
-                print(f"Step {self.num_timesteps:,} | Elapsed: {elapsed/60:.1f}min")
-                print(f"Games: {total_games:,} | With trades: {total_games_with_trades:,} ({games_with_trade_rate:.1%})")
-                print(f"Trades: {total_proposed:,} proposed, {total_accepted:,} accepted, {total_rejected:,} rejected")
+                print(f"\n{'=' * 60}")
+                print(f"Step {self.num_timesteps:,} | Elapsed: {elapsed / 60:.1f}min")
+                print(
+                    f"Games: {total_games:,} | With trades: {total_games_with_trades:,} "
+                    f"({games_with_trade_rate:.1%})"
+                )
+                print(
+                    f"Trades: {total_proposed:,} proposed, {total_accepted:,} accepted, "
+                    f"{total_rejected:,} rejected"
+                )
                 print(f"Acceptance rate: {acceptance_rate:.1%} | Per game: {trades_per_game:.2f}")
                 print(f"Speed: {steps_per_sec:.0f} steps/sec")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
 
     # Create vectorized environment
     def make_env(rank: int) -> gym.Env:
@@ -496,12 +495,13 @@ def train_with_trades(
             env = SelfPlayTradingEnv(num_players=4, max_turns=500)
             env.reset(seed=seed + rank if seed else None)
             return env
+
         return _init
 
     if verbose:
         print(f"Creating {num_envs} parallel environments with trades enabled...")
 
-    # Use DummyVecEnv for easier metric access (SubprocVecEnv would be faster but harder to access metrics)
+    # Use DummyVecEnv for easier metric access; subprocess workers hide these metrics.
     env = DummyVecEnv([make_env(i) for i in range(num_envs)])
 
     # Create model with action masking
@@ -640,7 +640,7 @@ Examples:
         print("\n" + "=" * 60)
         print("TRAINING COMPLETE")
         print("=" * 60)
-        print(f"Training time: {results['training_time']/60:.1f} minutes")
+        print(f"Training time: {results['training_time'] / 60:.1f} minutes")
         print(f"Model saved to: {results['model_path']}")
         print("\nFinal Trade Metrics:")
         for key, value in results["metrics"].items():

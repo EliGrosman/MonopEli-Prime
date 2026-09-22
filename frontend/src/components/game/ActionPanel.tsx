@@ -95,13 +95,8 @@ export function ActionPanel({ send }: ActionPanelProps) {
   const currentPosition = currentPlayer?.position ?? 0;
   const currentSpace = BOARD_SPACES.find((s) => s.position === currentPosition);
   const propertyInfo = PROPERTY_INFO[currentPosition];
-  const propertyAtPosition = gameState.properties[currentPosition];
-  const canBuyProperty =
-    propertyInfo &&
-    propertyAtPosition &&
-    propertyAtPosition.owner === null &&
-    (currentPlayer?.money ?? 0) >= propertyInfo.price &&
-    gameState.gamePhase === 'post_roll';
+  const canBuyProperty = (gameState.legal_actions ?? []).some((a) => a.type === 'BuyProperty');
+  const canPass = (gameState.legal_actions ?? []).some((a) => a.type === 'PassBuy');
 
   return (
     <section
@@ -179,7 +174,7 @@ export function ActionPanel({ send }: ActionPanelProps) {
       )}
 
       {/* Buy property section */}
-      {canBuyProperty && propertyInfo && (
+      {canPass && propertyInfo && (
         <div
           className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg"
           role="group"
@@ -193,7 +188,7 @@ export function ActionPanel({ send }: ActionPanelProps) {
           <div className="flex gap-2" role="group" aria-label="Purchase actions">
             <button
               onClick={() => buyProperty(currentPosition)}
-              disabled={isActionPending}
+              disabled={!canBuyProperty || isActionPending}
               className="flex-1 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 transition-colors"
               aria-label={`Buy ${propertyInfo.name} for ${propertyInfo.price.toLocaleString()} dollars`}
             >

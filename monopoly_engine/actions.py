@@ -66,6 +66,9 @@ class RollDice(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate dice roll action."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -90,6 +93,9 @@ class BuyProperty(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate property purchase."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -102,9 +108,7 @@ class BuyProperty(Action):
 
         from .rules import can_buy_property
 
-        can_buy, reason = can_buy_property(
-            player, game.property_manager, self.property_id
-        )
+        can_buy, reason = can_buy_property(player, game.property_manager, self.property_id)
         if not can_buy:
             return False, reason
 
@@ -136,6 +140,9 @@ class BuildHouse(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate house building."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -193,6 +200,9 @@ class BuildHotel(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate hotel building."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -251,15 +261,16 @@ class SellHouse(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate house selling."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         player = game.players[self.player_id]
         if player.bankrupt:
             return False, "Player is bankrupt"
 
         from .rules import can_sell_house
 
-        can_sell, reason = can_sell_house(
-            player, game.property_manager, self.property_id
-        )
+        can_sell, reason = can_sell_house(player, game.property_manager, self.property_id)
         if not can_sell:
             return False, reason
 
@@ -308,6 +319,9 @@ class SellHotel(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate hotel selling."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         player = game.players[self.player_id]
         if player.bankrupt:
             return False, "Player is bankrupt"
@@ -321,9 +335,7 @@ class SellHotel(Action):
 
         from .rules import can_sell_house
 
-        can_sell, reason = can_sell_house(
-            player, game.property_manager, self.property_id
-        )
+        can_sell, reason = can_sell_house(player, game.property_manager, self.property_id)
         if not can_sell:
             return False, reason
 
@@ -365,6 +377,9 @@ class MortgageProperty(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate property mortgaging."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         player = game.players[self.player_id]
         if player.bankrupt:
             return False, "Player is bankrupt"
@@ -405,6 +420,9 @@ class UnmortgageProperty(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate property unmortgaging."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -455,55 +473,21 @@ class ProposeTrade(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate trade proposal."""
-        if game.current_player != self.player_id:
-            return False, "Not your turn"
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
+        from .trading import validate_proposal
 
-        from_player = game.players[self.player_id]
-        if from_player.bankrupt:
-            return False, "Player is bankrupt"
-
-        if self.to_player == self.player_id:
-            return False, "Cannot trade with yourself"
-
-        if self.to_player < 0 or self.to_player >= len(game.players):
-            return False, "Invalid player ID"
-
-        to_player = game.players[self.to_player]
-        if to_player.bankrupt:
-            return False, "Cannot trade with bankrupt player"
-
-        # Validate the trade using rules
-        from .rules import validate_trade
-
-        is_valid, reason = validate_trade(
-            from_player,
-            to_player,
-            game.property_manager,
-            self.give_properties,
-            self.give_money,
-            self.want_properties,
-            self.want_money,
-        )
-        if not is_valid:
-            return False, reason
-
-        return True, ""
+        return validate_proposal(game, self)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Create a pending trade offer.
 
         The trade is stored in game state for the other player to accept/reject.
         """
-        # Store the pending trade in game state
-        # This will be implemented when game.py is created
-        game._add_pending_trade(
-            from_player=self.player_id,
-            to_player=self.to_player,
-            give_properties=self.give_properties,
-            give_money=self.give_money,
-            want_properties=self.want_properties,
-            want_money=self.want_money,
-        )
+        from .trading import propose
+
+        propose(game, self)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with all trade parameters."""
@@ -524,68 +508,18 @@ class AcceptTrade(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate trade acceptance."""
-        player = game.players[self.player_id]
-        if player.bankrupt:
-            return False, "Player is bankrupt"
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
+        from .trading import validate_response
 
-        # Check if trade exists and is directed to this player
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return False, "Trade does not exist"
-
-        if trade["to_player"] != self.player_id:
-            return False, "Trade is not for you"
-
-        # Re-validate the trade (money/properties may have changed)
-        from .rules import validate_trade
-
-        from_player = game.players[trade["from_player"]]
-        to_player = game.players[trade["to_player"]]
-
-        is_valid, reason = validate_trade(
-            from_player,
-            to_player,
-            game.property_manager,
-            trade["give_properties"],
-            trade["give_money"],
-            trade["want_properties"],
-            trade["want_money"],
-        )
-        if not is_valid:
-            return False, f"Trade no longer valid: {reason}"
-
-        return True, ""
+        return validate_response(game, self.player_id, self.trade_id, accepting=True)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Execute the trade, transferring properties and money."""
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return
+        from .trading import accept
 
-        from_player = game.players[trade["from_player"]]
-        to_player = game.players[trade["to_player"]]
-
-        # Transfer properties from from_player to to_player
-        for pos in trade["give_properties"]:
-            prop = game.property_manager.properties[pos]
-            prop.owner = to_player.id
-
-        # Transfer properties from to_player to from_player
-        for pos in trade["want_properties"]:
-            prop = game.property_manager.properties[pos]
-            prop.owner = from_player.id
-
-        # Transfer money
-        if trade["give_money"] > 0:
-            from_player.remove_money(trade["give_money"])
-            to_player.add_money(trade["give_money"])
-
-        if trade["want_money"] > 0:
-            to_player.remove_money(trade["want_money"])
-            from_player.add_money(trade["want_money"])
-
-        # Remove the trade from pending
-        game._remove_pending_trade(self.trade_id)
+        accept(game, self.player_id, self.trade_id)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with trade_id."""
@@ -602,23 +536,18 @@ class RejectTrade(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate trade rejection."""
-        player = game.players[self.player_id]
-        if player.bankrupt:
-            return False, "Player is bankrupt"
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
+        from .trading import validate_response
 
-        # Check if trade exists and is directed to this player
-        trade = game._get_pending_trade(self.trade_id)
-        if trade is None:
-            return False, "Trade does not exist"
-
-        if trade["to_player"] != self.player_id:
-            return False, "Trade is not for you"
-
-        return True, ""
+        return validate_response(game, self.player_id, self.trade_id, accepting=False)
 
     def execute(self, game: "MonopolyGame") -> None:
         """Remove the trade from pending offers."""
-        game._remove_pending_trade(self.trade_id)
+        from .trading import reject
+
+        reject(game, self.player_id, self.trade_id)
 
     def to_dict(self) -> dict[str, int | str | list[int]]:
         """Serialize with trade_id."""
@@ -633,6 +562,9 @@ class PayJailFine(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate jail fine payment."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -663,6 +595,9 @@ class UseJailCard(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate jail card usage."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -688,7 +623,7 @@ class UseJailCard(Action):
 
         # Return card to appropriate deck
         # This will be handled by game.py when implemented
-        game._return_jail_card()
+        game._return_jail_card(self.player_id)
 
 
 @dataclass
@@ -700,6 +635,9 @@ class DeclareBankruptcy(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate bankruptcy declaration."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         player = game.players[self.player_id]
 
         if player.bankrupt:
@@ -710,43 +648,8 @@ class DeclareBankruptcy(Action):
         return True, ""
 
     def execute(self, game: "MonopolyGame") -> None:
-        """Mark player as bankrupt and handle asset transfer."""
-        player = game.players[self.player_id]
-
-        # Mark player as bankrupt
-        player.bankrupt = True
-
-        # Transfer all properties back to bank (unowned)
-        for pos in game.property_manager.get_owned_by(self.player_id):
-            prop = game.property_manager.properties[pos]
-            # Remove all houses/hotels
-            if prop.houses > 0:
-                if prop.houses == 5:
-                    # Return hotel
-                    game.hotels_remaining += 1
-                    # Return 4 houses (conceptually)
-                    game.houses_remaining += 4
-                else:
-                    # Return houses
-                    game.houses_remaining += prop.houses
-                prop.houses = 0
-
-            # Clear ownership and mortgage
-            prop.owner = None
-            prop.mortgaged = False
-
-        # Return any jail cards
-        if player.jail_cards > 0:
-            # Cards go back to their decks (handled by game.py)
-            game._return_jail_cards(player.jail_cards)
-            player.jail_cards = 0
-
-        # Check if game is over (only one player left)
-        active_players = [p for p in game.players if not p.bankrupt]
-        if len(active_players) <= 1:
-            game.game_over = True
-            if len(active_players) == 1:
-                game.winner = active_players[0].id
+        debt = game.state.obligations[0]
+        game.handle_bankruptcy(self.player_id, debt["creditor"])
 
 
 @dataclass
@@ -755,6 +658,9 @@ class EndTurn(Action):
 
     def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
         """Validate turn ending."""
+        phase_valid, phase_error = game.validate_phase(self)
+        if not phase_valid:
+            return False, phase_error
         if game.current_player != self.player_id:
             return False, "Not your turn"
 
@@ -768,15 +674,50 @@ class EndTurn(Action):
         return True, ""
 
     def execute(self, game: "MonopolyGame") -> None:
-        """Advance to next player's turn."""
-        # Reset doubles counter and last roll
-        game.doubles_count = 0
-        game.last_roll = None
+        game.end_turn()
 
-        # Find next non-bankrupt player
-        next_player = (game.current_player + 1) % len(game.players)
-        while game.players[next_player].bankrupt:
-            next_player = (next_player + 1) % len(game.players)
 
-        game.current_player = next_player
-        game.turn_number += 1
+@dataclass
+class PassBuy(Action):
+    """Decline the pending purchase without ending the turn."""
+
+    def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
+        return game.validate_phase(self)
+
+    def execute(self, game: "MonopolyGame") -> None:
+        game.state.phase = "asset_management"
+
+
+@dataclass
+class SellBuildingGroup(Action):
+    """Liquidate all development in a color group; property_id identifies its first space."""
+
+    property_id: int
+
+    def validate(self, game: "MonopolyGame") -> tuple[bool, str]:
+        from .foundation import group_properties
+
+        valid, error = game.validate_phase(self)
+        if not valid:
+            return valid, error
+        props = group_properties(game, self.property_id)
+        if not props or any(p.owner != self.player_id for p in props):
+            return False, "Must own the color group"
+        return (True, "") if any(p.houses for p in props) else (False, "No buildings")
+
+    def execute(self, game: "MonopolyGame") -> None:
+        from .foundation import group_properties
+        from .rules import get_house_sale_value
+
+        for prop in group_properties(game, self.property_id):
+            game.players[self.player_id].add_money(
+                prop.houses * get_house_sale_value(prop.position)
+            )
+            if prop.houses == 5:
+                game.hotels_remaining += 1
+            else:
+                game.houses_remaining += prop.houses
+            prop.houses = 0
+
+    def to_dict(self) -> dict[str, int | str | list[int]]:
+        return {**super().to_dict(), "property_id": self.property_id}

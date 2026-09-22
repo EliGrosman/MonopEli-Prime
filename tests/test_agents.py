@@ -129,6 +129,8 @@ class TestRandomAgent:
         """choose_action should return an action that is True in the mask."""
         agent = RandomAgent(player_id=0, seed=42)
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         # Create a mask with some valid actions
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
@@ -142,6 +144,8 @@ class TestRandomAgent:
         """choose_action should return the only valid action."""
         agent = RandomAgent(player_id=0, seed=42)
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
         mask[OFFSET_END_TURN] = True  # Only valid action
@@ -152,6 +156,8 @@ class TestRandomAgent:
     def test_reproducibility_with_same_seed(self) -> None:
         """Same seed should produce same sequence of actions."""
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         # Create a mask with multiple valid actions
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
@@ -170,6 +176,8 @@ class TestRandomAgent:
     def test_different_seeds_give_different_results(self) -> None:
         """Different seeds should (usually) produce different actions."""
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         # Create a mask with many valid actions
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
@@ -189,11 +197,13 @@ class TestRandomAgent:
         """Should return OFFSET_END_TURN when mask is all False."""
         agent = RandomAgent(player_id=0, seed=42)
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)  # All False
 
-        action = agent.choose_action({}, mask, game)
-        assert action == OFFSET_END_TURN
+        with pytest.raises(RuntimeError, match="no legal actions"):
+            agent.choose_action({}, mask, game)
 
     def test_reset_does_not_raise(self) -> None:
         """reset() should not raise errors."""
@@ -215,6 +225,8 @@ class TestRandomAgent:
         """Actions should be uniformly distributed among valid options."""
         agent = RandomAgent(player_id=0, seed=42)
         game = MonopolyGame(num_players=2, seed=123)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         # Create a mask with exactly 3 valid actions
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
@@ -273,11 +285,14 @@ class TestRuleBasedAgent:
         """Agent should buy when cost < threshold * money."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=0.9)  # High threshold
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Move player to Mediterranean (position 1, cost $60)
         # Player has $1500, so $60 < 0.9 * $1500 = $1350 -> should buy
         game.players[0].position = 1
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, 0)
         assert mask[OFFSET_BUY_PROPERTY], "Buy should be valid"
@@ -289,11 +304,14 @@ class TestRuleBasedAgent:
         """Agent should pass when cost >= threshold * money."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=0.01)  # Very low threshold
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Move player to Mediterranean (position 1, cost $60)
         # Player has $1500, so $60 >= 0.01 * $1500 = $15 -> should pass
         game.players[0].position = 1
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, 0)
         assert mask[OFFSET_PASS_BUY], "Pass should be valid"
@@ -305,11 +323,14 @@ class TestRuleBasedAgent:
         """Agent should end turn when cannot afford property (no buy/pass in mask)."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=0.9)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Reduce money so player can't afford
         game.players[0].money = 50  # Mediterranean costs $60
         game.players[0].position = 1
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, 0)
         # Buy won't be in mask since can't afford
@@ -320,12 +341,14 @@ class TestRuleBasedAgent:
         action = agent.choose_action({}, mask, game)
         # When buy isn't available, agent ends turn (or does other actions if available)
         # In this case, there are no other priority actions, so it ends turn
-        assert action == OFFSET_END_TURN
+        assert action == OFFSET_PASS_BUY
 
     def test_priority_buy_over_build(self) -> None:
         """Buy property has priority over building."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=0.9, build_threshold=0.9)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player a monopoly with buildable houses
@@ -335,6 +358,7 @@ class TestRuleBasedAgent:
 
         # Move to an unowned property
         game.players[0].position = 6  # Oriental Avenue
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, 0)
         # Both buy and build should be available
@@ -351,10 +375,14 @@ class TestRuleBasedAgent:
         """Agent should use jail card when in jail and has one."""
         agent = RuleBasedAgent(player_id=0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Put player in jail with a jail card
         game.players[0].in_jail = True
+        game.state.phase = "jail_decision"
+        game.state.roll_owed = True
         game.players[0].jail_cards = 1
         game.players[0].position = 10  # Jail position
 
@@ -368,10 +396,14 @@ class TestRuleBasedAgent:
         """Agent should pay fine when in jail without card."""
         agent = RuleBasedAgent(player_id=0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Put player in jail without a jail card
         game.players[0].in_jail = True
+        game.state.phase = "jail_decision"
+        game.state.roll_owed = True
         game.players[0].jail_cards = 0
         game.players[0].position = 10  # Jail position
         game.players[0].money = 500  # Can afford fine
@@ -387,6 +419,8 @@ class TestRuleBasedAgent:
         """Agent should build houses when has monopoly and sufficient money."""
         agent = RuleBasedAgent(player_id=0, build_threshold=0.5)  # Build if cost < 50% money
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player Brown monopoly (cheap to build on)
@@ -410,6 +444,8 @@ class TestRuleBasedAgent:
         """Agent should build hotels when property has 4 houses."""
         agent = RuleBasedAgent(player_id=0, build_threshold=0.9)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player Brown monopoly with 4 houses on each
@@ -429,12 +465,16 @@ class TestRuleBasedAgent:
         assert len(hotel_actions) > 0, "Should be able to build hotels"
 
         action = agent.choose_action({}, mask, game)
-        assert OFFSET_BUILD_HOTEL <= action < OFFSET_BUILD_HOTEL + 22
+        decoded = encoder.decode(action, 0, game)
+        game.apply_action(0, decoded)
+        assert game.property_manager.properties[decoded.property_id].houses == 5
 
     def test_unmortgages_when_affordable(self) -> None:
         """Agent should unmortgage properties when affordable."""
         agent = RuleBasedAgent(player_id=0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player a mortgaged property
@@ -448,9 +488,7 @@ class TestRuleBasedAgent:
         mask = encoder.get_action_mask(game, 0)
 
         # Find unmortgage actions
-        unmortgage_actions = [
-            i for i in range(OFFSET_UNMORTGAGE, OFFSET_END_TURN) if mask[i]
-        ]
+        unmortgage_actions = [i for i in range(OFFSET_UNMORTGAGE, OFFSET_END_TURN) if mask[i]]
         assert len(unmortgage_actions) > 0, "Should be able to unmortgage"
 
         action = agent.choose_action({}, mask, game)
@@ -461,6 +499,8 @@ class TestRuleBasedAgent:
         """Agent should end turn when no better actions available."""
         agent = RuleBasedAgent(player_id=0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Player on Go with no properties
@@ -475,6 +515,8 @@ class TestRuleBasedAgent:
         """Agent should not build if money would go below reserve."""
         agent = RuleBasedAgent(player_id=0, build_threshold=0.3)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player Brown monopoly
@@ -496,9 +538,7 @@ class TestRuleBasedAgent:
         build_threshold=st.floats(0.0, 1.0),
     )
     @settings(max_examples=10)
-    def test_thresholds_in_valid_range(
-        self, buy_threshold: float, build_threshold: float
-    ) -> None:
+    def test_thresholds_in_valid_range(self, buy_threshold: float, build_threshold: float) -> None:
         """Agent should accept any threshold in [0, 1]."""
         agent = RuleBasedAgent(
             player_id=0,
@@ -1045,25 +1085,15 @@ class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     def test_random_agent_handles_all_false_mask(self) -> None:
-        """RandomAgent should handle empty mask gracefully."""
-        agent = RandomAgent(player_id=0, seed=42)
-        game = MonopolyGame(num_players=2, seed=123)
-
-        mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
-        action = agent.choose_action({}, mask, game)
-
-        assert action == OFFSET_END_TURN  # Fallback
+        agent = RandomAgent(0, seed=1)
+        with pytest.raises(RuntimeError, match="no legal actions"):
+            agent.choose_action({}, np.zeros(ACTION_SPACE_SIZE, dtype=bool), MonopolyGame(2))
 
     def test_rulebased_agent_handles_all_false_mask(self) -> None:
-        """RuleBasedAgent should handle empty mask gracefully."""
         agent = RuleBasedAgent(player_id=0)
         game = MonopolyGame(num_players=2, seed=123)
-
-        mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
-        action = agent.choose_action({}, mask, game)
-
-        # Should return end turn (which is checked regardless of mask)
-        assert action == OFFSET_END_TURN
+        with pytest.raises(RuntimeError):
+            agent.choose_action({}, np.zeros(ACTION_SPACE_SIZE, dtype=bool), game)
 
     def test_agent_with_bankrupt_player(self) -> None:
         """Agent should handle being bankrupt."""
@@ -1082,17 +1112,20 @@ class TestEdgeCases:
         assert not mask.any(), "Bankrupt player should have no valid actions"
 
         # Agent should still return something
-        action = agent.choose_action({}, mask, env.game)
-        assert action == OFFSET_END_TURN  # Fallback
+        with pytest.raises(RuntimeError, match="no legal actions"):
+            agent.choose_action({}, mask, env.game)
 
     def test_rulebased_with_extreme_thresholds_zero(self) -> None:
         """RuleBasedAgent with threshold 0 should never buy/build."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=0.0, build_threshold=0.0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Move to a property
         game.players[0].position = 1
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, 0)
 
@@ -1104,10 +1137,13 @@ class TestEdgeCases:
         """RuleBasedAgent with threshold 1 should buy if has any money."""
         agent = RuleBasedAgent(player_id=0, buy_threshold=1.0, build_threshold=1.0)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Move to Mediterranean (cost $60)
         game.players[0].position = 1
+        game.state.phase = "purchase_decision"
         game.players[0].money = 100  # Can afford, and $60 < 1.0 * $100
 
         mask = encoder.get_action_mask(game, 0)
@@ -1119,6 +1155,8 @@ class TestEdgeCases:
         """Agent should pick one of multiple valid build actions."""
         agent = RuleBasedAgent(player_id=0, build_threshold=0.9)
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
         encoder = ActionEncoder()
 
         # Give player Brown and Light Blue monopolies
@@ -1143,6 +1181,8 @@ class TestEdgeCases:
     def test_agent_player_id_matches_game_player(self) -> None:
         """Agent player_id should correspond to correct game player."""
         game = MonopolyGame(num_players=4, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         for player_id in range(4):
             agent = RandomAgent(player_id=player_id, seed=100 + player_id)
@@ -1166,16 +1206,13 @@ class TestPropertyBasedAgent:
         seed=st.integers(0, 10000),
     )
     @settings(max_examples=10, deadline=None)
-    def test_random_agent_always_returns_valid_action(
-        self, num_players: int, seed: int
-    ) -> None:
+    def test_random_agent_always_returns_valid_action(self, num_players: int, seed: int) -> None:
         """RandomAgent should always return a valid action."""
         env = MonopolyEnv(num_players=num_players)
         env.reset(seed=seed)
 
         agents = {
-            f"player_{i}": RandomAgent(player_id=i, seed=seed + i)
-            for i in range(num_players)
+            f"player_{i}": RandomAgent(player_id=i, seed=seed + i) for i in range(num_players)
         }
 
         steps = 0
@@ -1250,6 +1287,8 @@ class TestPropertyBasedAgent:
     def test_random_agent_seed_determinism(self, seed: int) -> None:
         """Same seed should always produce same first action."""
         game = MonopolyGame(num_players=2, seed=42)
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
 
         mask = np.zeros(ACTION_SPACE_SIZE, dtype=np.bool_)
         mask[OFFSET_END_TURN] = True

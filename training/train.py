@@ -39,6 +39,7 @@ class TrainingConfig:
         num_envs: Number of parallel environments
         seed: Random seed
     """
+
     total_timesteps: int = 1_000_000
     learning_rate: float = 3e-4
     n_steps: int = 2048
@@ -64,10 +65,12 @@ class EnvironmentConfig:
         max_turns: Max turns before truncation
         reward_type: Reward type ("sparse" or "dense")
     """
+
     num_players: int = 2
     opponent_type: str = "random"
     max_turns: int = 1000
     reward_type: str = "sparse"
+    rules_id: str = "foundation-v1"
 
 
 def make_env(
@@ -83,6 +86,7 @@ def make_env(
     Returns:
         Factory function that creates environments
     """
+
     def _init() -> Any:
         from monopoly_gym import SingleAgentMonopolyEnv
 
@@ -92,6 +96,7 @@ def make_env(
             max_turns=env_config.max_turns,
             reward_type=env_config.reward_type,
             seed=seed,
+            rules_id=env_config.rules_id,
         )
         return env
 
@@ -113,11 +118,13 @@ def create_vectorized_env(
     Returns:
         Vectorized environment
     """
+    import numpy as np
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
     env_fns = []
+    streams = np.random.SeedSequence(seed).spawn(num_envs)
     for i in range(num_envs):
-        env_seed = seed + i if seed is not None else None
+        env_seed = int(streams[i].generate_state(1)[0])
         env_fns.append(make_env(env_config, env_seed))
 
     # Use SubprocVecEnv for true parallelism, DummyVecEnv for debugging
@@ -256,6 +263,9 @@ def train_agent(
 
     # Save final model
     model.save(str(save_path))
+    from training.compatibility import write_checkpoint_metadata
+
+    write_checkpoint_metadata(save_path, env_config.rules_id, env_config.num_players)
 
     # Cleanup
     train_env.close()
@@ -264,7 +274,12 @@ def train_agent(
     return model
 
 
-def load_model(model_path: str | Path) -> Any:
+def load_model(
+    model_path: str | Path,
+    env_config: EnvironmentConfig | None = None,
+    *,
+    allow_legacy_v2: bool = False,
+) -> Any:
     """Load a trained model.
 
     Args:
@@ -275,4 +290,13 @@ def load_model(model_path: str | Path) -> Any:
     """
     from sb3_contrib import MaskablePPO
 
+    from training.compatibility import validate_checkpoint_metadata
+
+    config = env_config or EnvironmentConfig()
+    validate_checkpoint_metadata(
+        model_path,
+        config.rules_id,
+        config.num_players,
+        allow_legacy_v2=allow_legacy_v2,
+    )
     return MaskablePPO.load(str(model_path))

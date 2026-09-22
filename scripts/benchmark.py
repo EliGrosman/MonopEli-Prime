@@ -61,9 +61,7 @@ def play_game_fast(seed: int, max_turns: int = 300) -> tuple[bool, int, float]:
                 if prop and prop.owner is None:
                     cost = getattr(space, "cost", 0)
                     if cost > 0 and cost <= 200 and player.money >= cost + 100:
-                        BuyProperty(player_id=player_id, property_id=player.position).execute(
-                            game
-                        )
+                        BuyProperty(player_id=player_id, property_id=player.position).execute(game)
 
         EndTurn(player_id=player_id).execute(game)
 
@@ -280,7 +278,7 @@ def print_results(results: dict[str, Any]) -> None:
         t = results["throughput"]
         print("\n📊 THROUGHPUT")
         print(f"  Games played: {t['num_games']}")
-        pct = t['completed_games'] / t['num_games'] * 100
+        pct = t["completed_games"] / t["num_games"] * 100
         print(f"  Completed: {t['completed_games']} ({pct:.1f}%)")
         print(f"  Total turns: {t['total_turns']}")
         print(f"  Elapsed: {t['elapsed_seconds']:.2f}s")

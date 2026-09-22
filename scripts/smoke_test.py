@@ -33,7 +33,9 @@ def main() -> None:
     try:
         resp = urllib.request.urlopen(f"{base}/health", timeout=10)
         data = json.loads(resp.read())
-        results.append(check("Health check", data.get("status") == "healthy", f"v{data.get('version', '?')}"))
+        results.append(
+            check("Health check", data.get("status") == "healthy", f"v{data.get('version', '?')}")
+        )
     except Exception as e:
         results.append(check("Health check", False, str(e)))
 
@@ -74,10 +76,12 @@ def main() -> None:
         try:
             req = urllib.request.Request(
                 f"{base}/api/lobbies",
-                data=json.dumps({
-                    "host_name": "SmokeTest",
-                    "lobby_name": "Smoke Test Lobby",
-                }).encode(),
+                data=json.dumps(
+                    {
+                        "host_name": "SmokeTest",
+                        "lobby_name": "Smoke Test Lobby",
+                    }
+                ).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
@@ -92,7 +96,9 @@ def main() -> None:
     try:
         resp = urllib.request.urlopen(f"{base}/", timeout=10)
         body = resp.read().decode()
-        results.append(check("Frontend loads", "<html" in body.lower() or "<!doctype" in body.lower()))
+        results.append(
+            check("Frontend loads", "<html" in body.lower() or "<!doctype" in body.lower())
+        )
     except Exception as e:
         results.append(check("Frontend loads", False, str(e)))
 

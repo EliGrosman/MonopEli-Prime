@@ -16,7 +16,6 @@ from monopoly_gym.observation import (
     MAX_JAIL_CARDS,
     MAX_JAIL_TURNS,
     ObservationEncoder,
-    get_flat_observation_size,
 )
 
 
@@ -53,16 +52,10 @@ def extract_features(
     ps = obs["player_state"]
     assert isinstance(ps, dict)
     flat_parts.append(ps["money"].flatten().astype(np.float32))
-    flat_parts.append(
-        np.array([float(ps["position"]) / (BOARD_SIZE - 1)], dtype=np.float32)
-    )
+    flat_parts.append(np.array([float(ps["position"]) / (BOARD_SIZE - 1)], dtype=np.float32))
     flat_parts.append(np.array([float(ps["in_jail"])], dtype=np.float32))
-    flat_parts.append(
-        np.array([float(ps["jail_turns"]) / MAX_JAIL_TURNS], dtype=np.float32)
-    )
-    flat_parts.append(
-        np.array([float(ps["jail_cards"]) / MAX_JAIL_CARDS], dtype=np.float32)
-    )
+    flat_parts.append(np.array([float(ps["jail_turns"]) / MAX_JAIL_TURNS], dtype=np.float32))
+    flat_parts.append(np.array([float(ps["jail_cards"]) / MAX_JAIL_CARDS], dtype=np.float32))
     flat_parts.append(ps["properties_owned"].astype(np.float32))
 
     # Opponent states (already normalized in [0, 1])
@@ -99,5 +92,6 @@ def get_feature_size(num_players: int = 4) -> int:
     Returns:
         Feature vector dimension.
     """
-    action_mask_size = 149
-    return get_flat_observation_size(num_players) - action_mask_size
+    # Frozen experimental feature layout; learned search is not certified.
+    # Do not infer its size from the independently versioned Gym observation.
+    return 33 + (num_players - 1) * 34 + 140 + 4

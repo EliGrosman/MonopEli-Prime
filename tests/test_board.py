@@ -1,16 +1,13 @@
 """Tests for board.py module."""
 
-import pytest
-
 from monopoly_engine import (
     Board,
-    Space,
+    PropertyColor,
     PropertySpace,
     RailroadSpace,
-    UtilitySpace,
-    TaxSpace,
     SpaceType,
-    PropertyColor,
+    TaxSpace,
+    UtilitySpace,
 )
 
 
@@ -92,9 +89,7 @@ class TestPropertySpaces:
         for i in range(1, 6):
             assert space.rent[i] > space.rent[i - 1]
 
-    def test_all_properties_have_valid_data(
-        self, all_property_positions: list[int]
-    ) -> None:
+    def test_all_properties_have_valid_data(self, all_property_positions: list[int]) -> None:
         """All properties should have valid cost, rent, etc."""
         for pos in all_property_positions:
             space = Board.get_space(pos)
@@ -129,8 +124,8 @@ class TestRailroadSpaces:
         """Railroad rent should double with each owned."""
         space = Board.get_space(5)
         assert isinstance(space, RailroadSpace)
-        assert space.rent[0] == 25   # 1 owned
-        assert space.rent[1] == 50   # 2 owned
+        assert space.rent[0] == 25  # 1 owned
+        assert space.rent[1] == 50  # 2 owned
         assert space.rent[2] == 100  # 3 owned
         assert space.rent[3] == 200  # 4 owned
 

@@ -61,10 +61,9 @@ export function BuildingControls({ send }: BuildingControlsProps) {
           const propInfo = PROPERTY_INFO[pos];
           const houses = state?.houses ?? 0;
 
-          // Check even building rule
-          const groupHouses = positions.map((p) => gameState.properties[p]?.houses ?? 0);
-          const minHouses = Math.min(...groupHouses);
-          const maxHouses = Math.max(...groupHouses);
+          const legal = (type: string) =>
+            gameState.decision_player === playerId &&
+            (gameState.legal_actions ?? []).some((a) => a.type === type && a.property_id === pos);
 
           return {
             position: pos,
@@ -72,12 +71,8 @@ export function BuildingControls({ send }: BuildingControlsProps) {
             houses,
             mortgaged: state?.mortgaged ?? false,
             buildCost: propInfo?.buildCost || 0,
-            canBuild:
-              houses < 5 &&
-              !state?.mortgaged &&
-              houses <= minHouses &&
-              (gameState.housesRemaining > 0 || houses === 4),
-            canSell: houses > 0 && houses >= maxHouses,
+            canBuild: legal(houses === 4 ? 'BuildHotel' : 'BuildHouse'),
+            canSell: legal(houses === 5 ? 'SellHotel' : 'SellHouse'),
           };
         });
 
@@ -100,7 +95,13 @@ export function BuildingControls({ send }: BuildingControlsProps) {
       .filter((p) => {
         const propInfo = PROPERTY_INFO[p.position];
         // Can mortgage if no houses and not already mortgaged
-        return p.houses === 0 && !p.mortgaged && propInfo;
+        return (
+          propInfo &&
+          gameState.decision_player === playerId &&
+          (gameState.legal_actions ?? []).some(
+            (a) => a.type === 'MortgageProperty' && a.property_id === p.position
+          )
+        );
       })
       .map((p) => {
         const propInfo = PROPERTY_INFO[p.position];
@@ -117,14 +118,18 @@ export function BuildingControls({ send }: BuildingControlsProps) {
     if (!gameState || playerId === null) return [];
 
     const ownedProps = getPlayerProperties(playerId);
-    const player = gameState.players.find((p) => p.id === playerId);
 
     return ownedProps
       .filter((p) => {
         const propInfo = PROPERTY_INFO[p.position];
-        const unmortgageCost = Math.floor((propInfo?.mortgageValue || 0) * 1.1);
         // Can unmortgage if mortgaged and have enough money
-        return p.mortgaged && (player?.money ?? 0) >= unmortgageCost;
+        return (
+          propInfo &&
+          gameState.decision_player === playerId &&
+          (gameState.legal_actions ?? []).some(
+            (a) => a.type === 'UnmortgageProperty' && a.property_id === p.position
+          )
+        );
       })
       .map((p) => {
         const propInfo = PROPERTY_INFO[p.position];

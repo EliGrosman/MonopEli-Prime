@@ -15,7 +15,6 @@ Usage:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -36,6 +35,7 @@ class EvaluationResult:
         avg_reward: Average total reward
         games_per_second: Throughput metric
     """
+
     opponent_type: str
     num_games: int
     wins: int
@@ -66,6 +66,7 @@ class EvaluationSummary:
         total_wins: Total wins
         overall_win_rate: Overall win percentage
     """
+
     model_path: str
     results: dict[str, EvaluationResult] = field(default_factory=dict)
 
@@ -100,54 +101,10 @@ def play_game(
     seed: int | None = None,
     deterministic: bool = True,
 ) -> tuple[bool, int, float]:
-    """Play a single game and return result.
-
-    Args:
-        model: Trained model
-        opponent_type: Type of opponent
-        num_players: Number of players
-        max_turns: Max turns before truncation
-        seed: Random seed
-        deterministic: Whether to use deterministic actions
-
-    Returns:
-        Tuple of (won, game_length, total_reward)
-    """
-    from monopoly_gym import SingleAgentMonopolyEnv
-
-    env = SingleAgentMonopolyEnv(
-        num_players=num_players,
-        opponent_type=opponent_type,
-        max_turns=max_turns,
-        reward_type="sparse",
-        seed=seed,
+    raise RuntimeError(
+        "Legacy tuple evaluation cannot represent errors/cutoffs; "
+        "use evaluation.runner.evaluate_policy"
     )
-
-    obs, info = env.reset()
-    total_reward = 0.0
-    steps = 0
-
-    while True:
-        action_mask = info.get("action_mask")
-        if action_mask is not None:
-            action, _ = model.predict(obs, action_masks=action_mask, deterministic=deterministic)
-        else:
-            action, _ = model.predict(obs, deterministic=deterministic)
-
-        obs, reward, terminated, truncated, info = env.step(int(action))
-        total_reward += float(reward)
-        steps += 1
-
-        if terminated or truncated:
-            break
-
-    env.close()
-
-    # Determine if we won (reward > 0 means win in sparse reward)
-    won = float(reward) > 0
-    # Note: draw = truncated and not terminated (unused but kept for clarity)
-
-    return won, steps, total_reward
 
 
 def evaluate_against_opponent(
@@ -160,66 +117,30 @@ def evaluate_against_opponent(
     deterministic: bool = True,
     verbose: bool = False,
 ) -> EvaluationResult:
-    """Evaluate model against a specific opponent type.
+    from evaluation.runner import evaluate_policy, summarize
 
-    Args:
-        model: Trained model
-        opponent_type: Type of opponent
-        num_games: Number of games to play
-        num_players: Number of players
-        max_turns: Max turns per game
-        seed: Base random seed
-        deterministic: Whether to use deterministic actions
-        verbose: Print progress
-
-    Returns:
-        Evaluation results
-    """
-    wins = 0
-    losses = 0
-    draws = 0
-    total_length = 0
-    total_reward = 0.0
-
-    start_time = time.time()
-
-    for i in range(num_games):
-        game_seed = seed + i if seed is not None else None
-        won, length, reward = play_game(
-            model,
-            opponent_type=opponent_type,
-            num_players=num_players,
-            max_turns=max_turns,
-            seed=game_seed,
-            deterministic=deterministic,
-        )
-
-        if reward > 0:
-            wins += 1
-        elif reward < 0:
-            losses += 1
-        else:
-            draws += 1
-
-        total_length += length
-        total_reward += reward
-
-        if verbose and (i + 1) % 10 == 0:
-            current_win_rate = wins / (i + 1)
-            print(f"  Game {i + 1}/{num_games}: {current_win_rate:.1%} win rate")
-
-    elapsed = time.time() - start_time
-
+    rows = evaluate_policy(
+        model,
+        opponent_type,
+        num_games,
+        num_players,
+        max_turns,
+        17000000 if seed is None else seed,
+        deterministic,
+    )
+    report = summarize(rows)
+    if report["counts"].get("error", 0) or report["counts"].get("stalled", 0):
+        raise RuntimeError(f"Evaluation invalid: {report}")
     return EvaluationResult(
         opponent_type=opponent_type,
         num_games=num_games,
-        wins=wins,
-        losses=losses,
-        draws=draws,
-        win_rate=wins / num_games if num_games > 0 else 0.0,
-        avg_game_length=total_length / num_games if num_games > 0 else 0.0,
-        avg_reward=total_reward / num_games if num_games > 0 else 0.0,
-        games_per_second=num_games / elapsed if elapsed > 0 else 0.0,
+        wins=report["wins"],
+        losses=report["losses"],
+        draws=report["counts"].get("cutoff", 0),
+        win_rate=report["win_rate"],
+        avg_game_length=sum(r["turns"] for r in rows) / num_games,
+        avg_reward=(report["wins"] - report["losses"]) / num_games,
+        games_per_second=num_games / sum(r["runtime_seconds"] for r in rows),
     )
 
 

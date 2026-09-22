@@ -15,7 +15,6 @@ import csv
 import glob
 import os
 import statistics
-from pathlib import Path
 
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
@@ -39,9 +38,7 @@ def find_experiments(models_dir: str) -> dict[str, str]:
         tb_dir = os.path.join(models_dir, exp_name, "tensorboard")
         if not os.path.isdir(tb_dir):
             continue
-        event_files = glob.glob(
-            os.path.join(tb_dir, "**", "events.out.*"), recursive=True
-        )
+        event_files = glob.glob(os.path.join(tb_dir, "**", "events.out.*"), recursive=True)
         if event_files:
             experiments[exp_name] = os.path.dirname(event_files[0])
     return experiments
@@ -74,7 +71,8 @@ def write_per_experiment_csv(
         writer.writerow(["step"] + tags)
         for step in sorted_steps:
             row = [step] + [
-                tag_lookup[tag].get(step, "") for tag in tags  # type: ignore[list-item]
+                tag_lookup[tag].get(step, "")
+                for tag in tags  # type: ignore[list-item]
             ]
             writer.writerow(row)
 
@@ -141,9 +139,7 @@ def generate_eval_timeline(
     vs_rb = {s: v for s, v in data.get("eval/vs_rule_based", [])}
     lr = {s: v for s, v in data.get("train/learning_rate", [])}
 
-    all_eval_steps = sorted(
-        set(list(vs_random.keys()) + list(vs_rb.keys()))
-    )
+    all_eval_steps = sorted(set(list(vs_random.keys()) + list(vs_rb.keys())))
     if not all_eval_steps:
         return []
 
@@ -159,9 +155,7 @@ def generate_eval_timeline(
             "vs_random": f"{vs_random.get(closest, -1) * 100:.0f}%"
             if closest in vs_random
             else "-",
-            "vs_rule_based": f"{vs_rb.get(closest, -1) * 100:.0f}%"
-            if closest in vs_rb
-            else "-",
+            "vs_rule_based": f"{vs_rb.get(closest, -1) * 100:.0f}%" if closest in vs_rb else "-",
         }
         if closest in lr:
             row["learning_rate"] = f"{lr[closest]:.2e}"
@@ -182,9 +176,7 @@ def write_markdown_report(
     lines.append("")
     lines.append(f"**Generated**: {__import__('datetime').date.today()}")
     lines.append(f"**Experiments**: {len(all_data)}")
-    lines.append(
-        f"**Source**: TensorBoard event files from `models/` directory"
-    )
+    lines.append("**Source**: TensorBoard event files from `models/` directory")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -217,21 +209,9 @@ def write_markdown_report(
             if rb_stats
             else "-"
         )
-        final_r = (
-            f"{random_stats.get('final', 0) * 100:.0f}%"
-            if random_stats
-            else "-"
-        )
-        final_rb = (
-            f"{rb_stats.get('final', 0) * 100:.0f}%"
-            if rb_stats
-            else "-"
-        )
-        total = (
-            f"{random_stats.get('total_steps', 0) / 1000:.0f}k"
-            if random_stats
-            else "-"
-        )
+        final_r = f"{random_stats.get('final', 0) * 100:.0f}%" if random_stats else "-"
+        final_rb = f"{rb_stats.get('final', 0) * 100:.0f}%" if rb_stats else "-"
+        total = f"{random_stats.get('total_steps', 0) / 1000:.0f}k" if random_stats else "-"
 
         # Determine status
         final_r_val = random_stats.get("final", 0)
@@ -246,8 +226,7 @@ def write_markdown_report(
             status = "Degraded"
 
         lines.append(
-            f"| {exp_name} | {total} | {peak_r} | {peak_rb} |"
-            f" {final_r} | {final_rb} | {status} |"
+            f"| {exp_name} | {total} | {peak_r} | {peak_rb} | {final_r} | {final_rb} | {status} |"
         )
 
     lines.append("")
@@ -268,14 +247,9 @@ def write_markdown_report(
                 continue
             stats = compute_summary_stats(data[tag])
             lines.append(f"**{tag}**:")
-            lines.append(
-                f"- Peak: {stats['peak_value'] * 100:.1f}%"
-                f" at step {stats['peak_step']:,}"
-            )
+            lines.append(f"- Peak: {stats['peak_value'] * 100:.1f}% at step {stats['peak_step']:,}")
             lines.append(f"- Final: {stats['final'] * 100:.1f}%")
-            lines.append(
-                f"- Last 5 evals mean: {stats['last_5_mean'] * 100:.1f}%"
-            )
+            lines.append(f"- Last 5 evals mean: {stats['last_5_mean'] * 100:.1f}%")
             lines.append(f"- Overall mean: {stats['mean'] * 100:.1f}%")
             lines.append("")
 
@@ -288,9 +262,7 @@ def write_markdown_report(
             lines.append("| " + " | ".join(headers) + " |")
             lines.append("|" + "---|" * len(headers))
             for row in timeline:
-                lines.append(
-                    "| " + " | ".join(str(row.get(h, "-")) for h in headers) + " |"
-                )
+                lines.append("| " + " | ".join(str(row.get(h, "-")) for h in headers) + " |")
             lines.append("")
 
         # Training diagnostics
@@ -367,9 +339,7 @@ def write_markdown_report(
         r_stats = compute_summary_stats(vs_r) if vs_r else {}
         rb_stats = compute_summary_stats(vs_rb) if vs_rb else {}
         collapsed = (
-            "YES"
-            if r_stats.get("final", 0) == 0 and r_stats.get("peak_value", 0) > 0.2
-            else "No"
+            "YES" if r_stats.get("final", 0) == 0 and r_stats.get("peak_value", 0) > 0.2 else "No"
         )
         lines.append(
             f"| {exp_name}"
@@ -386,8 +356,14 @@ def write_markdown_report(
     lines.append("")
     lines.append("For detailed analysis, the raw data is available as CSV:")
     lines.append("")
-    lines.append("- `results/csv/all_experiments.csv` - All experiments in long format (experiment, tag, step, value)")
-    lines.append("- `results/csv/<experiment>.csv` - Per-experiment wide format (step, metric1, metric2, ...)")
+    lines.append(
+        "- `results/csv/all_experiments.csv` - All experiments in long format "
+        "(experiment, tag, step, value)"
+    )
+    lines.append(
+        "- `results/csv/<experiment>.csv` - Per-experiment wide format "
+        "(step, metric1, metric2, ...)"
+    )
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -402,9 +378,7 @@ def write_markdown_report(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Export TensorBoard data to CSV + Markdown"
-    )
+    parser = argparse.ArgumentParser(description="Export TensorBoard data to CSV + Markdown")
     parser.add_argument(
         "--models-dir",
         default="models/",

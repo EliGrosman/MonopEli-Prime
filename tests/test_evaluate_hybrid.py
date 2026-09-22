@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 # Ensure scripts/ is importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
@@ -26,6 +28,7 @@ from mcts.negotiation import NegotiationManager
 # ---------------------------------------------------------------------------
 # _EvalLLMClient
 # ---------------------------------------------------------------------------
+
 
 class TestEvalLLMClient:
     def test_complete_json_returns_no_trade(self) -> None:
@@ -50,6 +53,7 @@ class TestEvalLLMClient:
 # _create_opponent
 # ---------------------------------------------------------------------------
 
+
 class TestCreateOpponent:
     def test_creates_random(self) -> None:
         agent = _create_opponent("random", 1)
@@ -72,6 +76,7 @@ class TestCreateOpponent:
 # ---------------------------------------------------------------------------
 # EvalResults
 # ---------------------------------------------------------------------------
+
 
 class TestEvalResults:
     def test_empty_results(self) -> None:
@@ -107,7 +112,13 @@ class TestEvalResults:
 # play_eval_game
 # ---------------------------------------------------------------------------
 
+
 class TestPlayEvalGame:
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_runs_single_game(self) -> None:
         """Verify a single game runs to completion."""
         llm_client = _EvalLLMClient()
@@ -119,14 +130,19 @@ class TestPlayEvalGame:
         )
         mgr = NegotiationManager()
         agent = HybridAgent(
-            player_id=0, config=config,
-            negotiation_manager=mgr, llm_client=llm_client,
+            player_id=0,
+            config=config,
+            negotiation_manager=mgr,
+            llm_client=llm_client,
         )
         opponents = [RandomAgent(player_id=1)]
 
         result = play_eval_game(
-            agent, opponents, llm_client,
-            max_turns=200, seed=42,
+            agent,
+            opponents,
+            llm_client,
+            max_turns=200,
+            seed=42,
         )
 
         assert isinstance(result, GameResult)
@@ -134,6 +150,11 @@ class TestPlayEvalGame:
         assert result.action_count <= 200
         assert result.elapsed_sec >= 0
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_tracks_trade_metrics(self) -> None:
         """Verify trade metrics are captured."""
         llm_client = _EvalLLMClient()
@@ -145,14 +166,19 @@ class TestPlayEvalGame:
         )
         mgr = NegotiationManager()
         agent = HybridAgent(
-            player_id=0, config=config,
-            negotiation_manager=mgr, llm_client=llm_client,
+            player_id=0,
+            config=config,
+            negotiation_manager=mgr,
+            llm_client=llm_client,
         )
         opponents = [RandomAgent(player_id=1)]
 
         result = play_eval_game(
-            agent, opponents, llm_client,
-            max_turns=100, seed=42,
+            agent,
+            opponents,
+            llm_client,
+            max_turns=100,
+            seed=42,
         )
 
         # With trading disabled, should have 0 trades
@@ -164,7 +190,13 @@ class TestPlayEvalGame:
 # run_evaluation
 # ---------------------------------------------------------------------------
 
+
 class TestRunEvaluation:
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_runs_multiple_games(self) -> None:
         """Verify evaluation runs multiple games and aggregates."""
         results = run_evaluation(

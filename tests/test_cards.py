@@ -3,11 +3,11 @@
 import pytest
 
 from monopoly_engine import (
+    CHANCE_CARDS,
+    COMMUNITY_CHEST_CARDS,
     Card,
     CardDeck,
     CardType,
-    CHANCE_CARDS,
-    COMMUNITY_CHEST_CARDS,
     get_chance_card,
     get_community_chest_card,
 )
@@ -191,9 +191,7 @@ class TestCardDeck:
         assert isinstance(card, Card)
         assert chance_deck.cards_remaining() == initial - 1
 
-    def test_draw_non_jail_card_goes_to_discard(
-        self, chance_deck: CardDeck
-    ) -> None:
+    def test_draw_non_jail_card_goes_to_discard(self, chance_deck: CardDeck) -> None:
         """Non-jail cards should go to discard."""
         # Draw until we get a non-jail card
         card = chance_deck.draw()

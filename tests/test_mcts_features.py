@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from mcts.features import extract_features, get_feature_size
 from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
-
-from mcts.features import extract_features, get_feature_size
-
 
 # ===========================================================================
 # B2: Feature Extraction tests
@@ -35,7 +33,7 @@ class TestGetFeatureSize:
         from monopoly_gym.observation import get_flat_observation_size
 
         for n in (2, 3, 4):
-            assert get_feature_size(n) == get_flat_observation_size(n) - 149
+            assert get_feature_size(n) == get_flat_observation_size(n) - 158 - 13
 
 
 class TestExtractFeatures:

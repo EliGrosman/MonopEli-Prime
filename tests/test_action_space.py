@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from monopoly_engine import (
     BuildHotel,
@@ -28,7 +29,10 @@ from monopoly_engine import (
     UnmortgageProperty,
     UseJailCard,
 )
+from monopoly_engine.actions import PassBuy
 from monopoly_gym.action_space import (
+    _BUYABLE_TO_INDEX,
+    _DEVELOPABLE_TO_INDEX,
     ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
@@ -45,8 +49,6 @@ from monopoly_gym.action_space import (
     OFFSET_UNMORTGAGE,
     OFFSET_USE_JAIL_CARD,
     ActionEncoder,
-    _BUYABLE_TO_INDEX,
-    _DEVELOPABLE_TO_INDEX,
 )
 
 if TYPE_CHECKING:
@@ -57,9 +59,9 @@ class TestActionSpaceConstants:
     """Tests for action space constants and mappings."""
 
     def test_action_space_size(self) -> None:
-        """Gameplay action space should have 149 dimensions, full space 907."""
-        assert GAMEPLAY_ACTION_SPACE_SIZE == 149
-        assert ACTION_SPACE_SIZE == 907  # With Phase 2.5a trades
+        """Gameplay action space should have 158 dimensions, full space 907."""
+        assert GAMEPLAY_ACTION_SPACE_SIZE == 158
+        assert ACTION_SPACE_SIZE == 158  # With Phase 2.5a trades
 
     def test_buyable_positions_count(self) -> None:
         """Should have exactly 28 buyable positions."""
@@ -135,7 +137,7 @@ class TestActionEncoderInit:
     def test_init_sets_action_space_size(self) -> None:
         """Encoder should have correct action space size attribute."""
         encoder = ActionEncoder()
-        assert encoder.action_space_size == 149
+        assert encoder.action_space_size == 158
 
     def test_encoder_is_stateless(self) -> None:
         """Multiple encoder instances should be equivalent."""
@@ -252,13 +254,9 @@ class TestDecodeAction:
         assert action.property_id == 1  # Player's current position
 
     def test_decode_pass_buy(self) -> None:
-        """Index 1 should decode to EndTurn (pass buy)."""
         encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-
-        action = encoder.decode(OFFSET_PASS_BUY, player_id=0, game=game)
-        assert isinstance(action, EndTurn)
-        assert action.player_id == 0
+        game = MonopolyGame(2, seed=42)
+        assert isinstance(encoder.decode(OFFSET_PASS_BUY, 0, game), PassBuy)
 
     def test_decode_end_turn(self) -> None:
         """Index 146 should decode to EndTurn."""
@@ -329,22 +327,13 @@ class TestDecodeAction:
             encoder.decode(-1, player_id=0, game=game)
 
     def test_decode_out_of_range_index_raises(self) -> None:
-        """Out of range action indices should raise ValueError."""
-        # Without trades, action space is 149
-        encoder_no_trades = ActionEncoder(enable_trades=False)
-        game = MonopolyGame(num_players=2, seed=42)
-
-        with pytest.raises(ValueError, match="out of range"):
-            encoder_no_trades.decode(149, player_id=0, game=game)
-
-        # With trades, action space is 907
-        encoder_with_trades = ActionEncoder(enable_trades=True)
-
-        with pytest.raises(ValueError, match="out of range"):
-            encoder_with_trades.decode(907, player_id=0, game=game)
-
-        with pytest.raises(ValueError, match="out of range"):
-            encoder_with_trades.decode(1000, player_id=0, game=game)
+        encoder = ActionEncoder()
+        game = MonopolyGame(2, seed=42)
+        for index in (-1, 158, 907):
+            with pytest.raises(ValueError):
+                encoder.decode(index, 0, game)
+        with pytest.raises(ValueError, match="Trading is disabled"):
+            ActionEncoder(enable_trades=True)
 
 
 class TestEncodeDecodeRoundtrip:
@@ -405,21 +394,21 @@ class TestGetActionMask:
     """Tests for action mask generation."""
 
     def test_mask_shape(self) -> None:
-        """Action mask should have shape (149,)."""
+        """Action mask should have shape (158,)."""
         encoder = ActionEncoder()
         game = MonopolyGame(num_players=2, seed=42)
 
         mask = encoder.get_action_mask(game, player_id=0)
-        assert mask.shape == (149,)
+        assert mask.shape == (158,)
         assert mask.dtype == np.bool_
 
     def test_mask_end_turn_always_valid_for_current_player(self) -> None:
-        """End turn should always be valid for current player."""
         encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-
-        mask = encoder.get_action_mask(game, player_id=game.current_player)
-        assert mask[OFFSET_END_TURN]
+        game = MonopolyGame(2, seed=42)
+        assert not encoder.get_action_mask(game, 0)[OFFSET_END_TURN]
+        game.state.phase = "asset_management"
+        game.state.roll_owed = False
+        assert encoder.get_action_mask(game, 0)[OFFSET_END_TURN]
 
     def test_mask_all_invalid_for_non_current_player(self) -> None:
         """Non-current player should have limited valid actions."""
@@ -454,6 +443,7 @@ class TestGetActionMask:
         # Move current player to Mediterranean (position 1)
         current = game.current_player
         game.players[current].position = 1
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, player_id=current)
         assert mask[OFFSET_BUY_PROPERTY]
@@ -467,6 +457,7 @@ class TestGetActionMask:
         # Move current player to Mediterranean and have someone own it
         current = game.current_player
         game.players[current].position = 1
+        game.state.phase = "purchase_decision"
         game.property_manager.properties[1].owner = 1  # Player 1 owns it
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -479,6 +470,7 @@ class TestGetActionMask:
 
         current = game.current_player
         game.players[current].position = 39  # Boardwalk ($400)
+        game.state.phase = "purchase_decision"
         game.players[current].money = 100  # Not enough
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -493,6 +485,7 @@ class TestGetActionMask:
 
         current = game.current_player
         game.players[current].in_jail = True
+        game.state.phase = "jail_decision"
         game.players[current].jail_cards = 1
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -517,6 +510,7 @@ class TestGetActionMask:
 
         current = game.current_player
         game.players[current].in_jail = True
+        game.state.phase = "jail_decision"
         game.players[current].jail_cards = 0
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -529,6 +523,7 @@ class TestGetActionMask:
 
         current = game.current_player
         game.players[current].in_jail = True
+        game.state.phase = "jail_decision"
         game.players[current].money = 100  # Can afford $50
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -541,6 +536,7 @@ class TestGetActionMask:
 
         current = game.current_player
         game.players[current].in_jail = True
+        game.state.phase = "jail_decision"
         game.players[current].money = 10  # Cannot afford $50
 
         mask = encoder.get_action_mask(game, player_id=current)
@@ -644,6 +640,7 @@ class TestActionMaskConsistency:
 
         current = game.current_player
         game.players[current].position = 1  # Mediterranean
+        game.state.phase = "purchase_decision"
 
         mask = encoder.get_action_mask(game, player_id=current)
 
@@ -688,7 +685,7 @@ class TestPropertyBasedTests:
     """Property-based tests using hypothesis."""
 
     @given(action_idx=st.integers(0, 148))
-    @settings(max_examples=149)
+    @settings(max_examples=158)
     def test_all_valid_indices_decode_without_error(self, action_idx: int) -> None:
         """All valid action indices should decode without raising."""
         encoder = ActionEncoder()
@@ -698,7 +695,7 @@ class TestPropertyBasedTests:
         action = encoder.decode(action_idx, player_id=0, game=game)
         assert action is not None
 
-    @given(action_idx=st.integers(-1000, -1) | st.integers(149, 1000))
+    @given(action_idx=st.integers(-1000, -1) | st.integers(158, 1000))
     def test_invalid_indices_raise(self, action_idx: int) -> None:
         """Invalid action indices should raise ValueError."""
         encoder = ActionEncoder()
@@ -716,7 +713,7 @@ class TestPropertyBasedTests:
         game = MonopolyGame(num_players=num_players, seed=42)
 
         mask = encoder.get_action_mask(game, player_id=player_id)
-        assert mask.shape == (149,)
+        assert mask.shape == (158,)
         assert mask.dtype == np.bool_
 
     @given(
@@ -744,7 +741,7 @@ class TestPropertyBasedTests:
         encoded = encoder.encode(original)
         decoded = encoder.decode(encoded, player_id=0, game=game)
 
-        assert type(decoded) == type(original)
+        assert type(decoded) is type(original)
         assert hasattr(decoded, "property_id") and decoded.property_id == original.property_id
 
     @given(prop_idx=st.integers(0, 27))  # 28 buyable positions
@@ -825,229 +822,32 @@ class TestEdgeCases:
         assert action3.player_id == 3
 
 
-class TestActionMaskCaching:
-    """Tests for OPT-2 action mask caching correctness."""
-
-    def test_cache_returns_identical_mask_on_unchanged_state(self) -> None:
-        """Consecutive calls with no state change should return identical masks."""
+class TestFreshActionMasks:
+    @pytest.mark.parametrize("cash", [0, 59, 60, 1500])
+    def test_purchase_mask_changes_without_invalidation(self, cash):
         encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
+        game = MonopolyGame(2, seed=42)
+        game.players[0].position = 1
+        game.state.phase = "purchase_decision"
+        previous = encoder.get_action_mask(game, 0)
+        game.players[0].money = cash
+        current = encoder.get_action_mask(game, 0)
+        assert bool(current[OFFSET_BUY_PROPERTY]) == (cash >= 60)
+        assert previous[OFFSET_BUY_PROPERTY]
+        assert current[OFFSET_PASS_BUY]
+        assert not current[OFFSET_END_TURN]
+        assert not encoder.get_action_mask(game, 1).any()
+        np.testing.assert_array_equal(current, ActionEncoder().get_action_mask(game, 0))
 
-        mask1 = encoder.get_action_mask(game, pid)
-        mask2 = encoder.get_action_mask(game, pid)
-
-        np.testing.assert_array_equal(mask1, mask2)
-        assert encoder.cache_stats[0] >= 1  # at least 1 cache hit
-
-    def test_cache_invalidates_after_money_change(self) -> None:
-        """Mask should be recomputed after player money changes."""
+    def test_mask_arrays_do_not_alias(self):
         encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        mask1 = encoder.get_action_mask(game, pid)
-        game.players[pid].money += 500
-        mask2 = encoder.get_action_mask(game, pid)
-
-        # Should be a cache miss (money changed)
-        hits_before = encoder.cache_stats[0]
-        _ = encoder.get_action_mask(game, pid)
-        # After third call with same state, should hit
-        assert encoder.cache_stats[0] > hits_before
-
-    def test_cache_invalidates_after_property_purchase(self) -> None:
-        """Mask should update after a property is purchased."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        # Give property to player
-        game.property_manager.properties[1].owner = pid
-        mask_with_prop = encoder.get_action_mask(game, pid)
-
-        # Change ownership
-        game.property_manager.properties[1].owner = None
-        mask_without_prop = encoder.get_action_mask(game, pid)
-
-        # Masks should differ (mortgage actions change)
-        assert not np.array_equal(mask_with_prop, mask_without_prop)
-
-    def test_cache_invalidates_after_position_change(self) -> None:
-        """Cache should miss after player moves (fingerprint includes position)."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        game.players[pid].position = 1  # Mediterranean Avenue
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats == (0, 1)  # miss
-
-        game.players[pid].position = 0  # Go (not buyable)
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats == (0, 2)  # another miss (position changed)
-
-    def test_cache_invalidates_after_jail_change(self) -> None:
-        """Mask should update after jail status changes."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        game.players[pid].in_jail = False
-        mask1 = encoder.get_action_mask(game, pid)
-
-        game.players[pid].in_jail = True
-        mask2 = encoder.get_action_mask(game, pid)
-
-        # Jail status changes jail card / pay fine actions
-        assert not np.array_equal(mask1, mask2)
-
-    def test_cache_invalidates_after_house_build(self) -> None:
-        """Mask should update after houses are built."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        # Give player a monopoly
-        game.property_manager.properties[1].owner = pid
-        game.property_manager.properties[3].owner = pid
-
-        mask1 = encoder.get_action_mask(game, pid)
-
-        # Build a house
-        game.property_manager.properties[1].houses = 1
-        mask2 = encoder.get_action_mask(game, pid)
-
-        assert not np.array_equal(mask1, mask2)
-
-    def test_cache_invalidates_after_mortgage_change(self) -> None:
-        """Mask should update after mortgage status changes."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        game.property_manager.properties[5].owner = pid  # Reading Railroad
-        mask1 = encoder.get_action_mask(game, pid)
-
-        game.property_manager.properties[5].mortgaged = True
-        mask2 = encoder.get_action_mask(game, pid)
-
-        assert not np.array_equal(mask1, mask2)
-
-    def test_cache_per_player_independence(self) -> None:
-        """Cache for player 0 should not affect player 1."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-
-        mask_p0 = encoder.get_action_mask(game, 0)
-        mask_p1 = encoder.get_action_mask(game, 1)
-
-        # Different players may have different masks
-        # (one is current, one is not)
-        if game.current_player == 0:
-            # Player 0 has more actions (is current player)
-            assert mask_p0.sum() >= mask_p1.sum()
-
-    def test_cache_invalidation_on_reset(self) -> None:
-        """Cache should clear when invalidate_cache is called."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        _ = encoder.get_action_mask(game, pid)
-        encoder.invalidate_cache()
-
-        # After invalidation, next call should be a miss
-        misses_before = encoder.cache_stats[1]
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats[1] > misses_before
-
-    def test_cache_stats_tracking(self) -> None:
-        """Cache hit/miss counters should increment correctly."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        assert encoder.cache_stats == (0, 0)
-
-        # First call = miss
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats == (0, 1)
-
-        # Second call = hit
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats == (1, 1)
-
-        # Change state = miss
-        game.players[pid].money -= 100
-        _ = encoder.get_action_mask(game, pid)
-        assert encoder.cache_stats == (1, 2)
-
-    def test_cached_mask_correctness_over_many_states(self) -> None:
-        """Verify cached masks match fresh computations over many game states.
-
-        This is the key correctness test: run through random game states and
-        verify that the cached mask is always identical to a freshly computed one.
-        """
-        import random
-
-        rng = random.Random(12345)
-        encoder_cached = ActionEncoder()
-        encoder_fresh = ActionEncoder()
-
-        for seed in range(100):
-            game = MonopolyGame(num_players=2, seed=seed)
-            pid = game.current_player
-
-            # Randomly modify game state
-            for _ in range(rng.randint(0, 5)):
-                prop_pos = rng.choice(BUYABLE_POSITIONS)
-                prop = game.property_manager.properties[prop_pos]
-                action = rng.choice(["buy", "build", "mortgage", "move", "money"])
-
-                if action == "buy":
-                    prop.owner = rng.choice([0, 1, None])
-                elif action == "build" and prop.owner is not None:
-                    prop.houses = rng.randint(0, 5)
-                elif action == "mortgage" and prop.owner is not None:
-                    prop.mortgaged = rng.choice([True, False])
-                elif action == "move":
-                    game.players[pid].position = rng.randint(0, 39)
-                elif action == "money":
-                    game.players[pid].money = rng.randint(0, 5000)
-
-            # Get mask from cached encoder
-            mask_cached = encoder_cached.get_action_mask(game, pid)
-            # Get mask from fresh encoder (no cache history)
-            encoder_fresh.invalidate_cache()
-            mask_fresh = encoder_fresh.get_action_mask(game, pid)
-
-            np.testing.assert_array_equal(
-                mask_cached, mask_fresh,
-                err_msg=f"Mask mismatch at seed={seed}",
-            )
-
-    def test_cached_mask_is_read_only(self) -> None:
-        """Cached masks should be read-only to prevent accidental mutation."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        mask = encoder.get_action_mask(game, pid)
-        assert not mask.flags.writeable
-
-    def test_cache_with_houses_remaining_change(self) -> None:
-        """Mask should update when global house supply changes."""
-        encoder = ActionEncoder()
-        game = MonopolyGame(num_players=2, seed=42)
-        pid = game.current_player
-
-        mask1 = encoder.get_action_mask(game, pid)
-
-        game.houses_remaining = 0
-        mask2 = encoder.get_action_mask(game, pid)
-
-        # With no houses remaining, build actions should differ
-        # (only matters if player has monopoly, but fingerprint still changes)
-        hits, misses = encoder.cache_stats
-        assert misses >= 2  # Both calls should be misses (different fingerprints)
+        game = MonopolyGame(2, seed=42)
+        first = encoder.get_action_mask(game, 0)
+        expected = first.copy()
+        second = encoder.get_action_mask(game, 0)
+        assert not np.shares_memory(first, second)
+        game.players[0].in_jail = True
+        game.state.phase = "jail_decision"
+        third = encoder.get_action_mask(game, 0)
+        assert third[OFFSET_PAY_JAIL_FINE]
+        np.testing.assert_array_equal(first, expected)

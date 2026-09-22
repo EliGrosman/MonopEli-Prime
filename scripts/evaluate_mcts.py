@@ -7,7 +7,8 @@ simulation budgets for scaling analysis.
 
 Usage:
     uv run python scripts/evaluate_mcts.py --games 50
-    uv run python scripts/evaluate_mcts.py --opponents random rule_based aggressive conservative --games 100
+    uv run python scripts/evaluate_mcts.py --opponents random rule_based aggressive \
+        conservative --games 100
     uv run python scripts/evaluate_mcts.py --simulations 50 100 200 400 --games 50
     uv run python scripts/evaluate_mcts.py --network models/mcts_best/ --games 100
     uv run python scripts/evaluate_mcts.py --json results.json --games 100
@@ -67,7 +68,9 @@ def parse_args() -> argparse.Namespace:
         help="Opponent types (default: random rule_based)",
     )
     parser.add_argument(
-        "--games", type=int, default=50,
+        "--games",
+        type=int,
+        default=50,
         help="Games per opponent per simulation budget (default: 50)",
     )
     parser.add_argument(
@@ -76,30 +79,41 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=[200],
         help="MCTS simulation budgets to test (default: 200). "
-             "Pass multiple values for scaling analysis, e.g. --simulations 50 100 200 400",
+        "Pass multiple values for scaling analysis, e.g. --simulations 50 100 200 400",
     )
     parser.add_argument(
-        "--num-players", type=int, default=4,
+        "--num-players",
+        type=int,
+        default=4,
         help="Number of players (default: 4)",
     )
     parser.add_argument(
-        "--max-turns", type=int, default=500,
+        "--max-turns",
+        type=int,
+        default=500,
         help="Max actions per game (default: 500)",
     )
     parser.add_argument(
-        "--network", type=str, default=None,
+        "--network",
+        type=str,
+        default=None,
         help="Path to ValueNetwork checkpoint (default: None = random rollouts)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42)",
     )
     parser.add_argument(
-        "--quiet", action="store_true",
+        "--quiet",
+        action="store_true",
         help="Suppress per-game output",
     )
     parser.add_argument(
-        "--json", type=str, default=None,
+        "--json",
+        type=str,
+        default=None,
         metavar="FILE",
         help="Write results to JSON file for later analysis",
     )
@@ -144,9 +158,9 @@ def main() -> None:
     total_t0 = time.monotonic()
 
     for sims in args.simulations:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Simulation budget: {sims}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         mcts_agent = MCTSAgent(
             player_id=0,
@@ -170,13 +184,14 @@ def main() -> None:
             for game_idx in range(args.games):
                 game_seed = (args.seed + game_idx) if args.seed is not None else None
                 opp_agents = [
-                    _make_opponent(opp_type, player_id=i + 1)
-                    for i in range(num_opponents)
+                    _make_opponent(opp_type, player_id=i + 1) for i in range(num_opponents)
                 ]
 
                 winner, actions, elapsed = play_evaluation_game(
-                    mcts_agent, opp_agents,
-                    max_turns=args.max_turns, seed=game_seed,
+                    mcts_agent,
+                    opp_agents,
+                    max_turns=args.max_turns,
+                    seed=game_seed,
                 )
 
                 if winner == 0:
@@ -190,9 +205,7 @@ def main() -> None:
                 total_time += elapsed
 
                 if not args.quiet:
-                    outcome = "WIN " if winner == 0 else (
-                        "DRAW" if winner is None else "LOSS"
-                    )
+                    outcome = "WIN " if winner == 0 else ("DRAW" if winner is None else "LOSS")
                     print(
                         f"  Game {game_idx + 1:3d}/{args.games}: {outcome} "
                         f"| {actions:4d} actions | {elapsed:.1f}s"
@@ -213,11 +226,13 @@ def main() -> None:
             results_by_opp[opp_type] = result
             print(f"  {result}")
 
-            json_data["results"].append({
-                "simulations": sims,
-                **result.to_dict(),
-                "opponent_type": opp_type,
-            })
+            json_data["results"].append(
+                {
+                    "simulations": sims,
+                    **result.to_dict(),
+                    "opponent_type": opp_type,
+                }
+            )
 
         all_results.append((sims, results_by_opp))
 

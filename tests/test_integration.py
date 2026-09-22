@@ -4,16 +4,17 @@ These tests run complete games end-to-end to validate the entire system works to
 """
 
 import pytest
-from monopoly_engine.game import MonopolyGame
+
 from monopoly_engine.actions import (
-    RollDice,
-    BuyProperty,
-    BuildHouse,
     BuildHotel,
+    BuildHouse,
+    BuyProperty,
     EndTurn,
     PayJailFine,
+    RollDice,
     UseJailCard,
 )
+from monopoly_engine.game import MonopolyGame
 from monopoly_engine.types import SpaceType
 
 
@@ -65,9 +66,9 @@ class TestFullGameSimulation:
             turn_count += 1
 
         # Game should complete or hit turn limit
-        assert (
-            game.state.game_over or turn_count == turn_limit
-        ), f"Game ended unexpectedly at turn {turn_count}"
+        assert game.state.game_over or turn_count == turn_limit, (
+            f"Game ended unexpectedly at turn {turn_count}"
+        )
 
     @pytest.mark.parametrize("seed", [42, 100, 200, 300, 400])
     def test_game_determinism(self, seed: int) -> None:
@@ -123,7 +124,8 @@ class TestFullGameSimulation:
 
     def test_state_serialization_round_trip(self) -> None:
         """Test that game state can be serialized and restored."""
-        game = MonopolyGame(num_players=2, seed=42)
+        game = MonopolyGame(num_players=2, seed=42, rules_id="foundation-trade-v1")
+        game.state.phase, game.state.roll_owed = "asset_management", False
 
         # Play some turns
         for _ in range(10):
@@ -225,6 +227,7 @@ class TestJailScenarios:
         game = MonopolyGame(num_players=2, seed=42)
         game.send_to_jail(0)
         game.state.players[0].jail_cards = 1
+        game.state.jail_card_sources[0] = ["chance"]
 
         UseJailCard(player_id=0).execute(game)
         assert not game.state.players[0].in_jail
@@ -233,9 +236,10 @@ class TestJailScenarios:
         # Test 3: Auto-release after 3 turns
         game = MonopolyGame(num_players=2, seed=42)
         game.send_to_jail(0)
-        game.state.players[0].jail_turns = 3
-
-        RollDice(player_id=0).execute(game)
+        game.state.players[0].jail_turns = 2
+        game.state.phase = "jail_decision"
+        game.roll_dice = lambda: (1, 2)
+        game.apply_action(0, RollDice(0))
         assert not game.state.players[0].in_jail
 
     def test_multiple_players_in_jail(self) -> None:
@@ -390,7 +394,8 @@ class TestPropertyTrading:
 
     def test_basic_trade_mechanics(self) -> None:
         """Test that trade system basic mechanics work."""
-        game = MonopolyGame(num_players=2, seed=42)
+        game = MonopolyGame(num_players=2, seed=42, rules_id="foundation-trade-v1")
+        game.state.phase, game.state.roll_owed = "asset_management", False
 
         # Give players some properties and money
         game.state.property_manager.properties[1].owner = 0  # Mediterranean to P0

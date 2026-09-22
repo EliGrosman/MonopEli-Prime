@@ -19,9 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Train a Monopoly agent using MaskablePPO"
-    )
+    parser = argparse.ArgumentParser(description="Train a Monopoly agent using MaskablePPO")
 
     # Training mode
     parser.add_argument(
@@ -71,6 +69,12 @@ def parse_args() -> argparse.Namespace:
         choices=["sparse", "dense"],
         help="Reward type (default: sparse)",
     )
+    parser.add_argument(
+        "--rules-id",
+        choices=["foundation-v1", "foundation-trade-v1"],
+        default="foundation-v1",
+        help="Rules and learner encoding contract (default: foundation-v1)",
+    )
 
     # Output paths
     parser.add_argument(
@@ -107,9 +111,9 @@ def main() -> None:
     """Main training entry point."""
     args = parse_args()
 
-    print("="*60)
+    print("=" * 60)
     print("Monopoly PPO Training")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # Check if training dependencies are available
@@ -152,6 +156,7 @@ def main() -> None:
             num_players=args.num_players,
             opponent_type=args.opponent,
             reward_type=args.reward_type,
+            rules_id=args.rules_id,
         )
 
         print("\nStarting training...")

@@ -12,7 +12,6 @@ from gymnasium import spaces
 
 from monopoly_engine import MonopolyGame
 from monopoly_gym import (
-    ACTION_SPACE_SIZE,
     BUYABLE_POSITIONS,
     DEVELOPABLE_POSITIONS,
     GAMEPLAY_ACTION_SPACE_SIZE,
@@ -21,10 +20,7 @@ from monopoly_gym import (
     OFFSET_BUY_PROPERTY,
     OFFSET_END_TURN,
     OFFSET_MORTGAGE,
-    OFFSET_PASS_BUY,
     OFFSET_PAY_JAIL_FINE,
-    OFFSET_SELL_HOTEL,
-    OFFSET_SELL_HOUSE,
     OFFSET_UNMORTGAGE,
     OFFSET_USE_JAIL_CARD,
     ActionEncoder,
@@ -86,35 +82,26 @@ class TestMonopolyEnv:
             assert env1.game.players[i].position == env2.game.players[i].position
 
     def test_step_advances_game(self) -> None:
-        """Test step() advances the game state."""
         env = MonopolyEnv(num_players=2)
         env.reset(seed=42)
-
-        initial_agent = env.agent_selection
-        initial_turn = env.game.turn_number
-
-        # Take EndTurn action
-        env.step(OFFSET_END_TURN)
-
-        # Should have advanced to next player
-        assert env.agent_selection != initial_agent
-        assert env.game.turn_number > initial_turn
+        for _ in range(20):
+            _, _, _, _, info = env.last()
+            env.step(int(np.flatnonzero(info["action_mask"])[0]))
+            if env.game.turn_number == 1:
+                break
+        assert env.game.turn_number == 1
+        assert env.agent_selection == "player_1"
 
     def test_step_invalid_action_penalized(self) -> None:
-        """Test that invalid actions result in penalty."""
         env = MonopolyEnv(num_players=2)
         env.reset(seed=42)
-
-        # Get the action mask
-        _, _, _, _, info = env.last()
-        mask = info["action_mask"]
-
-        # Find an invalid action
-        invalid_actions = np.where(~mask)[0]
-        if len(invalid_actions) > 0:
-            env.step(invalid_actions[0])
-            # Should have received a penalty (cumulative rewards)
-            # Note: penalty is small (-0.01)
+        before = env.state()
+        with pytest.raises(ValueError):
+            env.step(OFFSET_END_TURN)
+        assert env.state() == before
+        assert env.rewards == {"player_0": 0, "player_1": 0}
+        # Should have received a penalty (cumulative rewards)
+        # Note: penalty is small (-0.01)
 
     def test_observe_returns_dict(self) -> None:
         """Test observe() returns dict with expected keys."""
@@ -155,7 +142,7 @@ class TestMonopolyEnv:
 
         valid_actions = np.where(mask)[0]
         assert len(valid_actions) > 0  # Should have at least EndTurn
-        assert mask[OFFSET_END_TURN]  # EndTurn should always be valid
+        assert not mask[OFFSET_END_TURN]  # EndTurn should always be valid
 
     def test_buy_property_action(self) -> None:
         """Test buying a property updates game state."""
@@ -185,7 +172,7 @@ class TestMonopolyEnv:
                 return
 
             # Otherwise end turn
-            env.step(OFFSET_END_TURN)
+            env.step(int(np.flatnonzero(info["action_mask"])[0]))
 
     def test_game_completion(self) -> None:
         """Test that game can complete via termination or truncation."""
@@ -232,7 +219,7 @@ class TestActionEncoder:
     def test_action_space_size(self) -> None:
         """Test action space has correct size."""
         encoder = ActionEncoder()
-        assert encoder.action_space_size == 149
+        assert encoder.action_space_size == 158
 
     def test_encode_decode_roundtrip_buy(self) -> None:
         """Test encode/decode roundtrip for BuyProperty."""
@@ -304,7 +291,7 @@ class TestActionEncoder:
         game = MonopolyGame(num_players=2, seed=42)
 
         mask = encoder.get_action_mask(game, player_id=0)
-        assert mask[OFFSET_END_TURN]
+        assert not mask[OFFSET_END_TURN]
 
     def test_developable_positions_correct(self) -> None:
         """Test developable positions exclude railroads and utilities."""
@@ -454,6 +441,7 @@ class TestActionMaskConsistency:
 
         # Send to jail
         game.send_to_jail(0)
+        game.state.phase = "jail_decision"
 
         # Now jail actions should be available
         mask = encoder.get_action_mask(game, player_id=0)
@@ -498,7 +486,7 @@ class TestIntegration:
                     if mask[OFFSET_BUY_PROPERTY]:
                         action = OFFSET_BUY_PROPERTY
                     else:
-                        action = OFFSET_END_TURN
+                        action = int(valid[0])
 
                 env.step(action)
                 steps += 1

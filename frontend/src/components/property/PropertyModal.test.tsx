@@ -60,9 +60,15 @@ describe('PropertyModal', () => {
   };
 
   const mockGameState: GameState = {
+    revision: 0,
     players: mockPlayers,
     properties: mockProperties,
     currentPlayer: 0,
+    decision_player: 0,
+    legal_actions: [
+      { type: 'BuildHouse', player_id: 0, property_id: 1 },
+      { type: 'MortgageProperty', player_id: 0, property_id: 1 },
+    ],
     turnNumber: 1,
     gamePhase: 'pre_roll' as const,
     lastRoll: null,
@@ -251,7 +257,11 @@ describe('PropertyModal', () => {
       };
 
       mockUseGameStore.mockReturnValue({
-        gameState: { ...mockGameState, properties: propsWith4Houses },
+        gameState: {
+          ...mockGameState,
+          properties: propsWith4Houses,
+          legal_actions: [{ type: 'BuildHotel', player_id: 0, property_id: 1 }],
+        },
         hasMonopoly: () => true,
       } as ReturnType<typeof useGameStore>);
 

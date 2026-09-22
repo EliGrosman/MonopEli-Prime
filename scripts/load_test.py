@@ -18,8 +18,6 @@ Usage:
     #   -t: Test duration
 """
 
-import json
-import random
 import uuid
 
 from locust import HttpUser, TaskSet, between, task

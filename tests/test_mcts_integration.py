@@ -32,6 +32,7 @@ from monopoly_gym.action_space import ActionEncoder
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_game(num_players: int = 2, seed: int = 42) -> MonopolyGame:
     """Create a game with dice already rolled so the first player can act."""
     game = MonopolyGame(num_players=num_players, seed=seed)
@@ -53,7 +54,7 @@ def _small_selfplay_config() -> SelfPlayConfig:
         num_players=2,
         temperature=1.0,
         eval_games=2,
-        eval_frequency=999,   # skip head-to-head eval
+        eval_frequency=999,  # skip head-to-head eval
         max_turns_per_game=30,
         training_config=TrainingConfig(num_epochs=1, batch_size=8),
     )
@@ -108,8 +109,7 @@ class TestMCTSGameplay:
             if pid == 0:
                 # MCTS action must be valid per the mask
                 assert mask[action_idx], (
-                    f"MCTSAgent chose invalid action {action_idx} "
-                    f"(mask sum={mask.sum()})"
+                    f"MCTSAgent chose invalid action {action_idx} (mask sum={mask.sum()})"
                 )
 
             valid, _ = action.validate(game)
@@ -129,6 +129,11 @@ class TestMCTSGameplay:
 
         assert state_before == state_after, "Game state was mutated during MCTS search"
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_mcts_with_network_completes_game(self, tmp_path: pytest.TempPathFactory) -> None:
         """MCTSAgent loaded with a value network plays a game without error."""
         feature_size = get_feature_size(2)
@@ -191,6 +196,11 @@ class TestMCTSGameplay:
 class TestDataPipeline:
     """Integration tests for the data generation → training pipeline."""
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_generate_data_feeds_buffer(self) -> None:
         """generate_training_data output can be added to a ReplayBuffer."""
         buf = ReplayBuffer(capacity=500)
@@ -207,6 +217,11 @@ class TestDataPipeline:
 
         assert len(buf) > 0
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_training_data_trains_network(self) -> None:
         """End-to-end: generate data → buffer → train_value_network runs."""
         buf = generate_training_data(
@@ -241,6 +256,11 @@ class TestDataPipeline:
         assert feats.shape == (expected_size,)
         assert np.isfinite(feats).all(), "Feature vector contains NaN or Inf"
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_buffer_round_trip_preserves_data(self, tmp_path: pytest.TempPathFactory) -> None:
         """ReplayBuffer saved and reloaded preserves all examples."""
         buf = generate_training_data(
@@ -269,9 +289,12 @@ class TestDataPipeline:
 class TestSelfPlayPipeline:
     """Integration tests for the AlphaZero-style self-play loop."""
 
-    def test_one_iteration_creates_checkpoint(
-        self, tmp_path: pytest.TempPathFactory
-    ) -> None:
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
+    def test_one_iteration_creates_checkpoint(self, tmp_path: pytest.TempPathFactory) -> None:
         """One self-play iteration should create mcts_iter_0/ directory."""
         config = _small_selfplay_config()
         save_dir = tmp_path / "sp"  # type: ignore[operator]
@@ -284,9 +307,12 @@ class TestSelfPlayPipeline:
         assert (ckpt / "buffer.npz").exists()  # type: ignore[operator]
         assert (ckpt / "metadata.json").exists()  # type: ignore[operator]
 
-    def test_checkpoint_loads_valid_network(
-        self, tmp_path: pytest.TempPathFactory
-    ) -> None:
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
+    def test_checkpoint_loads_valid_network(self, tmp_path: pytest.TempPathFactory) -> None:
         """Network saved in checkpoint is loadable and produces valid output."""
         config = _small_selfplay_config()
         save_dir = tmp_path / "sp"  # type: ignore[operator]
@@ -305,11 +331,17 @@ class TestSelfPlayPipeline:
         feats = extract_features(game, player_id=0, num_players=2)
 
         import torch
+
         t = torch.from_numpy(feats).unsqueeze(0)
         values, policy = network(t)
         assert values.shape == (1, 2)
         assert policy.shape == (1, 149)
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_resume_continues_from_previous_iteration(
         self, tmp_path: pytest.TempPathFactory
     ) -> None:
@@ -345,6 +377,11 @@ class TestEvaluationPipeline:
             verbose=False,
         )
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_evaluate_no_network_returns_dict(self) -> None:
         """evaluate_mcts_agent with no network returns a valid results dict."""
         result = evaluate_mcts_agent(
@@ -354,6 +391,11 @@ class TestEvaluationPipeline:
         assert isinstance(result, dict)
         assert "random" in result
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_evaluation_metrics_in_valid_ranges(self) -> None:
         """win_rate ∈ [0,1], avg_game_length > 0, avg_time_sec > 0."""
         result = evaluate_mcts_agent(
@@ -365,9 +407,12 @@ class TestEvaluationPipeline:
         assert m["avg_game_length"] > 0
         assert m["avg_time_sec"] > 0
 
-    def test_evaluate_with_network_runs(
-        self, tmp_path: pytest.TempPathFactory
-    ) -> None:
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
+    def test_evaluate_with_network_runs(self, tmp_path: pytest.TempPathFactory) -> None:
         """evaluate_mcts_agent with a trained network does not crash."""
         feature_size = get_feature_size(2)
         net = ValueNetwork(input_size=feature_size, num_players=2)
@@ -377,12 +422,16 @@ class TestEvaluationPipeline:
         result = evaluate_mcts_agent(
             network_path=net_path,
             opponents=["random"],
-            **{k: v for k, v in self._fast_eval_kwargs().items()
-               if k != "network_path"},
+            **{k: v for k, v in self._fast_eval_kwargs().items() if k != "network_path"},
         )
         assert "random" in result
         assert 0.0 <= result["random"]["win_rate"] <= 1.0
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_full_pipeline_smoke(self, tmp_path: pytest.TempPathFactory) -> None:
         """Generate data → train network → evaluate: full pipeline completes."""
         # Step 1: generate training data
@@ -423,6 +472,11 @@ class TestEvaluationPipeline:
         assert isinstance(result, dict)
         assert "random" in result
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=RuntimeError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_play_evaluation_game_uses_both_agent_types(self) -> None:
         """play_evaluation_game works with MCTSAgent vs RuleBasedAgent."""
         mcts = MCTSAgent(player_id=0, num_simulations=5)

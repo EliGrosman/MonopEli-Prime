@@ -3,6 +3,7 @@ Pydantic models for game state and configuration.
 """
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -47,6 +48,12 @@ class PlayerSlot(BaseModel):
 class GameState(BaseModel):
     """Full game state sent to clients."""
 
+    rules_id: str = "foundation-v1"
+    game_phase: str = "pre_roll"
+    decision_player: int = 0
+    revision: int = 0
+    debt: dict[str, Any] | None = None
+    legal_actions: list[dict[str, Any]] = Field(default_factory=list)
     players: list[PlayerState]
     properties: dict[str, PropertyState]  # String keys for JSON compatibility
     current_player: int
@@ -58,6 +65,7 @@ class GameState(BaseModel):
     game_over: bool
     winner: int | None
     event_log: list[str]
+    decision_contract: dict[str, Any]
 
     @classmethod
     def from_engine(
@@ -77,7 +85,16 @@ class GameState(BaseModel):
         state = game.state.to_dict()
         pm = game.property_manager
 
+        from monopoly_engine.foundation import legal_actions
+
+        pid = game.decision_player
         return cls(
+            rules_id=game.rules_id,
+            game_phase=game.state.phase,
+            decision_player=pid,
+            revision=game.state.revision,
+            debt=dict(game.state.obligations[0]) if game.state.obligations else None,
+            legal_actions=[action.to_dict() for action in legal_actions(game, pid)],
             players=[
                 PlayerState(
                     id=p["id"],
@@ -110,6 +127,7 @@ class GameState(BaseModel):
             game_over=state["game_over"],
             winner=state["winner"],
             event_log=state["event_log"],
+            decision_contract=game.decision_view(None).to_dict(),
         )
 
 
@@ -130,6 +148,7 @@ class CreateGameRequest(BaseModel):
     num_players: int = Field(ge=2, le=8, default=4)
     player_names: list[str] | None = None
     seed: int | None = None
+    rules_id: str = Field(default="foundation-v1", pattern="^(foundation-v1|foundation-trade-v1)$")
 
 
 class CreateGameResponse(BaseModel):

@@ -15,6 +15,7 @@ from monopoly_engine.types import TradeOfferData
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _game_with_ownership() -> MonopolyGame:
     """Create a 4-player game with specific property ownership.
 
@@ -37,6 +38,7 @@ def _game_with_ownership() -> MonopolyGame:
 # ---------------------------------------------------------------------------
 # serialize_game_state
 # ---------------------------------------------------------------------------
+
 
 class TestSerializeGameState:
     def test_includes_player_identity(self) -> None:
@@ -101,7 +103,7 @@ class TestSerializeGameState:
         game.players[3].bankrupt = True
         text = serialize_game_state(game, 0)
         # Player index 3 (named "Player 4") should not appear as an opponent
-        opp_section = text[text.index("OPPONENTS:"):text.index("UNOWNED:")]
+        opp_section = text[text.index("OPPONENTS:") : text.index("UNOWNED:")]
         # The opponent lines start with "- Player <id>", bankrupt pid=3 excluded
         assert "- Player 3" not in opp_section
 
@@ -122,6 +124,7 @@ class TestSerializeGameState:
 # ---------------------------------------------------------------------------
 # serialize_player_summary
 # ---------------------------------------------------------------------------
+
 
 class TestSerializePlayerSummary:
     def test_includes_money(self) -> None:
@@ -160,6 +163,7 @@ class TestSerializePlayerSummary:
 # ---------------------------------------------------------------------------
 # serialize_property_landscape
 # ---------------------------------------------------------------------------
+
 
 class TestSerializePropertyLandscape:
     def test_groups_by_color(self) -> None:
@@ -207,6 +211,7 @@ class TestSerializePropertyLandscape:
 # ---------------------------------------------------------------------------
 # serialize_trade_proposal
 # ---------------------------------------------------------------------------
+
 
 class TestSerializeTradeProposal:
     def test_basic_trade(self) -> None:

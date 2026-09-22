@@ -28,6 +28,7 @@ class CurriculumStage:
         win_rate_threshold: Win rate required to advance (0-1)
         eval_games: Number of games for evaluation
     """
+
     name: str
     opponent_type: str
     timesteps: int
@@ -45,36 +46,39 @@ class CurriculumConfig:
         eval_frequency: Evaluate every N timesteps
         save_checkpoints: Whether to save stage checkpoints
     """
-    stages: list[CurriculumStage] = field(default_factory=lambda: [
-        CurriculumStage(
-            name="Stage 1: Random",
-            opponent_type="random",
-            timesteps=500_000,
-            win_rate_threshold=0.80,
-            eval_games=50,
-        ),
-        CurriculumStage(
-            name="Stage 2: Conservative",
-            opponent_type="conservative",
-            timesteps=500_000,
-            win_rate_threshold=0.70,
-            eval_games=50,
-        ),
-        CurriculumStage(
-            name="Stage 3: Rule-Based",
-            opponent_type="rule_based",
-            timesteps=500_000,
-            win_rate_threshold=0.60,
-            eval_games=50,
-        ),
-        CurriculumStage(
-            name="Stage 4: Aggressive",
-            opponent_type="aggressive",
-            timesteps=500_000,
-            win_rate_threshold=0.50,
-            eval_games=50,
-        ),
-    ])
+
+    stages: list[CurriculumStage] = field(
+        default_factory=lambda: [
+            CurriculumStage(
+                name="Stage 1: Random",
+                opponent_type="random",
+                timesteps=500_000,
+                win_rate_threshold=0.80,
+                eval_games=50,
+            ),
+            CurriculumStage(
+                name="Stage 2: Conservative",
+                opponent_type="conservative",
+                timesteps=500_000,
+                win_rate_threshold=0.70,
+                eval_games=50,
+            ),
+            CurriculumStage(
+                name="Stage 3: Rule-Based",
+                opponent_type="rule_based",
+                timesteps=500_000,
+                win_rate_threshold=0.60,
+                eval_games=50,
+            ),
+            CurriculumStage(
+                name="Stage 4: Aggressive",
+                opponent_type="aggressive",
+                timesteps=500_000,
+                win_rate_threshold=0.50,
+                eval_games=50,
+            ),
+        ]
+    )
     max_attempts_per_stage: int = 3
     eval_frequency: int = 50_000
     save_checkpoints: bool = True
@@ -91,6 +95,7 @@ class StageResult:
         passed: Whether threshold was met
         attempts: Number of training attempts
     """
+
     stage: CurriculumStage
     final_win_rate: float
     timesteps_used: int
@@ -250,11 +255,11 @@ class CurriculumTrainer:
         Returns:
             Stage result
         """
-        self._log(f"\n{'='*50}")
+        self._log(f"\n{'=' * 50}")
         self._log(f"Starting {stage.name}")
         self._log(f"Opponent: {stage.opponent_type}")
         self._log(f"Target: {stage.win_rate_threshold:.0%} win rate")
-        self._log(f"{'='*50}")
+        self._log(f"{'=' * 50}")
 
         model = initial_model
         best_win_rate = 0.0
@@ -306,10 +311,10 @@ class CurriculumTrainer:
         Returns:
             Final trained model
         """
-        self._log("\n" + "="*60)
+        self._log("\n" + "=" * 60)
         self._log("CURRICULUM TRAINING")
         self._log(f"Stages: {len(self.config.stages)}")
-        self._log("="*60)
+        self._log("=" * 60)
 
         self.stage_results = []
         model = None
@@ -320,7 +325,7 @@ class CurriculumTrainer:
             model = self.current_model
 
             if not result.passed and i < len(self.config.stages) - 1:
-                self._log(f"\nWarning: Stage {i+1} not passed, continuing anyway...")
+                self._log(f"\nWarning: Stage {i + 1} not passed, continuing anyway...")
 
         # Save final model
         if model is None:
@@ -331,9 +336,9 @@ class CurriculumTrainer:
         self._log(f"\nFinal model saved: {final_path}")
 
         # Print summary
-        self._log("\n" + "="*60)
+        self._log("\n" + "=" * 60)
         self._log("TRAINING COMPLETE")
-        self._log("="*60)
+        self._log("=" * 60)
         for result in self.stage_results:
             status = "PASSED" if result.passed else "FAILED"
             self._log(f"  {status} {result.stage.name}: {result.final_win_rate:.1%}")

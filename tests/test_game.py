@@ -6,10 +6,9 @@ This module tests the main game orchestrator that ties everything together.
 import pytest
 
 from monopoly_engine import (
-    MonopolyGame,
-    Player,
     InvalidPlayerError,
     InvalidPropertyError,
+    MonopolyGame,
 )
 
 
@@ -241,7 +240,10 @@ class TestMonopolyGameTrading:
 
     def test_propose_trade(self) -> None:
         """Test proposing a trade."""
-        game = MonopolyGame(num_players=2)
+        game = MonopolyGame(num_players=2, rules_id="foundation-trade-v1")
+        game.state.phase, game.state.roll_owed = "asset_management", False
+        game.property_manager.get(1).owner = 0  # type: ignore
+        game.property_manager.get(3).owner = 1  # type: ignore
 
         trade_id = game.propose_trade(
             from_player=0,
@@ -249,7 +251,7 @@ class TestMonopolyGameTrading:
             give_properties=[1],
             give_money=100,
             want_properties=[3],
-            want_money=50,
+            want_money=0,
         )
 
         assert trade_id == 0
@@ -257,7 +259,8 @@ class TestMonopolyGameTrading:
 
     def test_accept_trade(self) -> None:
         """Test accepting a trade."""
-        game = MonopolyGame(num_players=2)
+        game = MonopolyGame(num_players=2, rules_id="foundation-trade-v1")
+        game.state.phase, game.state.roll_owed = "asset_management", False
 
         # Set up properties
         game.property_manager.get(1).owner = 0  # type: ignore
@@ -270,7 +273,7 @@ class TestMonopolyGameTrading:
             give_properties=[1],
             give_money=100,
             want_properties=[3],
-            want_money=50,
+            want_money=0,
         )
 
         # Accept trade
@@ -281,15 +284,18 @@ class TestMonopolyGameTrading:
         assert game.property_manager.get(3).owner == 0  # type: ignore
 
         # Check money transferred
-        assert game.players[0].money == 1500 - 100 + 50  # Gave 100, got 50
-        assert game.players[1].money == 1500 + 100 - 50  # Got 100, gave 50
+        assert game.players[0].money == 1500 - 100
+        assert game.players[1].money == 1500 + 100
 
         # Check trade removed
         assert len(game.state.pending_trades) == 0
 
     def test_reject_trade(self) -> None:
         """Test rejecting a trade."""
-        game = MonopolyGame(num_players=2)
+        game = MonopolyGame(num_players=2, rules_id="foundation-trade-v1")
+        game.state.phase, game.state.roll_owed = "asset_management", False
+        game.property_manager.get(1).owner = 0  # type: ignore
+        game.property_manager.get(3).owner = 1  # type: ignore
 
         trade_id = game.propose_trade(
             from_player=0,
@@ -297,7 +303,7 @@ class TestMonopolyGameTrading:
             give_properties=[1],
             give_money=100,
             want_properties=[3],
-            want_money=50,
+            want_money=0,
         )
 
         game.reject_trade(trade_id)

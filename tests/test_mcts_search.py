@@ -7,10 +7,6 @@ import math
 import numpy as np
 import pytest
 
-from monopoly_engine.actions import RollDice
-from monopoly_engine.game import MonopolyGame
-from monopoly_gym.action_space import ActionEncoder
-
 from mcts.search import (
     MCTSConfig,
     MCTSNode,
@@ -18,7 +14,9 @@ from mcts.search import (
     _terminal_values,
     clone_game_state,
 )
-
+from monopoly_engine.actions import RollDice
+from monopoly_engine.game import MonopolyGame
+from monopoly_gym.action_space import ActionEncoder
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -258,9 +256,7 @@ class TestBestChild:
         root.visit_count = 30
 
         _add_child(root, action=0, prior=0.3, visit_count=15, total_value={0: 3.0})
-        best = _add_child(
-            root, action=1, prior=0.3, visit_count=5, total_value={0: 4.0}
-        )
+        best = _add_child(root, action=1, prior=0.3, visit_count=5, total_value={0: 4.0})
         _add_child(root, action=2, prior=0.3, visit_count=10, total_value={0: 1.0})
 
         result = root.best_child(exploration_constant=1.41, player_id=0)
@@ -316,14 +312,8 @@ class TestCloneGameState:
 
         # Player states should match
         for i in range(len(orig_dict["players"])):
-            assert (
-                clone_dict["players"][i]["money"]
-                == orig_dict["players"][i]["money"]
-            )
-            assert (
-                clone_dict["players"][i]["position"]
-                == orig_dict["players"][i]["position"]
-            )
+            assert clone_dict["players"][i]["money"] == orig_dict["players"][i]["money"]
+            assert clone_dict["players"][i]["position"] == orig_dict["players"][i]["position"]
 
     def test_clone_rng_independent_with_seed(self) -> None:
         """Clones with different seeds should produce different dice rolls."""
@@ -576,7 +566,7 @@ class TestMCTSExpansion:
         # Create fake policy priors
         policy = np.zeros(149, dtype=np.float32)
         for i, a in enumerate(valid_actions):
-            policy[a] = (i + 1.0)
+            policy[a] = i + 1.0
         policy /= policy.sum()  # normalize
 
         node = MCTSNode(
@@ -853,6 +843,11 @@ class TestSimulate:
         assert values[2] == -1.0
         assert values[3] == -1.0
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_simulate_with_value_network_flag_but_no_network(self) -> None:
         """With use_value_network=True but no network, should fall back to rollout."""
         game = MonopolyGame(num_players=2, seed=42)
@@ -868,6 +863,11 @@ class TestSimulate:
         # Should fall back to rollout since network is None
         assert len(values) == 2
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_simulate_dispatches_to_value_network(self) -> None:
         """With use_value_network=True and a network, should use network eval."""
         game = MonopolyGame(num_players=4, seed=42)
@@ -1062,6 +1062,11 @@ class TestOpponentModeling:
 
         assert mask[action], f"Action {action} is not valid"
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_opponent_network_returns_valid_action(self) -> None:
         """Network opponent policy (placeholder) should return a valid action."""
         game = MonopolyGame(num_players=4, seed=42)
@@ -1077,6 +1082,11 @@ class TestOpponentModeling:
 
         assert mask[action], f"Action {action} is not valid"
 
+    @pytest.mark.xfail(
+        strict=True,
+        raises=NotImplementedError,
+        reason="Deferred search/trading positive path; foundation rejects this mode",
+    )
     def test_opponent_policy_config_respected(self) -> None:
         """Different policies should be usable via config."""
         game = MonopolyGame(num_players=4, seed=42)
@@ -1089,7 +1099,7 @@ class TestOpponentModeling:
             action = search._get_opponent_action(game, 0)
             # All should return a valid int action
             assert isinstance(action, int)
-            assert 0 <= action < 149
+            assert 0 <= action < 158
 
     def test_opponent_rule_based_caches_agents(self) -> None:
         """Rule-based agents should be cached per player_id."""
@@ -1366,7 +1376,7 @@ class TestPolicyDistribution:
         visit_counts = {5: 10, 10: 20, 15: 30}
         policy = search.get_policy_distribution(visit_counts)
 
-        assert policy.shape == (149,)
+        assert policy.shape == (158,)
         assert abs(float(policy.sum()) - 1.0) < 1e-6
 
     def test_policy_distribution_proportional(self) -> None:
@@ -1399,11 +1409,11 @@ class TestPolicyDistribution:
         search = MCTSSearch(config)
 
         policy = search.get_policy_distribution({})
-        assert policy.shape == (149,)
+        assert policy.shape == (158,)
         assert float(policy.sum()) == 0.0
 
     def test_policy_distribution_shape(self) -> None:
-        """Policy should be float32 array of shape (149,)."""
+        """Policy should be float32 array of shape (158,)."""
         config = MCTSConfig()
         search = MCTSSearch(config)
 
@@ -1411,7 +1421,7 @@ class TestPolicyDistribution:
         policy = search.get_policy_distribution(visit_counts)
 
         assert policy.dtype == np.float32
-        assert policy.shape == (149,)
+        assert policy.shape == (158,)
 
 
 class TestDirichletNoise:
@@ -1436,8 +1446,7 @@ class TestDirichletNoise:
 
         # At least some priors should have changed
         changed = sum(
-            1 for a, c in root.children.items()
-            if abs(c.prior - original_priors[a]) > 1e-10
+            1 for a, c in root.children.items() if abs(c.prior - original_priors[a]) > 1e-10
         )
         assert changed > 0
 
@@ -1501,7 +1510,7 @@ class TestFullSearchIntegration:
         visit_counts = search.search(game, player_id=0)
         policy = search.get_policy_distribution(visit_counts)
 
-        assert policy.shape == (149,)
+        assert policy.shape == (158,)
         assert abs(float(policy.sum()) - 1.0) < 1e-6
 
     def test_full_search_with_rule_based_rollouts(self) -> None:

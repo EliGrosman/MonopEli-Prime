@@ -44,6 +44,7 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
   const isOwned = property?.owner !== null && property?.owner !== undefined;
   const isOwnedByMe = property?.owner === playerId;
   const owner = isOwned ? gameState.players.find((p) => p.id === property.owner) : null;
+
   const hasMonopolyOnColor =
     playerId !== null && space.color ? hasMonopoly(playerId, space.color) : false;
 
@@ -57,24 +58,14 @@ export function PropertyModal({ position, isOpen, onClose, send }: PropertyModal
     property: gameState.properties[pos],
   }));
 
-  // Check if can build/sell (even building rule)
   const houses = property?.houses ?? 0;
-  const groupHouses = colorGroupPositions.map((p) => gameState.properties[p]?.houses ?? 0);
-  const minHouses = Math.min(...groupHouses);
-  const maxHouses = Math.max(...groupHouses);
-  const canBuild =
-    isOwnedByMe &&
-    hasMonopolyOnColor &&
-    !property?.mortgaged &&
-    houses < 5 &&
-    houses <= minHouses &&
-    (gameState.housesRemaining > 0 || houses === 4);
-  const canSell = isOwnedByMe && houses > 0 && houses >= maxHouses;
-  const canMortgage = isOwnedByMe && !property?.mortgaged && houses === 0;
-  const canUnmortgage =
-    isOwnedByMe &&
-    property?.mortgaged &&
-    (owner?.money ?? 0) >= Math.floor(info.mortgageValue * 1.1);
+  const legal = (type: string) =>
+    gameState.decision_player === playerId &&
+    (gameState.legal_actions ?? []).some((a) => a.type === type && a.property_id === position);
+  const canBuild = legal(houses === 4 ? 'BuildHotel' : 'BuildHouse');
+  const canSell = legal(houses === 5 ? 'SellHotel' : 'SellHouse');
+  const canMortgage = legal('MortgageProperty');
+  const canUnmortgage = legal('UnmortgageProperty');
 
   const handleBuild = () => {
     if (houses === 4) {

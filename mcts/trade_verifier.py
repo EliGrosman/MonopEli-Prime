@@ -128,14 +128,16 @@ class MCTSTradeVerifier:
             value_after = self._evaluate_position(clone, player_id)
             delta = value_after - value_before
 
-            results.append(TradeEvaluation(
-                trade=trade,
-                value_before=value_before,
-                value_after=value_after,
-                value_delta=delta,
-                recommended=delta >= self.acceptance_threshold,
-                simulations_used=sims,
-            ))
+            results.append(
+                TradeEvaluation(
+                    trade=trade,
+                    value_before=value_before,
+                    value_after=value_after,
+                    value_delta=delta,
+                    recommended=delta >= self.acceptance_threshold,
+                    simulations_used=sims,
+                )
+            )
 
         results.sort(key=lambda e: e.value_delta, reverse=True)
         return results

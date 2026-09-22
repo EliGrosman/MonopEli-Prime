@@ -36,9 +36,9 @@ def monopoly_proximity(
     for color, positions in PROPERTY_GROUPS.items():
         total = len(positions)
         owned = sum(
-            1 for pos in positions
-            if pm.properties.get(pos) is not None
-            and pm.properties[pos].owner == player_id
+            1
+            for pos in positions
+            if pm.properties.get(pos) is not None and pm.properties[pos].owner == player_id
         )
         result[color] = owned / total if total > 0 else 0.0
     return result
@@ -47,14 +47,16 @@ def monopoly_proximity(
 def _count_monopolies(player_id: int, pm: PropertyManager) -> int:
     """Count how many monopolies a player has (excluding railroads/utilities)."""
     return sum(
-        1 for color in PropertyColor
+        1
+        for color in PropertyColor
         if color not in (PropertyColor.RAILROAD, PropertyColor.UTILITY)
         and pm.has_monopoly(player_id, color)
     )
 
 
 def _player_metrics(
-    game: MonopolyGame, player_id: int,
+    game: MonopolyGame,
+    player_id: int,
 ) -> dict[str, Any]:
     """Compute strategic metrics for a player."""
     player = game.players[player_id]
@@ -62,10 +64,7 @@ def _player_metrics(
     return {
         "net_worth": calculate_net_worth(player, pm),
         "monopoly_count": _count_monopolies(player_id, pm),
-        "proximity": {
-            color.name: val
-            for color, val in monopoly_proximity(player_id, pm).items()
-        },
+        "proximity": {color.name: val for color, val in monopoly_proximity(player_id, pm).items()},
     }
 
 
@@ -134,12 +133,10 @@ def trade_impact(
     after_to_monopolies = _count_monopolies(to_id, pm_copy)
 
     after_from_proximity = {
-        color.name: val
-        for color, val in monopoly_proximity(from_id, pm_copy).items()
+        color.name: val for color, val in monopoly_proximity(from_id, pm_copy).items()
     }
     after_to_proximity = {
-        color.name: val
-        for color, val in monopoly_proximity(to_id, pm_copy).items()
+        color.name: val for color, val in monopoly_proximity(to_id, pm_copy).items()
     }
 
     # --- Detect monopoly changes ---
@@ -250,7 +247,8 @@ def property_strategic_value(
 
     # How many of this group does the player already own (excluding this one)?
     owned_in_group = sum(
-        1 for pos in group_positions
+        1
+        for pos in group_positions
         if pos != position
         and pm.properties.get(pos) is not None
         and pm.properties[pos].owner == for_player
@@ -276,7 +274,8 @@ def property_strategic_value(
         if pid == for_player:
             continue
         opp_owned = sum(
-            1 for pos in group_positions
+            1
+            for pos in group_positions
             if pos != position
             and pm.properties.get(pos) is not None
             and pm.properties[pos].owner == pid
@@ -293,6 +292,7 @@ def property_strategic_value(
 # ---------------------------------------------------------------------------
 # Suggest valuable trades
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TradeCandidate:
@@ -325,9 +325,9 @@ def suggest_valuable_trades(
 
     # Our properties available to offer (no buildings, not mortgaged)
     our_props = [
-        pos for pos in pm.get_owned_by(player_id)
-        if pm.properties[pos].houses == 0
-        and not pm.properties[pos].mortgaged
+        pos
+        for pos in pm.get_owned_by(player_id)
+        if pm.properties[pos].houses == 0 and not pm.properties[pos].mortgaged
     ]
 
     for color, positions in PROPERTY_GROUPS.items():
@@ -336,9 +336,9 @@ def suggest_valuable_trades(
 
         group_size = len(positions)
         owned_positions = [
-            pos for pos in positions
-            if pm.properties.get(pos) is not None
-            and pm.properties[pos].owner == player_id
+            pos
+            for pos in positions
+            if pm.properties.get(pos) is not None and pm.properties[pos].owner == player_id
         ]
         missing_positions = [pos for pos in positions if pos not in owned_positions]
 
@@ -366,9 +366,9 @@ def suggest_valuable_trades(
             if offer_color is not None:
                 offer_group = PROPERTY_GROUPS.get(offer_color, ())
                 offer_owned = sum(
-                    1 for p in offer_group
-                    if pm.properties.get(p) is not None
-                    and pm.properties[p].owner == player_id
+                    1
+                    for p in offer_group
+                    if pm.properties.get(p) is not None and pm.properties[p].owner == player_id
                 )
                 if offer_owned >= len(offer_group) - 1 and len(offer_group) > 1:
                     continue  # This property is critical for another monopoly
@@ -385,14 +385,16 @@ def suggest_valuable_trades(
             if isinstance(space, (PropertySpace, RailroadSpace, UtilitySpace)):
                 cash_offer = min(space.cost // 2, player.money // 4)
 
-            candidates.append(TradeCandidate(
-                to_player=target_player,
-                give_properties=[offer_pos],
-                want_properties=[missing_pos],
-                give_money=cash_offer,
-                want_money=0,
-                estimated_value=estimated,
-            ))
+            candidates.append(
+                TradeCandidate(
+                    to_player=target_player,
+                    give_properties=[offer_pos],
+                    want_properties=[missing_pos],
+                    give_money=cash_offer,
+                    want_money=0,
+                    estimated_value=estimated,
+                )
+            )
 
     # Sort by estimated value descending, return top N
     candidates.sort(key=lambda c: c.estimated_value, reverse=True)

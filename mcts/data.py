@@ -35,9 +35,9 @@ class TrainingExample:
         player_id: Which player's perspective this example is from.
     """
 
-    features: NDArray[np.float32]       # shape: (feature_size,)
-    mcts_policy: NDArray[np.float32]    # shape: (149,)
-    outcome: NDArray[np.float32]        # shape: (num_players,)
+    features: NDArray[np.float32]  # shape: (feature_size,)
+    mcts_policy: NDArray[np.float32]  # shape: (149,)
+    outcome: NDArray[np.float32]  # shape: (num_players,)
     player_id: int
 
 
@@ -163,8 +163,7 @@ def compute_outcomes(game: MonopolyGame) -> NDArray[np.float32]:
     else:
         # Truncated -- rank by net worth
         net_worths = [
-            calculate_net_worth(game.players[i], game.property_manager)
-            for i in range(num_players)
+            calculate_net_worth(game.players[i], game.property_manager) for i in range(num_players)
         ]
         ranked = list(np.argsort(net_worths))  # ascending: index 0 = worst
         for rank, pid in enumerate(ranked):
@@ -209,6 +208,9 @@ def generate_training_data(
     Returns:
         ReplayBuffer with collected training examples.
     """
+    raise NotImplementedError(
+        "Search data generation is deferred pending chance-aware search certification"
+    )
     buffer = ReplayBuffer()
     encoder = ActionEncoder(enable_trades=False)
 
@@ -234,7 +236,7 @@ def generate_training_data(
 
         turn = 0
         while not game.game_over and turn < max_turns:
-            pid = game.current_player
+            pid = game.decision_player
             player = game.players[pid]
 
             if player.bankrupt:
@@ -244,7 +246,7 @@ def generate_training_data(
                 end = EndTurn(player_id=pid)
                 valid, _ = end.validate(game)
                 if valid:
-                    end.execute(game)
+                    game.apply_action(end.player_id, end)
                     _auto_roll_dice(game)
                 turn += 1
                 continue
@@ -271,16 +273,16 @@ def generate_training_data(
                 # Select and execute action
                 action_idx = mcts.select_action(visit_counts, temperature)
                 action = encoder.decode(action_idx, pid, game)
-                action.execute(game)
+                game.apply_action(action.player_id, action)
             else:
                 # Opponent player: use configured policy
                 action_idx = mcts._get_opponent_action(game, pid)
                 action = encoder.decode(action_idx, pid, game)
-                action.execute(game)
+                game.apply_action(action.player_id, action)
 
             # Auto-roll dice if turn changed
             prev_player = pid
-            if game.current_player != prev_player:
+            if game.decision_player != prev_player:
                 _auto_roll_dice(game)
 
             turn += 1

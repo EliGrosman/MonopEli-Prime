@@ -267,11 +267,7 @@ class ConnectionManager:
         Returns:
             Number of player connections
         """
-        return sum(
-            1
-            for conn in self._connections.get(game_id, [])
-            if conn.player_id is not None
-        )
+        return sum(1 for conn in self._connections.get(game_id, []) if conn.player_id is not None)
 
     def get_spectator_count(self, game_id: str) -> int:
         """Get number of spectators for a game.
@@ -282,11 +278,7 @@ class ConnectionManager:
         Returns:
             Number of spectator connections
         """
-        return sum(
-            1
-            for conn in self._connections.get(game_id, [])
-            if conn.player_id is None
-        )
+        return sum(1 for conn in self._connections.get(game_id, []) if conn.player_id is None)
 
     def is_player_connected(self, game_id: str, player_id: int) -> bool:
         """Check if a player has an active connection.
@@ -298,10 +290,7 @@ class ConnectionManager:
         Returns:
             True if player has at least one active connection
         """
-        return any(
-            conn.player_id == player_id
-            for conn in self._connections.get(game_id, [])
-        )
+        return any(conn.player_id == player_id for conn in self._connections.get(game_id, []))
 
     def get_connected_players(self, game_id: str) -> list[int]:
         """Get list of connected player IDs for a game.

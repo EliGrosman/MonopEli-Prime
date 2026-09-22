@@ -429,16 +429,12 @@ async def lobby_websocket(
 
             # Handle message types
             if msg_type == "ready":
-                success, error = await lobby_manager.set_ready(
-                    lobby_id, session_id, True
-                )
+                success, error = await lobby_manager.set_ready(lobby_id, session_id, True)
                 if not success:
                     await _send_error(websocket, error)
 
             elif msg_type == "unready":
-                success, error = await lobby_manager.set_ready(
-                    lobby_id, session_id, False
-                )
+                success, error = await lobby_manager.set_ready(lobby_id, session_id, False)
                 if not success:
                     await _send_error(websocket, error)
 
@@ -459,9 +455,7 @@ async def lobby_websocket(
                     continue
                 slot = data.get("slot_id")
                 if slot is not None:
-                    success, error = await lobby_manager.kick_player(
-                        lobby_id, session_id, slot
-                    )
+                    success, error = await lobby_manager.kick_player(lobby_id, session_id, slot)
                     if not success:
                         await _send_error(websocket, error)
 
@@ -508,9 +502,7 @@ async def lobby_websocket(
                 if not is_host:
                     await _send_error(websocket, "Only host can start the game")
                     continue
-                success, error, game_id = await lobby_manager.start_game(
-                    lobby_id, session_id
-                )
+                success, error, game_id = await lobby_manager.start_game(lobby_id, session_id)
                 if not success:
                     await _send_error(websocket, error)
                 else:
@@ -540,8 +532,7 @@ async def lobby_websocket(
         async with conn_manager._lock:
             if lobby_key in conn_manager._connections:
                 conn_manager._connections[lobby_key] = [
-                    c for c in conn_manager._connections[lobby_key]
-                    if c.session_id != session_id
+                    c for c in conn_manager._connections[lobby_key] if c.session_id != session_id
                 ]
                 # Clean up empty list
                 if not conn_manager._connections[lobby_key]:

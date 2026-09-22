@@ -186,6 +186,9 @@ def can_build_house(
     if not property_manager.has_monopoly(player.id, color):
         return False, "You don't have a monopoly on this color"
 
+    if any(property_manager.properties[pos].mortgaged for pos in PROPERTY_GROUPS[color]):
+        return False, "All properties in the color group must be unmortgaged"
+
     # Check even building rule
     min_houses = property_manager.get_min_houses_in_group(color)
     if prop.houses > min_houses:

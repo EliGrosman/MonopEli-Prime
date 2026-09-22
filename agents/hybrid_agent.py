@@ -163,8 +163,7 @@ class HybridAgent(Agent):
         Handles trade logic as a side effect, then delegates to MCTSAgent
         for the normal gameplay action.
         """
-        self._handle_trade_phase(game)
-        return self._mcts_agent.choose_action(observation, action_mask, game)
+        raise NotImplementedError("Hybrid trading is disabled in foundation-v1")
 
     # ------------------------------------------------------------------
     # Trade orchestration
@@ -320,7 +319,9 @@ class HybridAgent(Agent):
 
         # Verify with MCTS
         evaluation = self._verifier.evaluate_trade(
-            game, self.player_id, trade_data,
+            game,
+            self.player_id,
+            trade_data,
         )
 
         if not evaluation.recommended:
@@ -363,7 +364,9 @@ class HybridAgent(Agent):
         """Respond to an incoming trade negotiation."""
         if not negotiation.history:
             self._negotiation_mgr.reject(
-                game, negotiation.negotiation_id, self.player_id,
+                game,
+                negotiation.negotiation_id,
+                self.player_id,
             )
             return
 
@@ -371,7 +374,9 @@ class HybridAgent(Agent):
 
         # Evaluate with MCTS
         evaluation = self._verifier.evaluate_trade(
-            game, self.player_id, trade,
+            game,
+            self.player_id,
+            trade,
         )
 
         # Ask LLM (with MCTS values for fast path)
@@ -388,7 +393,9 @@ class HybridAgent(Agent):
 
         if action == "accept":
             self._negotiation_mgr.accept(
-                game, negotiation.negotiation_id, self.player_id,
+                game,
+                negotiation.negotiation_id,
+                self.player_id,
             )
             logger.info(
                 "Accepted trade (MCTS delta=%.3f): %s",
@@ -412,12 +419,16 @@ class HybridAgent(Agent):
             else:
                 # Empty counter → reject
                 self._negotiation_mgr.reject(
-                    game, negotiation.negotiation_id, self.player_id,
+                    game,
+                    negotiation.negotiation_id,
+                    self.player_id,
                 )
 
         else:
             self._negotiation_mgr.reject(
-                game, negotiation.negotiation_id, self.player_id,
+                game,
+                negotiation.negotiation_id,
+                self.player_id,
             )
             logger.info(
                 "Rejected trade (MCTS delta=%.3f): %s",

@@ -3,18 +3,15 @@
 import pytest
 
 from monopoly_engine import (
-    Player,
-    Property,
-    PropertyManager,
+    PROPERTY_GROUPS,
     Board,
+    CardDeck,
+    Player,
+    PropertyColor,
+    PropertyManager,
     PropertySpace,
     RailroadSpace,
     UtilitySpace,
-    CardDeck,
-    CHANCE_CARDS,
-    COMMUNITY_CHEST_CARDS,
-    PropertyColor,
-    PROPERTY_GROUPS,
 )
 
 
@@ -42,10 +39,7 @@ def two_players() -> list[Player]:
 @pytest.fixture
 def four_players() -> list[Player]:
     """Create four players for a full game."""
-    return [
-        Player(id=i, name=f"Player {i + 1}")
-        for i in range(4)
-    ]
+    return [Player(id=i, name=f"Player {i + 1}") for i in range(4)]
 
 
 @pytest.fixture
@@ -124,10 +118,7 @@ def electric_company() -> UtilitySpace:
 @pytest.fixture
 def all_property_positions() -> list[int]:
     """Get all regular property positions."""
-    return [
-        i for i, s in enumerate(Board.SPACES)
-        if isinstance(s, PropertySpace)
-    ]
+    return [i for i, s in enumerate(Board.SPACES) if isinstance(s, PropertySpace)]
 
 
 @pytest.fixture

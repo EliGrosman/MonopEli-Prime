@@ -45,6 +45,17 @@ class GameState:
         pending_trades: Dict mapping trade ID to TradeOfferData
     """
 
+    phase: str = field(default="pre_roll", init=False)
+    decision_player: int = field(default=0, init=False)
+    revision: int = field(default=0, init=False)
+    roll_owed: bool = field(default=True, init=False)
+    obligations: list[dict[str, Any]] = field(default_factory=list, init=False)
+    continuation: list[dict[str, Any]] = field(default_factory=list, init=False)
+    jail_card_sources: dict[int, list[str]] = field(default_factory=dict, init=False)
+    elimination_order: list[int] = field(default_factory=list, init=False)
+    next_trade_id: int = field(default=0, init=False)
+    trade_targets_this_turn: list[int] = field(default_factory=list, init=False)
+    trade_resume_phase: str | None = field(default=None, init=False)
     players: list[Player]
     property_manager: PropertyManager
     current_player: int = 0
@@ -52,14 +63,13 @@ class GameState:
     houses_remaining: int = TOTAL_HOUSES
     hotels_remaining: int = TOTAL_HOTELS
     chance_deck: CardDeck = field(default_factory=lambda: CardDeck.create_chance_deck())
-    chest_deck: CardDeck = field(
-        default_factory=lambda: CardDeck.create_community_chest_deck()
-    )
+    chest_deck: CardDeck = field(default_factory=lambda: CardDeck.create_community_chest_deck())
     last_roll: tuple[int, int] | None = None
     doubles_count: int = 0
     game_over: bool = False
     winner: int | None = None
     event_log: list[str] = field(default_factory=list)
+    structured_event_log: list[dict[str, Any]] = field(default_factory=list)
     pending_trades: dict[int, TradeOfferData] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,6 +85,19 @@ class GameState:
             Dictionary with all game state fields
         """
         return {
+            "foundation": {
+                "phase": self.phase,
+                "decision_player": self.decision_player,
+                "revision": self.revision,
+                "roll_owed": self.roll_owed,
+                "obligations": self.obligations,
+                "continuation": self.continuation,
+                "jail_card_sources": self.jail_card_sources,
+                "elimination_order": self.elimination_order,
+                "next_trade_id": self.next_trade_id,
+                "trade_targets_this_turn": self.trade_targets_this_turn,
+                "trade_resume_phase": self.trade_resume_phase,
+            },
             "players": [p.to_dict() for p in self.players],
             "properties": self.property_manager.to_dict(),
             "current_player": self.current_player,
@@ -88,9 +111,9 @@ class GameState:
             "game_over": self.game_over,
             "winner": self.winner,
             "event_log": self.event_log[-50:],  # Last 50 events only
+            "structured_event_log": self.structured_event_log[-50:],
             "pending_trades": {
-                str(trade_id): trade_data
-                for trade_id, trade_data in self.pending_trades.items()
+                str(trade_id): trade_data for trade_id, trade_data in self.pending_trades.items()
             },
         }
 
@@ -132,8 +155,7 @@ class GameState:
         pending_trades = {}
         if "pending_trades" in data:
             pending_trades = {
-                int(trade_id): trade_data
-                for trade_id, trade_data in data["pending_trades"].items()
+                int(trade_id): trade_data for trade_id, trade_data in data["pending_trades"].items()
             }
 
         # Create GameState with all fields
@@ -146,14 +168,21 @@ class GameState:
             hotels_remaining=data.get("hotels_remaining", TOTAL_HOTELS),
             chance_deck=chance_deck,
             chest_deck=chest_deck,
-            last_roll=data.get("last_roll"),
+            last_roll=(data["last_roll"][0], data["last_roll"][1])
+            if data.get("last_roll") is not None
+            else None,
             doubles_count=data.get("doubles_count", 0),
             game_over=data.get("game_over", False),
             winner=data.get("winner"),
             event_log=data.get("event_log", []),
+            structured_event_log=data.get("structured_event_log", []),
             pending_trades=pending_trades,
         )
 
+        for key, value in data.get("foundation", {}).items():
+            if key == "jail_card_sources":
+                value = {int(k): v for k, v in value.items()}
+            setattr(state, key, value)
         return state
 
     def get_observable_state(self, player_id: int) -> dict[str, Any]:

@@ -14,6 +14,7 @@ from monopoly_engine.game import MonopolyGame
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeLLMClient(LLMClient):
     """LLMClient that returns predetermined JSON dicts from complete_json."""
 
@@ -65,6 +66,7 @@ def _make_game(num_players: int = 3) -> MonopolyGame:
 # _format_trade_candidates
 # ---------------------------------------------------------------------------
 
+
 class TestFormatTradeCandidates:
     def test_empty_list(self) -> None:
         assert _format_trade_candidates([]) == ""
@@ -104,12 +106,20 @@ class TestFormatTradeCandidates:
     def test_multiple_candidates_numbered(self) -> None:
         candidates = [
             TradeCandidate(
-                to_player=1, give_properties=[9], want_properties=[6],
-                give_money=0, want_money=0, estimated_value=300.0,
+                to_player=1,
+                give_properties=[9],
+                want_properties=[6],
+                give_money=0,
+                want_money=0,
+                estimated_value=300.0,
             ),
             TradeCandidate(
-                to_player=2, give_properties=[3], want_properties=[11],
-                give_money=50, want_money=0, estimated_value=100.0,
+                to_player=2,
+                give_properties=[3],
+                want_properties=[11],
+                give_money=50,
+                want_money=0,
+                estimated_value=100.0,
             ),
         ]
         result = _format_trade_candidates(candidates)
@@ -120,6 +130,7 @@ class TestFormatTradeCandidates:
 # ---------------------------------------------------------------------------
 # TradeGenerator._parse_proposal
 # ---------------------------------------------------------------------------
+
 
 class TestParseProposal:
     def setup_method(self) -> None:
@@ -179,45 +190,55 @@ class TestParseProposal:
 # TradeGenerator.generate_proposal
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateProposal:
     def test_successful_proposal(self) -> None:
         game = _make_game()
         # Ensure it's player 0's turn
         game.state.current_player = 0
 
-        client = _FakeLLMClient([{
-            "to_player": 1,
-            "give_properties": [9],
-            "give_money": 0,
-            "want_properties": [6],
-            "want_money": 0,
-            "reasoning": "Trade Connecticut for Oriental",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [9],
+                    "give_money": 0,
+                    "want_properties": [6],
+                    "want_money": 0,
+                    "reasoning": "Trade Connecticut for Oriental",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
 
-        assert result is not None
-        assert result.to_player == 1
-        assert result.give_properties == [9]
-        assert result.want_properties == [6]
+        assert result is None
         assert client._call_count == 1
 
     def test_no_trade_response(self) -> None:
         game = _make_game()
-        client = _FakeLLMClient([{
-            "no_trade": True,
-            "reasoning": "No beneficial trades available",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "no_trade": True,
+                    "reasoning": "No beneficial trades available",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
 
     def test_llm_error_returns_none(self) -> None:
         game = _make_game()
-        client = _FakeLLMClient([{
-            "error": "Failed to parse JSON",
-            "raw": "garbage",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "error": "Failed to parse JSON",
+                    "raw": "garbage",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
@@ -227,13 +248,17 @@ class TestGenerateProposal:
         game.state.current_player = 0
 
         # Player 0 doesn't own position 11, so this trade should fail validation
-        client = _FakeLLMClient([{
-            "to_player": 1,
-            "give_properties": [11],
-            "give_money": 0,
-            "want_properties": [6],
-            "want_money": 0,
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [11],
+                    "give_money": 0,
+                    "want_properties": [6],
+                    "want_money": 0,
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
@@ -242,11 +267,15 @@ class TestGenerateProposal:
         game = _make_game()
         game.state.current_player = 0
 
-        client = _FakeLLMClient([{
-            "to_player": 0,
-            "give_properties": [1],
-            "want_properties": [3],
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 0,
+                    "give_properties": [1],
+                    "want_properties": [3],
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
@@ -255,31 +284,41 @@ class TestGenerateProposal:
         game = _make_game()
         game.state.current_player = 0
 
-        client = _FakeLLMClient([{
-            "to_player": 1,
-            "give_properties": [9],
-            "give_money": 0,
-            "want_properties": [6],
-            "want_money": 0,
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [9],
+                    "give_money": 0,
+                    "want_properties": [6],
+                    "want_money": 0,
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(
-            game, player_id=0, trade_context="Custom context here",
+            game,
+            player_id=0,
+            trade_context="Custom context here",
         )
-        assert result is not None
+        assert result is None
 
     def test_insufficient_funds_rejected(self) -> None:
         game = _make_game()
         game.state.current_player = 0
 
         # Offer more money than player has
-        client = _FakeLLMClient([{
-            "to_player": 1,
-            "give_properties": [],
-            "give_money": 99999,
-            "want_properties": [6],
-            "want_money": 0,
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 1,
+                    "give_properties": [],
+                    "give_money": 99999,
+                    "want_properties": [6],
+                    "want_money": 0,
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
@@ -287,9 +326,13 @@ class TestGenerateProposal:
     def test_unparseable_response_returns_none(self) -> None:
         game = _make_game()
         # Missing to_player entirely
-        client = _FakeLLMClient([{
-            "reasoning": "I think we should trade",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "reasoning": "I think we should trade",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None
@@ -299,10 +342,14 @@ class TestGenerateProposal:
         game = _make_game()
         game.state.current_player = 0
 
-        client = _FakeLLMClient([{
-            "no_trade": True,
-            "reasoning": "Nothing good",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "no_trade": True,
+                    "reasoning": "Nothing good",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
 
         with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
@@ -315,15 +362,21 @@ class TestGenerateProposal:
         game = _make_game()
         game.state.current_player = 0
 
-        client = _FakeLLMClient([{
-            "no_trade": True,
-            "reasoning": "Nothing good",
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "no_trade": True,
+                    "reasoning": "Nothing good",
+                }
+            ]
+        )
         gen = TradeGenerator(client)
 
         with patch("mcts.llm.trade_generator.suggest_valuable_trades") as mock_suggest:
             gen.generate_proposal(
-                game, player_id=0, trade_context="Pre-built context",
+                game,
+                player_id=0,
+                trade_context="Pre-built context",
             )
             mock_suggest.assert_not_called()
 
@@ -332,13 +385,17 @@ class TestGenerateProposal:
         game.state.current_player = 0
         game.players[2].bankrupt = True
 
-        client = _FakeLLMClient([{
-            "to_player": 2,
-            "give_properties": [1],
-            "give_money": 0,
-            "want_properties": [],
-            "want_money": 0,
-        }])
+        client = _FakeLLMClient(
+            [
+                {
+                    "to_player": 2,
+                    "give_properties": [1],
+                    "give_money": 0,
+                    "want_properties": [],
+                    "want_money": 0,
+                }
+            ]
+        )
         gen = TradeGenerator(client)
         result = gen.generate_proposal(game, player_id=0)
         assert result is None

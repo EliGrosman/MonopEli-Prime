@@ -171,6 +171,42 @@ export function LobbyRoom({
                 <span className="font-medium">Conservative</span>
                 <p className="text-xs text-gray-600">Saves money carefully</p>
               </button>
+              {lobby.settings.rules_id === 'foundation-trade-v1' && (
+                <>
+                  <button
+                    onClick={() => handleAddAi('trading_random')}
+                    className="p-3 text-left border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="font-medium">Trading Random</span>
+                    <p className="text-xs text-gray-600">Random play with mutual-benefit trades</p>
+                  </button>
+                  <button
+                    onClick={() => handleAddAi('trading_rule_based')}
+                    className="p-3 text-left border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="font-medium">Trading Rule-Based</span>
+                    <p className="text-xs text-gray-600">Basic play with mutual-benefit trades</p>
+                  </button>
+                  <button
+                    onClick={() => handleAddAi('trading_aggressive')}
+                    className="p-3 text-left border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="font-medium">Trading Aggressive</span>
+                    <p className="text-xs text-gray-600">
+                      Aggressive play with mutual-benefit trades
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => handleAddAi('trading_conservative')}
+                    className="p-3 text-left border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="font-medium">Trading Conservative</span>
+                    <p className="text-xs text-gray-600">
+                      Conservative play with mutual-benefit trades
+                    </p>
+                  </button>
+                </>
+              )}
             </div>
             <button
               onClick={() => setShowAiMenu(false)}

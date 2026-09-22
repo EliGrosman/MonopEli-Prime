@@ -51,10 +51,21 @@ class RuleBasedAgent(Agent):
             OFFSET_END_TURN,
             OFFSET_PASS_BUY,
             OFFSET_PAY_JAIL_FINE,
+            OFFSET_ROLL_DICE,
+            OFFSET_SELL_GROUP,
             OFFSET_UNMORTGAGE,
             OFFSET_USE_JAIL_CARD,
         )
 
+        if game.state.phase == "debt_resolution":
+            # Stable legal liquidation: buildings first, mortgages second.
+            for lo, hi in ((46, 90), (OFFSET_SELL_GROUP, len(action_mask)), (90, 118)):
+                for index in range(lo, hi):
+                    if action_mask[index]:
+                        return index
+            raise RuntimeError("Debt has no legal liquidation action")
+        if action_mask[OFFSET_ROLL_DICE] and not game.players[self.player_id].in_jail:
+            return OFFSET_ROLL_DICE
         player = game.players[self.player_id]
 
         # Priority 0: Buy property if affordable
@@ -67,6 +78,9 @@ class RuleBasedAgent(Agent):
                 if prop_cost < player.money * self.buy_threshold:
                     return OFFSET_BUY_PROPERTY
             # If can't afford threshold, pass
+            return OFFSET_PASS_BUY
+
+        if action_mask[OFFSET_PASS_BUY]:
             return OFFSET_PASS_BUY
 
         # Priority 1: Get out of jail
@@ -104,6 +118,10 @@ class RuleBasedAgent(Agent):
                     return OFFSET_UNMORTGAGE + i
 
         # Default: End turn
+        if action_mask[OFFSET_ROLL_DICE]:
+            return OFFSET_ROLL_DICE
+        if not action_mask[OFFSET_END_TURN]:
+            raise RuntimeError("No legal heuristic action")
         return OFFSET_END_TURN
 
 

@@ -1,21 +1,19 @@
 """Tests for types.py module."""
 
-import pytest
-
 from monopoly_engine import (
-    SpaceType,
-    PropertyColor,
+    BOARD_SIZE,
+    GO_SALARY,
+    JAIL_POSITION,
+    POSITION_TO_COLOR,
+    PROPERTY_GROUPS,
+    STARTING_MONEY,
+    TOTAL_HOTELS,
+    TOTAL_HOUSES,
     ActionType,
     CardType,
     GamePhase,
-    BOARD_SIZE,
-    STARTING_MONEY,
-    GO_SALARY,
-    JAIL_POSITION,
-    TOTAL_HOUSES,
-    TOTAL_HOTELS,
-    PROPERTY_GROUPS,
-    POSITION_TO_COLOR,
+    PropertyColor,
+    SpaceType,
 )
 
 
@@ -25,9 +23,17 @@ class TestSpaceType:
     def test_all_space_types_defined(self) -> None:
         """Verify all expected space types exist."""
         expected = [
-            "GO", "PROPERTY", "RAILROAD", "UTILITY",
-            "CHANCE", "COMMUNITY_CHEST", "INCOME_TAX",
-            "LUXURY_TAX", "JAIL", "GO_TO_JAIL", "FREE_PARKING"
+            "GO",
+            "PROPERTY",
+            "RAILROAD",
+            "UTILITY",
+            "CHANCE",
+            "COMMUNITY_CHEST",
+            "INCOME_TAX",
+            "LUXURY_TAX",
+            "JAIL",
+            "GO_TO_JAIL",
+            "FREE_PARKING",
         ]
         actual = [st.name for st in SpaceType]
         for name in expected:
@@ -45,9 +51,16 @@ class TestPropertyColor:
     def test_all_property_colors_defined(self) -> None:
         """Verify all expected property colors exist."""
         expected = [
-            "BROWN", "LIGHT_BLUE", "MAGENTA", "ORANGE",
-            "RED", "YELLOW", "GREEN", "DARK_BLUE",
-            "RAILROAD", "UTILITY"
+            "BROWN",
+            "LIGHT_BLUE",
+            "MAGENTA",
+            "ORANGE",
+            "RED",
+            "YELLOW",
+            "GREEN",
+            "DARK_BLUE",
+            "RAILROAD",
+            "UTILITY",
         ]
         actual = [pc.name for pc in PropertyColor]
         for name in expected:
@@ -65,8 +78,12 @@ class TestActionType:
     def test_all_action_types_defined(self) -> None:
         """Verify key action types exist."""
         expected = [
-            "ROLL_DICE", "BUY_PROPERTY", "BUILD_HOUSE",
-            "MORTGAGE_PROPERTY", "END_TURN", "DECLARE_BANKRUPTCY"
+            "ROLL_DICE",
+            "BUY_PROPERTY",
+            "BUILD_HOUSE",
+            "MORTGAGE_PROPERTY",
+            "END_TURN",
+            "DECLARE_BANKRUPTCY",
         ]
         actual = [at.name for at in ActionType]
         for name in expected:
@@ -79,10 +96,16 @@ class TestCardType:
     def test_all_card_types_defined(self) -> None:
         """Verify all expected card types exist."""
         expected = [
-            "MOVE", "MOVE_NEAREST", "MOVE_BACK",
-            "COLLECT", "PAY", "PAY_PER_BUILDING",
-            "COLLECT_FROM_PLAYERS", "PAY_TO_PLAYERS",
-            "GET_OUT_OF_JAIL", "GO_TO_JAIL"
+            "MOVE",
+            "MOVE_NEAREST",
+            "MOVE_BACK",
+            "COLLECT",
+            "PAY",
+            "PAY_PER_BUILDING",
+            "COLLECT_FROM_PLAYERS",
+            "PAY_TO_PLAYERS",
+            "GET_OUT_OF_JAIL",
+            "GO_TO_JAIL",
         ]
         actual = [ct.name for ct in CardType]
         for name in expected:
@@ -95,8 +118,12 @@ class TestGamePhase:
     def test_key_phases_defined(self) -> None:
         """Verify key game phases exist."""
         expected = [
-            "WAITING_FOR_ROLL", "ROLLED", "LANDED",
-            "PURCHASE_DECISION", "IN_JAIL", "GAME_OVER"
+            "WAITING_FOR_ROLL",
+            "ROLLED",
+            "LANDED",
+            "PURCHASE_DECISION",
+            "IN_JAIL",
+            "GAME_OVER",
         ]
         actual = [gp.name for gp in GamePhase]
         for name in expected:
@@ -162,9 +189,12 @@ class TestPropertyGroups:
     def test_standard_groups_have_three_properties(self) -> None:
         """Most color groups should have 3 properties."""
         three_prop_colors = [
-            PropertyColor.LIGHT_BLUE, PropertyColor.MAGENTA,
-            PropertyColor.ORANGE, PropertyColor.RED,
-            PropertyColor.YELLOW, PropertyColor.GREEN
+            PropertyColor.LIGHT_BLUE,
+            PropertyColor.MAGENTA,
+            PropertyColor.ORANGE,
+            PropertyColor.RED,
+            PropertyColor.YELLOW,
+            PropertyColor.GREEN,
         ]
         for color in three_prop_colors:
             assert len(PROPERTY_GROUPS[color]) == 3

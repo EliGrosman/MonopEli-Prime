@@ -42,9 +42,7 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
         )
     else:
         # Human-readable format for development
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     handler.setFormatter(formatter)
 

@@ -22,6 +22,7 @@ export interface LobbySettings {
   go_salary: number;
   allow_spectators: boolean;
   private: boolean;
+  rules_id: 'foundation-v1' | 'foundation-trade-v1';
 }
 
 /**

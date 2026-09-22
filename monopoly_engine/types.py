@@ -5,7 +5,7 @@ the game engine. No dependencies on other engine modules.
 """
 
 from enum import Enum, auto
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 
 class SpaceType(Enum):
@@ -189,6 +189,8 @@ class TradeOfferData(TypedDict):
     give_money: int
     want_properties: list[int]  # Property positions
     want_money: int
+    trade_id: NotRequired[int]
+    created_revision: NotRequired[int]
 
 
 # Constants

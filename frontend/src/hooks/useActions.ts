@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { useUIStore } from '@/store/uiStore';
@@ -15,10 +15,10 @@ interface UseActionsOptions {
  * Provides computed states for UI enablement.
  */
 export function useActions({ send }: UseActionsOptions) {
-  const { setLoading, setError, gameState } = useGameStore();
+  const { setError, gameState, pendingRequestId } = useGameStore();
   const { playerId } = useSessionStore();
   const { addToast } = useUIStore();
-  const [isActionPending, setIsActionPending] = useState(false);
+  const isActionPending = pendingRequestId !== null;
 
   // Current player state
   const currentPlayer = useMemo(
@@ -26,33 +26,19 @@ export function useActions({ send }: UseActionsOptions) {
     [gameState?.players, playerId]
   );
 
-  // Computed states for UI
-  const isMyTurn = gameState?.currentPlayer === playerId;
+  const isMyTurn = gameState?.decision_player === playerId;
   const isInJail = currentPlayer?.inJail ?? false;
   const doublesCount = gameState?.doublesCount ?? 0;
-
-  // Can roll if: it's my turn, not in jail, AND either:
-  // - In pre_roll phase (haven't rolled yet), OR
-  // - In post_roll phase but rolled doubles (doublesCount > 0), so must roll again
-  const canRollDice =
-    isMyTurn &&
-    !isInJail &&
-    (gameState?.gamePhase === 'pre_roll' ||
-      (gameState?.gamePhase === 'post_roll' && doublesCount > 0));
-
-  // Can roll in jail: try for doubles to escape
-  const canRollInJail = isMyTurn && isInJail && gameState?.gamePhase === 'pre_roll';
-
-  // Can end turn if: it's my turn, we've rolled (post_roll), and we didn't roll doubles
-  const canEndTurn = isMyTurn && gameState?.gamePhase === 'post_roll' && doublesCount === 0;
-  const canPayJailFine = isMyTurn && isInJail && (currentPlayer?.money ?? 0) >= 50;
-  const canUseJailCard = isMyTurn && isInJail && (currentPlayer?.jailCards ?? 0) > 0;
+  const legal = (type: string) =>
+    isMyTurn && (gameState?.legal_actions ?? []).some((action) => action.type === type);
+  const canRollDice = !isInJail && legal('RollDice');
+  const canRollInJail = isInJail && legal('RollDice');
+  const canEndTurn = legal('EndTurn');
+  const canPayJailFine = legal('PayJailFine');
+  const canUseJailCard = legal('UseJailCard');
 
   const sendAction = useCallback(
     (actionType: string, data: Record<string, unknown> = {}) => {
-      setIsActionPending(true);
-      setLoading(true);
-
       try {
         send({
           type: 'action',
@@ -65,13 +51,9 @@ export function useActions({ send }: UseActionsOptions) {
         const message = error instanceof Error ? error.message : 'Action failed';
         setError(message);
         addToast(message, 'error');
-      } finally {
-        // Note: Loading state will be cleared when we receive state update
-        setIsActionPending(false);
-        setLoading(false);
       }
     },
-    [send, setLoading, setError, addToast]
+    [send, setError, addToast]
   );
 
   return {
@@ -99,7 +81,7 @@ export function useActions({ send }: UseActionsOptions) {
     ),
 
     // Pass on buying just ends the turn (no specific action needed)
-    passBuy: useCallback(() => sendAction('end_turn'), [sendAction]),
+    passBuy: useCallback(() => sendAction('pass_buy'), [sendAction]),
 
     // Building
     buildHouse: useCallback(
@@ -150,17 +132,17 @@ export function useActions({ send }: UseActionsOptions) {
     // Trade (simplified)
     proposeTradeOffer: useCallback(
       (targetPlayerId: number, offer: Record<string, unknown>) =>
-        sendAction('propose_trade', { target_player: targetPlayerId, ...offer }),
+        sendAction('propose_trade', { to_player: targetPlayerId, ...offer }),
       [sendAction]
     ),
 
     acceptTrade: useCallback(
-      (tradeId: string) => sendAction('accept_trade', { trade_id: tradeId }),
+      (tradeId: number) => sendAction('accept_trade', { trade_id: tradeId }),
       [sendAction]
     ),
 
     rejectTrade: useCallback(
-      (tradeId: string) => sendAction('reject_trade', { trade_id: tradeId }),
+      (tradeId: number) => sendAction('reject_trade', { trade_id: tradeId }),
       [sendAction]
     ),
   };

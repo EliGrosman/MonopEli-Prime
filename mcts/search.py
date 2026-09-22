@@ -15,7 +15,6 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from monopoly_engine.actions import RollDice
 from monopoly_engine.game import MonopolyGame
 from monopoly_engine.rules import calculate_net_worth
 from monopoly_gym.action_space import ActionEncoder
@@ -98,10 +97,7 @@ class MCTSNode:
 
         parent_visits = self.parent.visit_count if self.parent is not None else 1
         exploration = (
-            exploration_constant
-            * self.prior
-            * math.sqrt(parent_visits)
-            / (1 + self.visit_count)
+            exploration_constant * self.prior * math.sqrt(parent_visits) / (1 + self.visit_count)
         )
 
         return q_value + exploration
@@ -179,9 +175,7 @@ class MCTSConfig:
         return cls(**data)
 
 
-def clone_game_state(
-    game: MonopolyGame, new_seed: int | None = None
-) -> MonopolyGame:
+def clone_game_state(game: MonopolyGame, new_seed: int | None = None) -> MonopolyGame:
     """Clone a game state for MCTS simulation.
 
     Uses game.to_dict() / MonopolyGame.from_dict() for deep copy.
@@ -206,25 +200,8 @@ def clone_game_state(
 
 
 def _auto_roll_dice(game: MonopolyGame) -> None:
-    """Automatically roll dice for the current player if needed.
-
-    In Monopoly, each turn starts with a dice roll before the player
-    chooses actions. The 149-dim action space only covers post-roll
-    decisions. This function handles the automatic dice roll so that
-    child game states are ready for action selection.
-
-    Args:
-        game: The game state (mutated in place).
-    """
-    if game.game_over:
-        return
-    player = game.players[game.current_player]
-    if player.bankrupt:
-        return
-    roll_action = RollDice(player_id=game.current_player)
-    is_valid, _ = roll_action.validate(game)
-    if is_valid:
-        roll_action.execute(game)
+    """Legacy compatibility hook: rolling is now an explicit decision."""
+    return None
 
 
 def _terminal_values(game: MonopolyGame) -> dict[int, float]:
@@ -251,8 +228,7 @@ def _terminal_values(game: MonopolyGame) -> dict[int, float]:
 
     # Truncated or ongoing -- rank by net worth
     net_worths = [
-        calculate_net_worth(game.players[i], game.property_manager)
-        for i in range(num_players)
+        calculate_net_worth(game.players[i], game.property_manager) for i in range(num_players)
     ]
     ranked = list(np.argsort(net_worths))  # ascending: index 0 = worst
     for rank, pid in enumerate(ranked):
@@ -280,6 +256,14 @@ class MCTSSearch:
         config: MCTSConfig,
         value_network: Any | None = None,
     ) -> None:
+        if (
+            config.use_value_network
+            or value_network is not None
+            or config.opponent_policy == "network"
+        ):
+            raise NotImplementedError(
+                "Learned MCTS is disconnected; use experimental rollout-only search"
+            )
         self.config = config
         self.value_network = value_network
         self._encoder = ActionEncoder(enable_trades=False)
@@ -321,14 +305,12 @@ class MCTSSearch:
 
         for action_idx in valid_actions:
             child_game = clone_game_state(game)
-            action = self._encoder.decode(
-                int(action_idx), node.player_to_move, child_game
-            )
-            action.execute(child_game)
+            action = self._encoder.decode(int(action_idx), node.player_to_move, child_game)
+            child_game.apply_action(action.player_id, action)
 
             # If the action changed the current player (e.g. EndTurn),
             # auto-roll dice for the new current player.
-            if child_game.current_player != node.player_to_move:
+            if child_game.decision_player != node.player_to_move:
                 _auto_roll_dice(child_game)
 
             # Determine prior
@@ -342,7 +324,7 @@ class MCTSSearch:
                 parent=node,
                 action=int(action_idx),
                 prior=prior,
-                player_to_move=child_game.current_player,
+                player_to_move=child_game.decision_player,
                 is_terminal=child_game.game_over,
             )
             node.children[int(action_idx)] = child
@@ -370,10 +352,7 @@ class MCTSSearch:
         if game.game_over:
             return _terminal_values(game)
 
-        if (
-            self.config.use_value_network
-            and self.value_network is not None
-        ):
+        if self.config.use_value_network and self.value_network is not None:
             return self._value_network_evaluate(game, player_id)
 
         return self._random_rollout(game, self.config.max_rollout_depth)
@@ -401,7 +380,7 @@ class MCTSSearch:
             if game.game_over:
                 break
 
-            current = game.current_player
+            current = game.decision_player
             player = game.players[current]
             if player.bankrupt:
                 # Skip bankrupt players by ending their turn
@@ -410,42 +389,22 @@ class MCTSSearch:
                 end = EndTurn(player_id=current)
                 valid, _ = end.validate(game)
                 if valid:
-                    end.execute(game)
+                    game.apply_action(end.player_id, end)
                     _auto_roll_dice(game)
                 continue
 
             chosen = self._get_opponent_action(game, current)
             action = self._encoder.decode(chosen, current, game)
-            action.execute(game)
+            game.apply_action(action.player_id, action)
 
             # Auto-roll dice if turn changed
-            if game.current_player != current:
+            if game.decision_player != current:
                 _auto_roll_dice(game)
 
         return _terminal_values(game)
 
-    def _value_network_evaluate(
-        self,
-        game: MonopolyGame,
-        player_id: int,
-    ) -> dict[int, float]:
-        """Evaluate game state using the value network.
-
-        Extracts features, runs a forward pass, and returns per-player
-        value estimates. This is a placeholder that will be fully wired
-        in Workstream B (B1-B2).
-
-        Args:
-            game: Game state to evaluate.
-            player_id: Player perspective for feature encoding.
-
-        Returns:
-            Per-player value estimates from the network.
-        """
-        # Value network integration will be completed in Workstream B.
-        # For now, return zeros if somehow called without a proper network.
-        num_players = len(game.players)
-        return {i: 0.0 for i in range(num_players)}
+    def _value_network_evaluate(self, game: MonopolyGame, player_id: int) -> dict[int, float]:
+        raise NotImplementedError("Network-backed MCTS is not certified or implemented")
 
     def backpropagate(self, node: MCTSNode, values: dict[int, float]) -> None:
         """Propagate simulation values from leaf to root.
@@ -462,9 +421,7 @@ class MCTSSearch:
         while current is not None:
             current.visit_count += 1
             for player_id, value in values.items():
-                current.total_value[player_id] = (
-                    current.total_value.get(player_id, 0.0) + value
-                )
+                current.total_value[player_id] = current.total_value.get(player_id, 0.0) + value
             current = current.parent
 
     def search(self, game: MonopolyGame, player_id: int) -> dict[int, int]:
@@ -487,7 +444,7 @@ class MCTSSearch:
         # 1. Create root node
         root = MCTSNode(
             state_dict=game.to_dict(),
-            player_to_move=game.current_player,
+            player_to_move=game.decision_player,
             is_terminal=game.game_over,
         )
 
@@ -632,9 +589,7 @@ class MCTSSearch:
             return
 
         num_children = len(root.children)
-        noise = np.random.dirichlet(
-            [self.config.dirichlet_alpha] * num_children
-        )
+        noise = np.random.dirichlet([self.config.dirichlet_alpha] * num_children)
 
         eps = self.config.dirichlet_epsilon
         for i, child in enumerate(root.children.values()):

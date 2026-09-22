@@ -1,0 +1,1320 @@
+{
+  "jail": {
+    "rules_id": "foundation-v1",
+    "game_phase": "jail_decision",
+    "decision_player": 0,
+    "revision": 0,
+    "debt": null,
+    "legal_actions": [
+      {
+        "type": "RollDice",
+        "player_id": 0
+      },
+      {
+        "type": "PayJailFine",
+        "player_id": 0
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 1500,
+        "position": 10,
+        "in_jail": true,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1500,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      }
+    },
+    "current_player": 0,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": null,
+    "doubles_count": 0,
+    "game_over": false,
+    "winner": null,
+    "event_log": ["Game initialized with 2 players", "Player 1 went to JAIL"]
+  },
+  "paid": {
+    "rules_id": "foundation-v1",
+    "game_phase": "pre_roll",
+    "decision_player": 0,
+    "revision": 1,
+    "debt": null,
+    "legal_actions": [
+      {
+        "type": "RollDice",
+        "player_id": 0
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 1450,
+        "position": 10,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1500,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      }
+    },
+    "current_player": 0,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": null,
+    "doubles_count": 0,
+    "game_over": false,
+    "winner": null,
+    "event_log": [
+      "Game initialized with 2 players",
+      "Player 1 went to JAIL",
+      "decision 0: PayJailFine"
+    ]
+  },
+  "debt": {
+    "rules_id": "foundation-v1",
+    "game_phase": "debt_resolution",
+    "decision_player": 0,
+    "revision": 0,
+    "debt": {
+      "debtor": 0,
+      "amount": 100,
+      "creditor": 1
+    },
+    "legal_actions": [
+      {
+        "type": "MortgageProperty",
+        "player_id": 0,
+        "property_id": 39
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 0,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": [39]
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1500,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": 0,
+        "houses": 0,
+        "mortgaged": false
+      }
+    },
+    "current_player": 1,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": null,
+    "doubles_count": 0,
+    "game_over": false,
+    "winner": null,
+    "event_log": ["Game initialized with 2 players"]
+  },
+  "rescued": {
+    "rules_id": "foundation-v1",
+    "game_phase": "asset_management",
+    "decision_player": 1,
+    "revision": 1,
+    "debt": null,
+    "legal_actions": [
+      {
+        "type": "EndTurn",
+        "player_id": 1
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 100,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": [39]
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1600,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": 0,
+        "houses": 0,
+        "mortgaged": true
+      }
+    },
+    "current_player": 1,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": null,
+    "doubles_count": 0,
+    "game_over": false,
+    "winner": null,
+    "event_log": [
+      "Game initialized with 2 players",
+      "payment 0 -> 1: 100",
+      "decision 0: MortgageProperty"
+    ]
+  },
+  "purchase": {
+    "rules_id": "foundation-v1",
+    "game_phase": "purchase_decision",
+    "decision_player": 0,
+    "revision": 0,
+    "debt": null,
+    "legal_actions": [
+      {
+        "type": "BuyProperty",
+        "player_id": 0,
+        "property_id": 6
+      },
+      {
+        "type": "PassBuy",
+        "player_id": 0
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 1500,
+        "position": 6,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1500,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      }
+    },
+    "current_player": 0,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": [3, 3],
+    "doubles_count": 1,
+    "game_over": false,
+    "winner": null,
+    "event_log": ["Game initialized with 2 players"]
+  },
+  "passed": {
+    "rules_id": "foundation-v1",
+    "game_phase": "asset_management",
+    "decision_player": 0,
+    "revision": 1,
+    "debt": null,
+    "legal_actions": [
+      {
+        "type": "RollDice",
+        "player_id": 0
+      }
+    ],
+    "players": [
+      {
+        "id": 0,
+        "name": "Player 1",
+        "money": 1500,
+        "position": 6,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      },
+      {
+        "id": 1,
+        "name": "Player 2",
+        "money": 1500,
+        "position": 0,
+        "in_jail": false,
+        "jail_turns": 0,
+        "jail_cards": 0,
+        "bankrupt": false,
+        "properties": []
+      }
+    ],
+    "properties": {
+      "1": {
+        "position": 1,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "3": {
+        "position": 3,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "5": {
+        "position": 5,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "6": {
+        "position": 6,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "8": {
+        "position": 8,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "9": {
+        "position": 9,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "11": {
+        "position": 11,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "12": {
+        "position": 12,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "13": {
+        "position": 13,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "14": {
+        "position": 14,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "15": {
+        "position": 15,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "16": {
+        "position": 16,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "18": {
+        "position": 18,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "19": {
+        "position": 19,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "21": {
+        "position": 21,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "23": {
+        "position": 23,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "24": {
+        "position": 24,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "25": {
+        "position": 25,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "26": {
+        "position": 26,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "27": {
+        "position": 27,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "28": {
+        "position": 28,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "29": {
+        "position": 29,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "31": {
+        "position": 31,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "32": {
+        "position": 32,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "34": {
+        "position": 34,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "35": {
+        "position": 35,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "37": {
+        "position": 37,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      },
+      "39": {
+        "position": 39,
+        "owner": null,
+        "houses": 0,
+        "mortgaged": false
+      }
+    },
+    "current_player": 0,
+    "turn_number": 0,
+    "houses_remaining": 32,
+    "hotels_remaining": 12,
+    "last_roll": [3, 3],
+    "doubles_count": 1,
+    "game_over": false,
+    "winner": null,
+    "event_log": ["Game initialized with 2 players", "decision 0: PassBuy"]
+  }
+}
