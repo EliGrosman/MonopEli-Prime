@@ -32,7 +32,7 @@ def app():
 @pytest.fixture
 def client(app):
     """Create test client with lifespan."""
-    with TestClient(app) as client:
+    with TestClient(app, backend_options={"use_uvloop": True}) as client:
         yield client
 
 

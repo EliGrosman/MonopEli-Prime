@@ -72,7 +72,7 @@ class TestRequestLoggingMiddleware:
     @pytest.fixture
     def client(self, app_with_logging: FastAPI) -> TestClient:
         """Create test client."""
-        return TestClient(app_with_logging)
+        return TestClient(app_with_logging, backend_options={"use_uvloop": True})
 
     def test_adds_request_id_header(self, client: TestClient) -> None:
         """Test that request ID is added to response headers."""
@@ -253,7 +253,11 @@ class TestErrorHandlingMiddleware:
     @pytest.fixture
     def client(self, app_with_errors: FastAPI) -> TestClient:
         """Create test client."""
-        return TestClient(app_with_errors, raise_server_exceptions=False)
+        return TestClient(
+            app_with_errors,
+            raise_server_exceptions=False,
+            backend_options={"use_uvloop": True},
+        )
 
     def test_handles_api_error(self, client: TestClient) -> None:
         """Test handling of APIError."""
@@ -413,7 +417,7 @@ class TestRateLimitMiddleware:
     @pytest.fixture
     def client(self, app_with_rate_limit: FastAPI) -> TestClient:
         """Create test client."""
-        return TestClient(app_with_rate_limit)
+        return TestClient(app_with_rate_limit, backend_options={"use_uvloop": True})
 
     def test_allows_normal_requests(self, client: TestClient) -> None:
         """Test that normal requests are allowed."""
@@ -488,7 +492,11 @@ class TestMiddlewareIntegration:
     @pytest.fixture
     def client(self, app_with_all_middleware: FastAPI) -> TestClient:
         """Create test client."""
-        return TestClient(app_with_all_middleware, raise_server_exceptions=False)
+        return TestClient(
+            app_with_all_middleware,
+            raise_server_exceptions=False,
+            backend_options={"use_uvloop": True},
+        )
 
     def test_successful_request(self, client: TestClient) -> None:
         """Test successful request with all middleware."""

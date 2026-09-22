@@ -25,8 +25,13 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
 
       // Only animate if this is actually a new roll
       if (lastRollRef.current === rollKey) {
-        // Same roll values, defer update to avoid cascading renders
-        const t = setTimeout(() => setDisplayDice([roll.die1, roll.die2]), 0);
+        // A state transition can repeat the last roll (for example, passing on
+        // a property after doubles). The effect cleanup cancels the previous
+        // animation timeout, so explicitly finish that animation here.
+        const t = setTimeout(() => {
+          setDisplayDice([roll.die1, roll.die2]);
+          setAnimating(false);
+        }, 0);
         return () => clearTimeout(t);
       }
 

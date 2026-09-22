@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { DiceRoll, DiceDisplay } from './DiceRoll';
 import type { DiceRoll as DiceRollType } from '@/types';
@@ -49,6 +49,25 @@ describe('DiceRoll', () => {
     render(<DiceRoll roll={null} canRoll={true} onRoll={() => {}} isRolling={true} />);
     const button = screen.getByText('Rolling...');
     expect(button).toBeDisabled();
+  });
+
+  it('finishes an active animation when refreshed with the same roll', () => {
+    vi.useFakeTimers();
+    const onRoll = vi.fn();
+    const { rerender } = render(<DiceRoll roll={doublesRoll} canRoll={true} onRoll={onRoll} />);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole('button', { name: 'Roll Dice' })).toBeDisabled();
+
+    rerender(<DiceRoll roll={{ ...doublesRoll }} canRoll={true} onRoll={onRoll} />);
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(screen.getByRole('button', { name: 'Roll Dice' })).toBeEnabled();
+    vi.useRealTimers();
   });
 
   it('shows question marks when no roll', () => {
