@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useEffect, useRef, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -34,16 +34,11 @@ export function Modal({
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
-
-  // Handle escape key
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (closeOnEscape && e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [closeOnEscape, onClose]
-  );
+  const titleId = useId();
+  const callbacks = useRef({ onClose, closeOnEscape });
+  useEffect(() => {
+    callbacks.current = { onClose, closeOnEscape };
+  }, [onClose, closeOnEscape]);
 
   // Focus trap and body scroll lock
   useEffect(() => {
@@ -51,26 +46,55 @@ export function Modal({
       // Save current focus
       previousActiveElement.current = document.activeElement as HTMLElement;
 
-      // Lock body scroll
+      const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-
-      // Add escape key listener
+      const getFocusable = () =>
+        Array.from(
+          modalRef.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        ).filter((element) => !element.closest('[hidden], [inert], [aria-hidden="true"]'));
+      const focusFirst = () => (getFocusable()[0] ?? modalRef.current)?.focus();
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape' && callbacks.current.closeOnEscape) {
+          event.preventDefault();
+          callbacks.current.onClose();
+        }
+        if (event.key === 'Tab') {
+          const elements = getFocusable();
+          const first = elements[0];
+          const last = elements.at(-1);
+          if (!first) {
+            event.preventDefault();
+            modalRef.current?.focus();
+          } else if (
+            event.shiftKey &&
+            (document.activeElement === first || document.activeElement === modalRef.current)
+          ) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      };
+      const containFocus = (event: FocusEvent) => {
+        if (!modalRef.current?.contains(event.target as Node)) focusFirst();
+      };
       document.addEventListener('keydown', handleKeyDown);
-
-      // Focus first focusable element
-      const focusable = modalRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      focusable?.focus();
+      document.addEventListener('focusin', containFocus);
+      focusFirst();
 
       return () => {
-        document.body.style.overflow = '';
+        document.body.style.overflow = previousOverflow;
         document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('focusin', containFocus);
         // Restore focus
         previousActiveElement.current?.focus();
       };
     }
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen]);
 
   // Handle backdrop click
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -94,11 +118,11 @@ export function Modal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? 'modal-title' : undefined}
+      aria-labelledby={title ? titleId : undefined}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black bg-opacity-50 animate-[fadeIn_0.2s_ease-out]"
+        className="absolute inset-0 bg-black/50 animate-[fadeIn_0.2s_ease-out]"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
@@ -106,8 +130,9 @@ export function Modal({
       {/* Modal content */}
       <div
         ref={modalRef}
+        tabIndex={-1}
         className={`
-          relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]}
+          relative bg-white text-slate-900 rounded-lg shadow-xl w-full ${sizeClasses[size]}
           animate-[slideUp_0.2s_ease-out]
           max-h-[90vh] flex flex-col
         `}
@@ -116,7 +141,7 @@ export function Modal({
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             {title && (
-              <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+              <h2 id={titleId} className="text-lg font-semibold text-gray-900 break-words min-w-0">
                 {title}
               </h2>
             )}

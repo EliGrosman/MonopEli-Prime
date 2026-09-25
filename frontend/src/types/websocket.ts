@@ -7,6 +7,7 @@ export const WSMessageType = {
   // Game state
   STATE_UPDATE: 'state_update',
   GAME_OVER: 'game_over',
+  AGENT_UPDATE: 'agent_update',
 
   // Player events
   PLAYER_JOINED: 'player_joined',

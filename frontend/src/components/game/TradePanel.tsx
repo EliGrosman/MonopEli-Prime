@@ -7,6 +7,8 @@ import type { ClientActionMessage } from '@/types';
 
 interface TradePanelProps {
   send: (message: ClientActionMessage) => void;
+  variant?: 'card' | 'embedded';
+  onActionSubmitted?: () => void;
 }
 
 function propertyLabel(position: number, mortgaged: boolean): string {
@@ -14,7 +16,7 @@ function propertyLabel(position: number, mortgaged: boolean): string {
   return `${name}${mortgaged ? ' (mortgaged)' : ''}`;
 }
 
-export function TradePanel({ send }: TradePanelProps) {
+export function TradePanel({ send, variant = 'card', onActionSubmitted }: TradePanelProps) {
   const gameState = useGameStore((state) => state.gameState);
   const playerId = useSessionStore((state) => state.playerId);
   const { proposeTradeOffer, acceptTrade, rejectTrade, isActionPending } = useActions({ send });
@@ -56,7 +58,7 @@ export function TradePanel({ send }: TradePanelProps) {
     const responding = offer.to_player === playerId && gameState.decision_player === playerId;
     return (
       <section
-        className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+        className={`${variant === 'embedded' ? '' : 'rounded-lg border border-blue-200 bg-blue-50 p-4'}`}
         aria-label="Trade offer"
       >
         <h2 className="font-semibold text-blue-900">
@@ -84,14 +86,20 @@ export function TradePanel({ send }: TradePanelProps) {
             <button
               className="flex-1 p-2 rounded bg-green-600 text-white"
               disabled={isActionPending}
-              onClick={() => acceptTrade(offer.trade_id)}
+              onClick={() => {
+                acceptTrade(offer.trade_id);
+                onActionSubmitted?.();
+              }}
             >
               Accept
             </button>
             <button
               className="flex-1 p-2 rounded bg-gray-700 text-white"
               disabled={isActionPending}
-              onClick={() => rejectTrade(offer.trade_id)}
+              onClick={() => {
+                rejectTrade(offer.trade_id);
+                onActionSubmitted?.();
+              }}
             >
               Reject
             </button>
@@ -110,6 +118,7 @@ export function TradePanel({ send }: TradePanelProps) {
       give_money: cashDirection === 'give' ? cash : 0,
       want_money: cashDirection === 'want' ? cash : 0,
     });
+    onActionSubmitted?.();
   };
 
   const propertyDetails = (position: number) =>
@@ -122,7 +131,7 @@ export function TradePanel({ send }: TradePanelProps) {
   if (reviewing && recipient !== null) {
     return (
       <section
-        className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+        className={`${variant === 'embedded' ? '' : 'rounded-lg border border-blue-200 bg-blue-50 p-4'}`}
         aria-label="Review trade"
       >
         <h2 className="font-semibold text-blue-900">Review offer</h2>
@@ -172,7 +181,10 @@ export function TradePanel({ send }: TradePanelProps) {
   }
 
   return (
-    <section className="bg-white rounded-lg shadow-md p-4" aria-label="Compose trade">
+    <section
+      className={variant === 'embedded' ? '' : 'bg-white rounded-lg shadow-md p-4'}
+      aria-label="Compose trade"
+    >
       <div className="flex justify-between gap-2">
         <h2 className="font-semibold">Trade</h2>
         <span className="text-sm text-gray-500">

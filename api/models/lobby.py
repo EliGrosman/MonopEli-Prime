@@ -58,6 +58,7 @@ class LobbyState(BaseModel):
     created_at: datetime
     game_id: str | None = None  # Set when game starts
     invite_code: str | None = None  # For private lobbies
+    jev_available: bool = False
 
 
 class LobbyInfo(BaseModel):
@@ -110,7 +111,7 @@ class JoinLobbyResponse(BaseModel):
 class AddAIRequest(BaseModel):
     """Request to add an AI player to the lobby."""
 
-    ai_type: str = "rule_based"  # random, rule_based, aggressive, conservative
+    ai_type: str = "rule_based"  # random, rule_based, aggressive, conservative, jev
     name: str | None = None  # Auto-generated if not provided
 
 

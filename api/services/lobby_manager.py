@@ -58,7 +58,7 @@ class ActiveLobby:
             return False
         return all(p.is_ready or p.is_host for p in self.players.values())
 
-    def to_state(self) -> LobbyState:
+    def to_state(self, *, jev_available: bool = False) -> LobbyState:
         """Convert to LobbyState model."""
         return LobbyState(
             id=self.id,
@@ -71,6 +71,7 @@ class ActiveLobby:
             created_at=self.created_at,
             game_id=self.game_id,
             invite_code=self.invite_code,
+            jev_available=jev_available,
         )
 
 
@@ -163,7 +164,9 @@ class LobbyManager:
         lobby = await self.get_lobby(lobby_id)
         if lobby is None:
             return None
-        return lobby.to_state()
+        return lobby.to_state(
+            jev_available=self._ai_manager is not None and self._ai_manager.jev_available
+        )
 
     async def join_lobby(
         self,
@@ -344,10 +347,15 @@ class LobbyManager:
 
             ordinary_types = {"random", "rule_based", "aggressive", "conservative"}
             trading_types = {f"trading_{name}" for name in ordinary_types}
-            if ai_type not in ordinary_types | trading_types:
+            if ai_type not in ordinary_types | trading_types | {"jev"}:
                 return False, f"Unknown AI type: {ai_type}", -1
             if ai_type in trading_types and lobby.settings.rules_id != "foundation-trade-v1":
                 return False, "Trading AI requires foundation-trade-v1", -1
+            if ai_type == "jev":
+                if lobby.settings.rules_id != "foundation-trade-v1":
+                    return False, "Jev requires foundation-trade-v1", -1
+                if self._ai_manager is None or not self._ai_manager.jev_available:
+                    return False, "Jev is not configured on this server", -1
 
             slot_id = lobby.get_next_slot()
             if slot_id is None:
@@ -490,6 +498,10 @@ class LobbyManager:
             # Remove players if max_players reduced
             if settings.max_players < len(lobby.players):
                 return False, "Cannot reduce max players below current count"
+            if settings.rules_id != "foundation-trade-v1" and any(
+                player.ai_type == "jev" for player in lobby.players.values()
+            ):
+                return False, "Remove Jev before disabling trading rules"
 
             lobby.settings = settings
 
@@ -536,6 +548,12 @@ class LobbyManager:
             if not lobby.all_ready():
                 return False, "Not all players are ready", None
 
+            has_jev = any(player.ai_type == "jev" for player in lobby.players.values())
+            if has_jev and lobby.settings.rules_id != "foundation-trade-v1":
+                return False, "Jev requires foundation-trade-v1", None
+            if has_jev and (self._ai_manager is None or not self._ai_manager.jev_available):
+                return False, "Jev is not configured on this server", None
+
             lobby.status = LobbyStatus.STARTING
 
         # Notify clients game is starting
@@ -560,6 +578,7 @@ class LobbyManager:
                 num_players=len(player_names),
                 player_names=player_names,
                 rules_id=lobby.settings.rules_id,
+                owner_session_id=lobby.host_session_id,
             )
 
             # Set up AI agents and mark AI player slots
@@ -588,6 +607,7 @@ class LobbyManager:
                                 player_id=game_player_id,
                                 ai_type=player.ai_type or "rule_based",
                                 seed=opponent_seed,
+                                session_budget_id=lobby.host_session_id,
                             )
                     else:
                         # Claim slot for human player
@@ -617,10 +637,7 @@ class LobbyManager:
             ):
                 first_player = active_game.game.current_player
                 if self._ai_manager.is_ai_player(game_id, first_player):
-                    # Schedule AI turn processing (don't await, let it run)
-                    asyncio.create_task(
-                        self._ai_manager.process_ai_turns_for_game(self._game_manager, game_id)
-                    )
+                    self._ai_manager.schedule_ai_turns(self._game_manager, game_id)
 
             return True, "", game_id
 

@@ -38,9 +38,45 @@ export interface GameState {
   game_over?: boolean;
   event_log?: string[];
   decision_contract?: DecisionContract;
+  agent_inspections?: Record<number, AgentInspection>;
+  agent_activity?: AgentActivity[];
+  game_activity?: GameActivity[];
 
   // Allow additional backend fields
   [key: string]: unknown;
+}
+
+export interface AgentInspection {
+  player_id: number;
+  sequence: number;
+  basis_revision: number;
+  status: 'idle' | 'thinking' | 'fallback' | 'error' | 'disabled';
+  short_term_objective: string;
+  long_term_objective: string;
+  cash_reserve_target: number;
+  latest_summary: string;
+  fallback_reason: string | null;
+}
+
+export interface AgentActivity {
+  actor: number;
+  before_revision: number;
+  after_revision: number;
+  source: 'jev' | 'forced' | 'fallback';
+  summary: string;
+  action_type: string;
+  fallback_reason: string | null;
+}
+
+export interface GameActivity {
+  id: string;
+  actor: number;
+  revision: number;
+  turn_number: number;
+  action_type: string;
+  summary: string;
+  details: string[];
+  occurred_at: string;
 }
 
 export type GamePhase =
@@ -103,6 +139,9 @@ export interface GameEvent {
   playerId: number;
   message: string;
   data?: Record<string, unknown>;
+  revision?: number;
+  turnNumber?: number;
+  details?: string[];
 }
 
 export type GameEventType =
@@ -115,5 +154,6 @@ export type GameEventType =
   | 'jail'
   | 'card'
   | 'trade'
+  | 'agent'
   | 'bankrupt'
   | 'win';

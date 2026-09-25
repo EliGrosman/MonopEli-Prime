@@ -361,6 +361,41 @@ class TestGameManagerUnit:
         success, msg = await game_manager.execute_action(game_id, action)
         assert success is True
 
+        state = await game_manager.get_game_state(game_id)
+        assert state is not None
+        assert len(state.game_activity) == 1
+        activity = state.game_activity[0]
+        assert activity.id == f"{game_id}:1"
+        assert activity.actor == 0
+        assert activity.action_type == "RollDice"
+        assert activity.summary.startswith("Player 1 rolled")
+        assert any("moved to" in detail for detail in activity.details)
+
+    @pytest.mark.asyncio
+    async def test_activity_is_confirmed_once_for_humans_and_bots(self, game_manager: GameManager):
+        """The shared activity path ignores source metadata and duplicate requests."""
+        from monopoly_engine.actions import RollDice
+
+        game_id = await game_manager.create_game(num_players=2)
+        action = RollDice(player_id=0)
+        success, msg = await game_manager.execute_action(
+            game_id,
+            action,
+            request_id="command-1",
+            action_metadata={"source": "native", "summary": "internal diagnostic"},
+        )
+        assert success, msg
+
+        duplicate, reason = await game_manager.execute_action(
+            game_id, action, request_id="command-1"
+        )
+        assert not duplicate
+        assert reason == "Duplicate request ID"
+        state = await game_manager.get_game_state(game_id)
+        assert state is not None
+        assert len(state.game_activity) == 1
+        assert "internal diagnostic" not in state.game_activity[0].summary
+
     @pytest.mark.asyncio
     async def test_execute_action_invalid(self, game_manager: GameManager):
         """Test executing an invalid action."""
@@ -373,6 +408,9 @@ class TestGameManagerUnit:
         success, msg = await game_manager.execute_action(game_id, action)
         assert success is False
         assert msg != ""
+        state = await game_manager.get_game_state(game_id)
+        assert state is not None
+        assert state.game_activity == []
 
     @pytest.mark.asyncio
     async def test_execute_action_game_not_found(self, game_manager: GameManager):

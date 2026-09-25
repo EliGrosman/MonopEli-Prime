@@ -28,7 +28,7 @@ describe('EventLog', () => {
     render(<EventLog />);
 
     expect(screen.getByText('No events yet')).toBeInTheDocument();
-    expect(screen.getByText('Game Log')).toBeInTheDocument();
+    expect(screen.getByText('Activity')).toBeInTheDocument();
   });
 
   it('renders events when events exist', () => {

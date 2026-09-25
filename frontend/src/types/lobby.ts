@@ -39,6 +39,7 @@ export interface LobbyState {
   created_at: string;
   game_id: string | null;
   invite_code: string | null;
+  jev_available?: boolean;
 }
 
 /**

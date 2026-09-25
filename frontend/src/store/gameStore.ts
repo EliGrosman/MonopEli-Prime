@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { GameState, GameEvent, PlayerState, PropertyState } from '@/types';
+import type {
+  AgentInspection,
+  GameActivity,
+  GameState,
+  GameEvent,
+  PlayerState,
+  PropertyState,
+} from '@/types';
 import { getColorGroupPositions } from '@/utils/board';
+import { actionEventType } from '@/utils/activity';
 
 // Default player colors
 const PLAYER_COLORS = [
@@ -32,6 +40,7 @@ interface GameStore {
   // Actions
   setGameId: (id: string | null) => void;
   updateGameState: (state: Record<string, unknown>) => void;
+  updateAgentInspection: (inspection: AgentInspection) => void;
   addEvent: (event: GameEvent) => void;
   clearEvents: () => void;
   setConnected: (connected: boolean) => void;
@@ -52,6 +61,16 @@ interface GameStore {
 }
 
 const MAX_EVENTS = 100;
+const DEVELOPABLE_COLOR_GROUPS = new Set([
+  'brown',
+  'lightblue',
+  'magenta',
+  'orange',
+  'red',
+  'yellow',
+  'green',
+  'blue',
+]);
 
 const initialState = {
   gameId: null,
@@ -68,7 +87,9 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       ...initialState,
 
-      setGameId: (id) => set({ gameId: id }),
+      setGameId: (id) => {
+        if (id !== get().gameId) set({ ...initialState, gameId: id });
+      },
 
       updateGameState: (rawState) => {
         // Transform snake_case from backend to camelCase for frontend
@@ -88,6 +109,7 @@ export const useGameStore = create<GameStore>()(
           jailCards: p.jail_cards,
           bankrupt: p.bankrupt,
           isAi: p.is_ai ?? false,
+          aiType: p.ai_type as string | undefined,
           color: p.color ?? getPlayerColor(p.id as number),
           properties: p.properties ?? [],
         }));
@@ -145,11 +167,58 @@ export const useGameStore = create<GameStore>()(
           rolledDoubles: rolledDoubles ?? false,
           doublesCount,
         };
+        const existingEvents = get().events;
+        const hasActivity = Array.isArray(raw.game_activity);
+        const activityEvents: GameEvent[] = hasActivity
+          ? (raw.game_activity as GameActivity[]).map((activity) => ({
+              id: activity.id,
+              timestamp: Date.parse(activity.occurred_at),
+              type: actionEventType(activity.action_type),
+              playerId: activity.actor,
+              message: activity.summary,
+              revision: activity.revision,
+              turnNumber: activity.turn_number,
+              details: activity.details,
+            }))
+          : (raw.agent_activity || []).map((activity: Record<string, unknown>) => ({
+              id: `agent-${get().gameId}-${activity.actor}-${activity.after_revision}`,
+              timestamp: 0,
+              type: 'agent' as const,
+              playerId: activity.actor as number,
+              message: activity.summary as string,
+              revision: activity.after_revision as number,
+              data: activity,
+            }));
+        const merged = new Map(
+          existingEvents
+            .filter((event) => !hasActivity || event.type !== 'agent')
+            .map((event) => [event.id, event])
+        );
+        activityEvents.forEach((event) => merged.set(event.id, event));
         set({
           gameState: state,
+          events: [...merged.values()]
+            .sort((a, b) => (a.revision ?? 0) - (b.revision ?? 0))
+            .slice(-MAX_EVENTS),
           error: null,
         });
       },
+
+      updateAgentInspection: (inspection) =>
+        set((store) => {
+          if (!store.gameState) return store;
+          const current = store.gameState.agent_inspections?.[inspection.player_id];
+          if (current && current.sequence >= inspection.sequence) return store;
+          return {
+            gameState: {
+              ...store.gameState,
+              agent_inspections: {
+                ...store.gameState.agent_inspections,
+                [inspection.player_id]: inspection,
+              },
+            },
+          };
+        }),
 
       setConnected: (connected) => set({ isConnected: connected }),
 
@@ -204,7 +273,10 @@ export const useGameStore = create<GameStore>()(
 
       hasMonopoly: (playerId, colorGroup) => {
         const { gameState } = get();
-        if (!gameState) return false;
+        // Railroads and utilities are collections, not developable monopolies.
+        // Guarding here also avoids [].every(...) reporting true when a group
+        // is represented by a space type instead of a color band.
+        if (!gameState || !DEVELOPABLE_COLOR_GROUPS.has(colorGroup)) return false;
 
         const colorPositions = getColorGroupPositions(
           colorGroup as

@@ -10,13 +10,14 @@ import secrets
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 from monopoly_engine import MonopolyGame
 
 from ..config import get_settings
-from ..models.game import GameInfo, GameState, PlayerSlot
+from ..models.game import GameActivity, GameInfo, GameState, PlayerSlot
 from ..models.websocket import WSMessage, WSMessageType
+from .activity import describe_activity
 
 if TYPE_CHECKING:
     from monopoly_engine.actions import Action
@@ -36,7 +37,9 @@ class ActiveGame:
     player_slots: dict[int, PlayerSlot] = field(default_factory=dict)
     spectator_count: int = 0
     root_seed: int | None = None
+    owner_session_id: str | None = None
     processed_request_ids: set[str] = field(default_factory=set)
+    agent_action_log: list[dict[str, Any]] = field(default_factory=list)
 
     def is_expired(self, timeout_minutes: int) -> bool:
         """Check if game has exceeded timeout."""
@@ -55,13 +58,14 @@ class GameManager:
     Thread-safe access to game instances with automatic cleanup.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, background_ai_scheduling: bool = True) -> None:
         """Initialize the game manager."""
         self.games: dict[str, ActiveGame] = {}
         self._lock = asyncio.Lock()
         self._cleanup_task: asyncio.Task[None] | None = None
         self._connection_manager: "ConnectionManager | None" = None
         self._ai_manager: "AIManager | None" = None
+        self._background_ai_scheduling = background_ai_scheduling
 
     def set_connection_manager(self, manager: "ConnectionManager") -> None:
         """Set the WebSocket connection manager for broadcasts.
@@ -79,12 +83,29 @@ class GameManager:
         """
         self._ai_manager = manager
 
+    @staticmethod
+    def _public_agent_activity(active_game: ActiveGame) -> list[dict[str, Any]]:
+        return [
+            {
+                "actor": row["actor"],
+                "before_revision": row["before_revision"],
+                "after_revision": row["after_revision"],
+                "source": row.get("source", "human"),
+                "summary": row.get("summary", row["action"]["type"]),
+                "action_type": row["action"]["type"],
+                "fallback_reason": row.get("fallback_reason"),
+            }
+            for row in active_game.agent_action_log[-20:]
+            if row.get("source") in {"jev", "forced", "fallback"}
+        ]
+
     async def create_game(
         self,
         num_players: int = 4,
         player_names: list[str] | None = None,
         seed: int | None = None,
         rules_id: str = "foundation-v1",
+        owner_session_id: str | None = None,
     ) -> str:
         """Create a new game session.
 
@@ -141,6 +162,7 @@ class GameManager:
                 game=game,
                 created_at=datetime.now(UTC),
                 player_slots=player_slots,
+                owner_session_id=owner_session_id,
             )
 
             self.games[game_id] = active_game
@@ -167,11 +189,40 @@ class GameManager:
         Returns:
             GameState if game found, None otherwise
         """
-        game = await self.get_game(game_id)
-        if game is None:
-            return None
+        async with self._lock:
+            game = self.games.get(game_id)
+            if game is None:
+                return None
+            inspections = self._ai_manager.public_inspections(game_id) if self._ai_manager else {}
+            return GameState.from_engine(
+                game.game,
+                game.player_slots,
+                agent_inspections=inspections,
+                agent_activity=self._public_agent_activity(game),
+                game_activity=[
+                    row["public_activity"]
+                    for row in game.agent_action_log[-100:]
+                    if "public_activity" in row
+                ],
+            )
 
-        return GameState.from_engine(game.game, game.player_slots)
+    async def capture_decision(self, game_id: str, player_id: int):
+        """Capture one detached public decision under the game lock."""
+        async with self._lock:
+            active_game = self.games.get(game_id)
+            if (
+                active_game is None
+                or active_game.game.game_over
+                or active_game.game.decision_player != player_id
+            ):
+                return None
+            return active_game.game.decision_view(player_id)
+
+    async def capture_public_view(self, game_id: str):
+        """Capture the latest detached public view for observation/inspection."""
+        async with self._lock:
+            active_game = self.games.get(game_id)
+            return active_game.game.decision_view(None) if active_game is not None else None
 
     async def execute_action(
         self,
@@ -182,6 +233,9 @@ class GameManager:
         expected_revision: int | None = None,
         request_id: str | None = None,
         actor_session_id: str | None = None,
+        commit_guard: Callable[[], bool] | None = None,
+        action_metadata: dict[str, Any] | None = None,
+        post_commit: Callable[[int, int], None] | None = None,
     ) -> tuple[bool, str]:
         """Execute a game action.
 
@@ -200,6 +254,8 @@ class GameManager:
                 return False, "Game not found"
             if request_id is not None and request_id in active_game.processed_request_ids:
                 return False, "Duplicate request ID"
+            if commit_guard is not None and not commit_guard():
+                return False, "AI agent was replaced or removed"
             if actor_session_id is not None:
                 slot = active_game.player_slots.get(action.player_id)
                 if slot is None or slot.session_id != actor_session_id:
@@ -220,14 +276,71 @@ class GameManager:
 
             # Execute action
             try:
-                active_game.game.apply_action(
+                before_view = active_game.game.decision_view(None)
+                before_revision = active_game.game.state.revision
+                result = active_game.game.apply_action(
                     action.player_id, action, expected_revision=expected_revision
                 )
                 if request_id is not None:
                     active_game.processed_request_ids.add(request_id)
-                captured_state = GameState.from_engine(active_game.game, active_game.player_slots)
+                after_view = active_game.game.decision_view(None)
+                if post_commit is not None:
+                    post_commit(result.revision, active_game.game.state.turn_number)
+                metadata = dict(action_metadata or {})
+                try:
+                    public_activity = describe_activity(
+                        game_id, action, before_view, after_view, result
+                    )
+                except Exception:
+                    # Activity is a public projection of a committed action. A
+                    # description failure must never make that action appear rejected.
+                    public_activity = GameActivity(
+                        id=f"{game_id}:{result.revision}",
+                        actor=action.player_id,
+                        revision=result.revision,
+                        turn_number=before_view.turn_number,
+                        action_type=type(action).__name__,
+                        summary=f"{before_view.players[action.player_id].name} completed an action",
+                        occurred_at=datetime.now(UTC),
+                    )
+                active_game.agent_action_log.append(
+                    {
+                        "actor": action.player_id,
+                        "request_id": request_id,
+                        "before_revision": before_revision,
+                        "after_revision": result.revision,
+                        "action": action.to_dict(),
+                        "events": list(result.events),
+                        "structured_events": list(result.structured_events),
+                        **metadata,
+                        "public_activity": public_activity.model_dump(mode="json"),
+                    }
+                )
+                active_game.agent_action_log = active_game.agent_action_log[-5000:]
+                inspections = (
+                    self._ai_manager.public_inspections(game_id) if self._ai_manager else {}
+                )
+                captured_state = GameState.from_engine(
+                    active_game.game,
+                    active_game.player_slots,
+                    agent_inspections=inspections,
+                    agent_activity=self._public_agent_activity(active_game),
+                    game_activity=[
+                        row["public_activity"]
+                        for row in active_game.agent_action_log[-100:]
+                        if "public_activity" in row
+                    ],
+                )
             except Exception as e:
                 return False, f"Action execution failed: {e}"
+
+        if self._ai_manager is not None:
+            self._ai_manager.observe_transition(
+                game_id,
+                before_view,
+                after_view,
+                list(result.structured_events),
+            )
 
         # Broadcast state update to other players (outside lock)
         if broadcast and self._connection_manager:
@@ -245,6 +358,14 @@ class GameManager:
 
         return True, ""
 
+    async def broadcast_agent_update(self, game_id: str, inspection: dict[str, Any]) -> None:
+        """Broadcast non-authoritative agent status without changing game revision."""
+        if self._connection_manager is not None:
+            await self._connection_manager.broadcast_to_game(
+                game_id,
+                WSMessage(type=WSMessageType.AGENT_UPDATE, data=inspection),
+            )
+
     async def _maybe_process_ai_turns(self, game_id: str) -> None:
         """Process AI turns if the current player is AI.
 
@@ -256,6 +377,8 @@ class GameManager:
         """
         if self._ai_manager is None:
             return
+        if not self._background_ai_scheduling:
+            return
 
         active_game = self.games.get(game_id)
         if active_game is None or active_game.game.game_over:
@@ -263,10 +386,7 @@ class GameManager:
 
         current_player = active_game.game.decision_player
         if self._ai_manager.is_ai_player(game_id, current_player):
-            # Schedule AI turn processing (don't block the response)
-            import asyncio
-
-            asyncio.create_task(self._ai_manager.process_ai_turns_for_game(self, game_id))
+            self._ai_manager.schedule_ai_turns(self, game_id)
 
     async def claim_player_slot(
         self,
@@ -435,10 +555,10 @@ class GameManager:
             True if game was deleted, False if not found
         """
         async with self._lock:
-            if game_id in self.games:
-                del self.games[game_id]
-                return True
-            return False
+            found = self.games.pop(game_id, None) is not None
+        if found and self._ai_manager is not None:
+            self._ai_manager.remove_game_agents(game_id)
+        return found
 
     async def list_games(self) -> list[GameInfo]:
         """List all active games.
@@ -471,6 +591,8 @@ class GameManager:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
+        if self._ai_manager is not None:
+            await self._ai_manager.shutdown()
         self.games.clear()
 
     async def _cleanup_expired_games(self) -> None:
@@ -487,6 +609,9 @@ class GameManager:
                 ]
                 for gid in expired:
                     del self.games[gid]
+            if self._ai_manager is not None:
+                for gid in expired:
+                    self._ai_manager.remove_game_agents(gid)
 
     def game_count(self) -> int:
         """Get number of active games.

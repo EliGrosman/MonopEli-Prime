@@ -4,6 +4,17 @@ import { useGameStore } from '@/store/gameStore';
 import { BOARD_SPACES } from '@/utils/board';
 import type { PropertyState, PropertyColor } from '@/types';
 
+const DEVELOPABLE_COLORS = new Set<string>([
+  'brown',
+  'lightblue',
+  'magenta',
+  'orange',
+  'red',
+  'yellow',
+  'green',
+  'blue',
+]);
+
 interface PropertyListProps {
   playerId: number;
   onPropertyClick?: (position: number) => void;
@@ -55,7 +66,8 @@ export function PropertyList({
         groups.set(color, {
           color,
           properties: [],
-          hasMonopoly: hasMonopoly(playerId, color as PropertyColor),
+          hasMonopoly:
+            DEVELOPABLE_COLORS.has(color) && hasMonopoly(playerId, color as PropertyColor),
         });
       }
 

@@ -174,6 +174,18 @@ export function LobbyRoom({
               {lobby.settings.rules_id === 'foundation-trade-v1' && (
                 <>
                   <button
+                    onClick={() => handleAddAi('jev')}
+                    disabled={!lobby.jev_available}
+                    className="p-3 text-left border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="font-medium">Jev — guided decisions</span>
+                    <p className="text-xs text-gray-600">
+                      {lobby.jev_available
+                        ? 'Persistent objectives and bounded trading'
+                        : 'Unavailable: server credentials are not configured'}
+                    </p>
+                  </button>
+                  <button
                     onClick={() => handleAddAi('trading_random')}
                     className="p-3 text-left border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                   >

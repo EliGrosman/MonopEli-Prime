@@ -8,7 +8,7 @@ for (const scenario of [
   {
     before: 'debt',
     after: 'rescued',
-    button: /Mortgage Property · property 39/,
+    button: /Mortgage Property · Boardwalk/,
     action: 'mortgage_property',
   },
   { before: 'purchase', after: 'passed', button: /Pass on buying/, action: 'pass_buy' },
@@ -38,6 +38,7 @@ for (const scenario of [
       });
     });
     await page.goto('/game/foundation-browser');
+    await page.getByText(/Game details · Turn/).click();
     await expect(page.getByText(/Rules: foundation-v1/)).toBeVisible();
     await expect(page.getByRole('button', { name: scenario.button })).toBeEnabled();
     await page.reload();

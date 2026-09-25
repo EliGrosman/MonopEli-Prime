@@ -29,7 +29,10 @@ describe('Modal', () => {
       </Modal>
     );
     expect(screen.getByText('Test Title')).toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', 'modal-title');
+    expect(screen.getByRole('dialog', { name: 'Test Title' })).toHaveAttribute(
+      'aria-labelledby',
+      screen.getByText('Test Title').id
+    );
   });
 
   it('shows close button by default', () => {

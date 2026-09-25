@@ -72,6 +72,32 @@ describe('PlayerCard', () => {
     expect(screen.getByText('AI')).toBeInTheDocument();
   });
 
+  it('shows guided Jev objectives and fallback status', () => {
+    const aiPlayer = { ...mockPlayer, isAi: true, aiType: 'jev' };
+    render(
+      <PlayerCard
+        player={aiPlayer}
+        isCurrentTurn={false}
+        isCurrentUser={false}
+        properties={mockProperties}
+        inspection={{
+          player_id: 0,
+          sequence: 3,
+          basis_revision: 8,
+          status: 'fallback',
+          short_term_objective: 'Restore liquidity',
+          long_term_objective: 'Return to development',
+          cash_reserve_target: 300,
+          latest_summary: 'Mortgaged Baltic Avenue',
+          fallback_reason: 'timeout',
+        }}
+      />
+    );
+    expect(screen.getByText('Jev')).toBeInTheDocument();
+    expect(screen.getByText('Now: Restore liquidity')).toBeInTheDocument();
+    expect(screen.getByText('Fallback: timeout')).toBeInTheDocument();
+  });
+
   it('shows Bankrupt badge for bankrupt players', () => {
     const bankruptPlayer = { ...mockPlayer, bankrupt: true };
     render(
@@ -151,7 +177,7 @@ describe('PlayerCard', () => {
       />
     );
 
-    const card = screen.getByRole('button');
+    const card = screen.getByLabelText('Alice');
     fireEvent.keyDown(card, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith(0);
   });
@@ -167,7 +193,7 @@ describe('PlayerCard', () => {
       />
     );
 
-    const card = screen.getByRole('button');
+    const card = screen.getByLabelText('Alice');
     expect(card.className).toContain('opacity-50');
   });
 });

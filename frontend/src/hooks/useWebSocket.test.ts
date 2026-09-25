@@ -246,4 +246,26 @@ describe('useWebSocket action lifecycle', () => {
     act(() => vi.advanceTimersByTime(3000));
     expect(MockWebSocket.instances).toHaveLength(1);
   });
+
+  it('applies agent status without changing revision or pending human requests', () => {
+    const { result, ws } = setup();
+    act(() => result.current.actions.mortgageProperty(39));
+    const pending = useGameStore.getState().pendingRequestId;
+    act(() =>
+      ws.message('agent_update', {
+        player_id: 1,
+        sequence: 2,
+        basis_revision: 7,
+        status: 'thinking',
+        short_term_objective: 'Complete orange',
+        long_term_objective: 'Develop orange rent income',
+        cash_reserve_target: 200,
+        latest_summary: 'Considering the current decision',
+        fallback_reason: null,
+      })
+    );
+    expect(useGameStore.getState().gameState?.revision).toBe(7);
+    expect(useGameStore.getState().pendingRequestId).toBe(pending);
+    expect(useGameStore.getState().gameState?.agent_inspections?.[1].status).toBe('thinking');
+  });
 });

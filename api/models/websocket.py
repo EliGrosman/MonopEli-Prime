@@ -41,6 +41,7 @@ class WSMessageType(str, Enum):
     PLAYER_RECONNECTED = "player_reconnected"
     GAME_STARTED = "game_started"
     GAME_OVER = "game_over"
+    AGENT_UPDATE = "agent_update"
 
 
 class WSMessage(BaseModel):

@@ -40,7 +40,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.game_manager = GameManager()
     app.state.connection_manager = ConnectionManager()
     app.state.lobby_manager = LobbyManager()
-    app.state.ai_manager = AIManager()
+    configured_settings: Settings = app.state.configured_settings
+    app.state.ai_manager = AIManager(settings=configured_settings)
     app.state.session_manager = SessionManager()
 
     # Link connection manager to game manager for broadcasts
@@ -123,6 +124,7 @@ Message types:
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
     )
+    app.state.configured_settings = settings
 
     # Install error handlers (must be before middleware)
     ErrorHandlingMiddleware.install(app)
