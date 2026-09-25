@@ -8,6 +8,7 @@ export interface PlayerState {
   jailCards: number;
   bankrupt: boolean;
   isAi: boolean;
+  aiType?: string;
   color: string;
 }
 

@@ -121,6 +121,27 @@ describe('PropertyList', () => {
     expect(screen.getByText('Monopoly')).toBeInTheDocument();
   });
 
+  it('never labels railroads or utilities as monopolies', () => {
+    const assets: Record<number, PropertyState> = {
+      5: { position: 5, owner: 0, houses: 0, mortgaged: false },
+      12: { position: 12, owner: 0, houses: 0, mortgaged: false },
+    };
+    mockUseGameStore.mockReturnValue({
+      gameState: { ...mockGameState, properties: assets },
+      // A defensive component check prevents a permissive or legacy selector
+      // from turning non-color asset groups into monopolies.
+      hasMonopoly: () => true,
+      getPlayerProperties: () => Object.values(assets),
+    } as ReturnType<typeof useGameStore>);
+
+    render(<PropertyList playerId={0} />);
+
+    expect(screen.queryByText('Monopoly')).not.toBeInTheDocument();
+    expect(screen.getByText('Monopolies').parentElement).toHaveTextContent('0');
+    expect(screen.getByText('(1/4)')).toBeInTheDocument();
+    expect(screen.getByText('(1/2)')).toBeInTheDocument();
+  });
+
   it('hides monopoly indicator when showMonopolyIndicator is false', () => {
     render(<PropertyList playerId={0} showMonopolyIndicator={false} />);
     expect(screen.queryByText('Monopoly')).not.toBeInTheDocument();

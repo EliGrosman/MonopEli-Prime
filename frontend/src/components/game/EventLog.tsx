@@ -1,132 +1,148 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { GameEvent, GameEventType } from '@/types';
 import { useGameStore } from '@/store';
 import { getPlayerColor } from '@/utils/colors';
-import { formatRelativeTime } from '@/utils/format';
 
 interface EventLogProps {
   maxEvents?: number;
   className?: string;
+  onOpenHistory?: () => void;
 }
 
-/**
- * Game event history log showing rolls, purchases, rent payments, etc.
- */
-export function EventLog({ maxEvents = 20, className = '' }: EventLogProps) {
+export function EventLog({ maxEvents = 100, className = '', onOpenHistory }: EventLogProps) {
   const allEvents = useGameStore((state) => state.events);
   const events = useMemo(() => allEvents.slice(-maxEvents).reverse(), [allEvents, maxEvents]);
+  // Freeze the reader's snapshot while they explore older actions. A new action
+  // must never move the line they are reading, including at the history cap.
+  const [reading, setReading] = useState<GameEvent[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when new events arrive
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
-  }, [events.length]);
-
-  if (events.length === 0) {
-    return (
-      <div className={`bg-white rounded-lg border border-gray-200 p-4 ${className}`}>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Game Log</h3>
-        <p className="text-sm text-gray-500 text-center py-4">No events yet</p>
-      </div>
-    );
-  }
+  const newActivity = reading !== null && events[0]?.id !== reading[0]?.id;
+  const visibleEvents = reading ?? events;
+  const followLatest = () => {
+    setReading(null);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  };
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-      <div className="p-3 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700">Game Log</h3>
+    <section className={`activity-feed ${className}`} aria-label="Activity feed">
+      <div className="activity-heading">
+        <h3 className="font-semibold">Activity</h3>
+        <div className="flex items-center gap-2">
+          {newActivity && (
+            <button
+              className="text-xs font-semibold text-blue-800 underline"
+              onClick={followLatest}
+            >
+              New activity
+            </button>
+          )}
+          {onOpenHistory && (
+            <button
+              className="text-xs font-medium text-slate-600 underline"
+              onClick={onOpenHistory}
+            >
+              History
+            </button>
+          )}
+        </div>
       </div>
       <div
         ref={scrollRef}
-        className="max-h-64 overflow-y-auto p-2 space-y-1"
+        className="activity-scroll"
         role="log"
-        aria-live="polite"
+        aria-live={reading ? 'off' : 'polite'}
+        aria-relevant="additions"
         aria-label="Game events"
+        tabIndex={0}
+        onScroll={(event) => {
+          if (event.currentTarget.scrollTop <= 12) setReading(null);
+          else if (reading === null) setReading(events);
+        }}
       >
-        {events.map((event) => (
-          <EventItem key={event.id} event={event} />
-        ))}
+        {visibleEvents.length === 0 ? (
+          <p className="p-3 text-sm text-slate-600">No events yet</p>
+        ) : (
+          visibleEvents.map((event) => <EventItem key={event.id} event={event} />)
+        )}
       </div>
+    </section>
+  );
+}
+
+function EventItem({ event }: { event: GameEvent }) {
+  const player = useGameStore((state) =>
+    state.gameState?.players.find((p) => p.id === event.playerId)
+  );
+  return (
+    <article className="activity-entry" data-event-id={event.id}>
+      <span
+        className="mt-1 h-2 w-2 shrink-0 rounded-full"
+        style={{ background: player?.color ?? getPlayerColor(event.playerId) }}
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-slate-900">{event.message}</p>
+        {event.details && event.details.length > 0 && (
+          <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+            {event.details.map((detail, index) => (
+              <li key={index}>{detail}</li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-[11px] text-slate-500">
+          {event.turnNumber !== undefined ? `Turn ${event.turnNumber}` : 'Recorded action'}
+          {event.timestamp > 0 && Number.isFinite(event.timestamp)
+            ? ` · ${new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+            : ''}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+export function CompactEventLog({ maxEvents = 5 }: { maxEvents?: number }) {
+  const allEvents = useGameStore((state) => state.events);
+  const events = allEvents.slice(-maxEvents).reverse();
+  if (!events.length) return null;
+  return (
+    <div className="space-y-1">
+      {events.map((event) => (
+        <p key={event.id} className="text-xs text-slate-700" title={event.message}>
+          {getEventIcon(event.type)} {event.message}
+        </p>
+      ))}
     </div>
   );
 }
 
-interface EventItemProps {
-  event: GameEvent;
-}
-
-function EventItem({ event }: EventItemProps) {
-  const icon = getEventIcon(event.type);
-  const playerColor = getPlayerColor(event.playerId);
-
+export function LatestActivity({ onOpenHistory }: { onOpenHistory: () => void }) {
+  const latest = useGameStore((state) => state.events.at(-1));
   return (
-    <div className="flex items-start gap-2 px-2 py-1.5 hover:bg-gray-50 rounded text-sm">
-      {/* Event icon */}
-      <div
-        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs"
-        style={{ backgroundColor: playerColor }}
-      >
-        {icon}
-      </div>
-
-      {/* Event message */}
-      <div className="flex-1 min-w-0">
-        <p className="text-gray-800">{event.message}</p>
-        <p className="text-xs text-gray-400">{formatRelativeTime(event.timestamp)}</p>
-      </div>
-    </div>
+    <button className="latest-activity" onClick={onOpenHistory} aria-label="Open activity history">
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-blue-800">
+        Activity ›
+      </span>
+      <span className="line-clamp-2 text-left text-xs text-slate-800">
+        {latest?.message ?? 'No events yet'}
+      </span>
+    </button>
   );
 }
 
 function getEventIcon(type: GameEventType): string {
-  switch (type) {
-    case 'roll':
-      return '🎲';
-    case 'move':
-      return '👟';
-    case 'buy':
-      return '🏠';
-    case 'rent':
-      return '💰';
-    case 'build':
-      return '🔨';
-    case 'mortgage':
-      return '📋';
-    case 'jail':
-      return '🔒';
-    case 'card':
-      return '🃏';
-    case 'trade':
-      return '🤝';
-    case 'bankrupt':
-      return '💸';
-    case 'win':
-      return '🏆';
-    default:
-      return '📌';
-  }
-}
-
-/**
- * Compact event log for sidebar use.
- */
-export function CompactEventLog({ maxEvents = 5 }: { maxEvents?: number }) {
-  const allEvents = useGameStore((state) => state.events);
-  const events = useMemo(() => allEvents.slice(-maxEvents).reverse(), [allEvents, maxEvents]);
-
-  if (events.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-1">
-      {events.map((event) => (
-        <div key={event.id} className="text-xs text-gray-600 truncate" title={event.message}>
-          {getEventIcon(event.type)} {event.message}
-        </div>
-      ))}
-    </div>
-  );
+  const icons: Record<GameEventType, string> = {
+    roll: '🎲',
+    move: '👟',
+    buy: '🏠',
+    rent: '💰',
+    build: '🔨',
+    mortgage: '📋',
+    jail: '🔒',
+    card: '🃏',
+    trade: '🤝',
+    agent: '🧠',
+    bankrupt: '💸',
+    win: '🏆',
+  };
+  return icons[type];
 }

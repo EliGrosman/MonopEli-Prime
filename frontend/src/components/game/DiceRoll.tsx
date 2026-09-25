@@ -6,12 +6,20 @@ interface DiceRollProps {
   onRoll?: () => void;
   canRoll?: boolean;
   isRolling?: boolean;
+  /** Reduce spacing and die sizes for constrained surfaces such as the board center. */
+  compact?: boolean;
 }
 
 /**
  * Dice display component with roll animation.
  */
-export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: DiceRollProps) {
+export function DiceRoll({
+  roll,
+  onRoll,
+  canRoll = false,
+  isRolling = false,
+  compact = false,
+}: DiceRollProps) {
   const [animating, setAnimating] = useState(false);
   const [displayDice, setDisplayDice] = useState<[number, number]>([1, 1]);
   // Track the last roll values to prevent re-animating on state updates
@@ -69,19 +77,33 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
   const total = roll ? roll.die1 + roll.die2 : 0;
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className={`flex flex-col items-center ${compact ? 'gap-1 sm:gap-2' : 'gap-3'}`}>
       {/* Dice display */}
-      <div className="flex items-center gap-4">
-        <Die value={roll ? displayDice[0] : null} animating={animating || isRolling} />
-        <Die value={roll ? displayDice[1] : null} animating={animating || isRolling} />
+      <div className={`flex items-center ${compact ? 'gap-2 sm:gap-3' : 'gap-4'}`}>
+        <Die
+          value={roll ? displayDice[0] : null}
+          animating={animating || isRolling}
+          compact={compact}
+        />
+        <Die
+          value={roll ? displayDice[1] : null}
+          animating={animating || isRolling}
+          compact={compact}
+        />
       </div>
 
       {/* Roll result */}
       {roll && !animating && (
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-800">{total}</div>
+        <div className="dice-result text-center">
+          <div
+            className={`${compact ? 'text-base sm:text-xl' : 'text-2xl'} font-bold text-gray-800`}
+          >
+            {total}
+          </div>
           {roll.isDoubles && (
-            <div className="mt-1 px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-sm font-semibold animate-bounce">
+            <div
+              className={`${compact ? 'mt-0.5 px-2 py-0.5 text-xs' : 'mt-1 px-3 py-1 text-sm'} bg-yellow-400 text-yellow-900 rounded-full font-semibold animate-bounce`}
+            >
               Doubles!
             </div>
           )}
@@ -94,7 +116,8 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
           onClick={onRoll}
           disabled={isRolling || animating}
           className={`
-            px-6 py-3 rounded-lg font-bold text-lg transition-all
+            ${compact ? 'px-3 py-1.5 text-sm sm:px-5 sm:py-2 sm:text-base' : 'px-6 py-3 text-lg'}
+            rounded-lg font-bold transition-all
             ${
               isRolling || animating
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -112,22 +135,24 @@ export function DiceRoll({ roll, onRoll, canRoll = false, isRolling = false }: D
 interface DieProps {
   value: number | null;
   animating?: boolean;
+  compact?: boolean;
 }
 
 /**
  * Single die component.
  */
-function Die({ value, animating = false }: DieProps) {
+function Die({ value, animating = false, compact = false }: DieProps) {
   return (
     <div
       className={`
-        w-16 h-16 bg-white rounded-xl shadow-lg border-2 border-gray-200
+        ${compact ? 'h-8 w-8 rounded-md sm:h-12 sm:w-12 sm:rounded-lg lg:h-14 lg:w-14' : 'w-16 h-16 rounded-xl'}
+        bg-white shadow-lg border-2 border-gray-200
         flex items-center justify-center
         ${animating ? 'animate-spin' : ''}
       `}
     >
       {value !== null ? (
-        <DiceFace value={value} />
+        <DiceFace value={value} compact={compact} />
       ) : (
         <span className="text-gray-300 text-2xl">?</span>
       )}
@@ -137,12 +162,13 @@ function Die({ value, animating = false }: DieProps) {
 
 interface DiceFaceProps {
   value: number;
+  compact?: boolean;
 }
 
 /**
  * Dice face with dots.
  */
-function DiceFace({ value }: DiceFaceProps) {
+function DiceFace({ value, compact = false }: DiceFaceProps) {
   const dotPositions: Record<number, string[]> = {
     1: ['center'],
     2: ['top-right', 'bottom-left'],
@@ -176,11 +202,11 @@ function DiceFace({ value }: DiceFaceProps) {
   };
 
   return (
-    <div className="relative w-12 h-12">
+    <div className={`relative ${compact ? 'h-6 w-6 sm:h-9 sm:w-9 lg:h-10 lg:w-10' : 'w-12 h-12'}`}>
       {positions.map((pos, i) => (
         <div
           key={i}
-          className={`absolute w-2.5 h-2.5 bg-gray-800 rounded-full ${getPosition(pos)}`}
+          className={`absolute ${compact ? 'h-1.5 w-1.5 sm:h-2 sm:w-2' : 'w-2.5 h-2.5'} bg-gray-800 rounded-full ${getPosition(pos)}`}
         />
       ))}
     </div>

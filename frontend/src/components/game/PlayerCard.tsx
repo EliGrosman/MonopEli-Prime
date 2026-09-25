@@ -1,4 +1,4 @@
-import type { PlayerState, PropertyState } from '@/types';
+import type { AgentInspection, PlayerState, PropertyState } from '@/types';
 import { BOARD_SPACES, PROPERTY_INFO } from '@/utils/board';
 
 interface PlayerCardProps {
@@ -6,6 +6,7 @@ interface PlayerCardProps {
   isCurrentTurn: boolean;
   isCurrentUser: boolean;
   properties: Record<number, PropertyState>;
+  inspection?: AgentInspection;
   onSelect?: (playerId: number) => void;
 }
 
@@ -17,6 +18,7 @@ export function PlayerCard({
   isCurrentTurn,
   isCurrentUser,
   properties,
+  inspection,
   onSelect,
 }: PlayerCardProps) {
   // Get properties owned by this player
@@ -55,15 +57,16 @@ export function PlayerCard({
   return (
     <div
       className={`
-        rounded-lg border-2 transition-all duration-200 cursor-pointer
+        rounded-lg border-2 transition-all duration-200
+        ${onSelect ? 'cursor-pointer' : ''}
         ${isCurrentTurn ? 'border-blue-500 shadow-lg bg-blue-50' : 'border-gray-200 bg-white'}
         ${isCurrentUser ? 'ring-2 ring-green-400' : ''}
         ${player.bankrupt ? 'opacity-50 grayscale' : ''}
         hover:shadow-md
       `}
       onClick={() => onSelect?.(player.id)}
-      role="button"
-      tabIndex={0}
+      role={onSelect ? 'button' : undefined}
+      tabIndex={onSelect ? 0 : undefined}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -95,7 +98,9 @@ export function PlayerCard({
               <span className="px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full">Turn</span>
             )}
             {player.isAi && (
-              <span className="px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">AI</span>
+              <span className="px-2 py-0.5 text-xs bg-purple-500 text-white rounded-full">
+                {player.aiType === 'jev' ? 'Jev' : 'AI'}
+              </span>
             )}
             {player.bankrupt && (
               <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
@@ -109,6 +114,24 @@ export function PlayerCard({
             )}
           </div>
         </div>
+
+        {player.aiType === 'jev' && inspection && (
+          <section
+            className="mt-2 rounded bg-purple-50 p-2 text-xs text-purple-950"
+            aria-label={`${player.name} guided strategy`}
+          >
+            <div className="flex items-center justify-between font-medium">
+              <span className="capitalize">{inspection.status}</span>
+              <span>Reserve ${inspection.cash_reserve_target}</span>
+            </div>
+            <p className="mt-1">Now: {inspection.short_term_objective}</p>
+            <p>Later: {inspection.long_term_objective}</p>
+            <p className="mt-1 text-purple-700">{inspection.latest_summary}</p>
+            {inspection.fallback_reason && (
+              <p className="mt-1 text-amber-800">Fallback: {inspection.fallback_reason}</p>
+            )}
+          </section>
+        )}
 
         {/* Money */}
         <div className="flex justify-between items-center mb-2 text-sm">

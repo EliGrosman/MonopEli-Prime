@@ -139,6 +139,13 @@ describe('Board', () => {
     expect(screen.getByText('MONOPOLY')).toBeInTheDocument();
   });
 
+  it('renders supplied center content instead of the decorative title', () => {
+    render(<Board centerContent={<button>Roll from center</button>} />);
+
+    expect(screen.getByRole('button', { name: 'Roll from center' })).toBeInTheDocument();
+    expect(screen.queryByText('MONOPOLY')).not.toBeInTheDocument();
+  });
+
   it('supports keyboard navigation on spaces', () => {
     const onSpaceClick = vi.fn();
     render(<Board onSpaceClick={onSpaceClick} />);

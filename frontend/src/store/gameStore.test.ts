@@ -103,6 +103,105 @@ describe('gameStore', () => {
       expect(useGameStore.getState().error).toBeNull();
     });
 
+    it('deduplicates revision-bound agent activity on reconnect', () => {
+      const activity = {
+        actor: 1,
+        before_revision: 3,
+        after_revision: 4,
+        source: 'jev',
+        summary: 'Bought Baltic Avenue; objective: complete brown.',
+        action_type: 'BuyProperty',
+        fallback_reason: null,
+      };
+      act(() => {
+        useGameStore.getState().updateGameState({
+          ...createMockRawState(),
+          revision: 4,
+          agent_activity: [activity],
+        });
+        useGameStore.getState().updateGameState({
+          ...createMockRawState(),
+          revision: 4,
+          agent_activity: [activity],
+        });
+      });
+      expect(useGameStore.getState().events).toHaveLength(1);
+      expect(useGameStore.getState().events[0].message).toContain('Bought Baltic Avenue');
+    });
+
+    it('merges public activity by stable identity and prefers it to the agent feed', () => {
+      const activity = {
+        id: 'game-123:4',
+        actor: 1,
+        revision: 4,
+        turn_number: 2,
+        action_type: 'BuyProperty',
+        summary: 'Bob bought Baltic Avenue for $60',
+        details: ['Bob cash: -60 → $1,140'],
+        occurred_at: '2026-09-25T12:00:00Z',
+      };
+      const update = {
+        ...createMockRawState(),
+        revision: 4,
+        game_activity: [activity],
+        agent_activity: [
+          {
+            actor: 1,
+            after_revision: 4,
+            summary: 'internal duplicate',
+            action_type: 'BuyProperty',
+          },
+        ],
+      };
+
+      act(() => {
+        useGameStore.getState().setGameId('game-123');
+        useGameStore.getState().updateGameState(update);
+        useGameStore.getState().updateGameState(update);
+      });
+
+      expect(useGameStore.getState().events).toEqual([
+        expect.objectContaining({
+          id: 'game-123:4',
+          message: activity.summary,
+          turnNumber: 2,
+          details: activity.details,
+        }),
+      ]);
+    });
+
+    it('clears activity and revisions when changing games', () => {
+      act(() => {
+        useGameStore.getState().setGameId('first-game');
+        useGameStore.getState().updateGameState({
+          ...createMockRawState(),
+          revision: 20,
+          game_activity: [
+            {
+              id: 'first-game:20',
+              actor: 0,
+              revision: 20,
+              turn_number: 4,
+              action_type: 'EndTurn',
+              summary: 'Alice ended their turn',
+              details: [],
+              occurred_at: '2026-09-25T12:00:00Z',
+            },
+          ],
+        });
+        useGameStore.getState().setGameId('second-game');
+        useGameStore.getState().updateGameState({
+          ...createMockRawState(),
+          revision: 1,
+          game_activity: [],
+        });
+      });
+
+      expect(useGameStore.getState().gameId).toBe('second-game');
+      expect(useGameStore.getState().gameState?.revision).toBe(1);
+      expect(useGameStore.getState().events).toEqual([]);
+    });
+
     it('setConnected updates connection status', () => {
       act(() => {
         useGameStore.getState().setConnected(true);
@@ -228,6 +327,9 @@ describe('gameStore', () => {
       expect(useGameStore.getState().hasMonopoly(0, 'brown')).toBe(true);
       // Alice doesn't own all light blue properties
       expect(useGameStore.getState().hasMonopoly(0, 'lightblue')).toBe(false);
+      // Railroads and utilities never count as Monopoly color groups.
+      expect(useGameStore.getState().hasMonopoly(1, 'railroad')).toBe(false);
+      expect(useGameStore.getState().hasMonopoly(1, 'utility')).toBe(false);
     });
   });
 });

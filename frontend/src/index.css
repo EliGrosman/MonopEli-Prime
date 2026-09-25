@@ -174,9 +174,10 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --color-board-bg: #1b5e20;
-    --color-space-bg: #2d2d2d;
-    --color-text-primary: #fafafa;
-    --color-text-secondary: #aaaaaa;
+    /* The application uses light cards and panels in both color schemes. */
+    --color-space-bg: #fafafa;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #666666;
   }
 }
 
@@ -210,4 +211,416 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: #9ca3af;
+}
+
+/* Game surfaces deliberately stay light in both color preferences. */
+.game-shell {
+  min-height: 100dvh;
+  background: #edf3ee;
+  color: #172b24;
+}
+.game-nav {
+  height: 44px;
+  padding: 8px 16px;
+}
+.game-nav h1 {
+  font-size: 18px;
+  line-height: 28px;
+}
+.game-nav nav {
+  font-size: 14px;
+}
+.game-page {
+  max-width: 1440px;
+  margin: auto;
+  padding: 8px 16px 16px;
+}
+.game-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  padding-bottom: 8px;
+}
+.game-page-header h1 {
+  font-size: 15px;
+}
+.your-turn-pill {
+  margin-left: auto;
+  white-space: nowrap;
+  border-radius: 24px;
+  padding: 4px 10px;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 700;
+}
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+.board-stage {
+  min-width: 0;
+  container-type: inline-size;
+}
+.board-fit {
+  --board-size: min(100cqw, calc(100dvh - 108px), 900px);
+  width: 100%;
+}
+.board-fit .board-center {
+  container: board-center / size;
+}
+.board-fit .board-center-content {
+  padding: 10px;
+}
+.center-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(140px, 33%);
+  gap: 10px;
+  height: 100%;
+  min-width: 0;
+  padding: 14px;
+  background: #fff;
+  color: #172b24;
+  border: 1px solid #d3e1d7;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px #12371c12;
+}
+.center-status-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.turn-status {
+  min-width: 0;
+  flex: 1;
+  font-size: 18px;
+}
+.decision-description {
+  font-size: 13px;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.strategy-objective {
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: #f5f0ff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.actor-last-action {
+  margin-top: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.center-main {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.center-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.primary-decision {
+  width: 100%;
+}
+.center-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.center-action-buttons:empty {
+  display: none;
+}
+.game-button {
+  position: relative;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #25394f;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.game-button:hover:not(:disabled) {
+  background: #e8eef5;
+}
+.game-button-primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: white;
+}
+.game-button-primary:hover:not(:disabled) {
+  background: #1e40af;
+}
+.game-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.game-shell :focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+.trade-button {
+  flex-shrink: 0;
+  color: #1e40af;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.trade-dot {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  background: #b91c1c;
+  color: #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+.jail-decisions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 6px;
+}
+.waiting-hint {
+  max-width: 32ch;
+  align-self: center;
+  text-align: center;
+}
+.center-history {
+  min-height: 0;
+  border-top: 1px solid #dbe3dd;
+}
+.center-latest {
+  display: none;
+  min-width: 0;
+}
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #fff;
+  color: #172b24;
+}
+.activity-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+.activity-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  flex: 1;
+}
+.activity-entry {
+  display: flex;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid #edf1ee;
+  overflow-wrap: anywhere;
+}
+.history-dialog-feed {
+  height: min(65dvh, 620px);
+}
+.latest-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 0 0;
+  border-top: 1px solid #dbe3dd;
+  cursor: pointer;
+}
+.debt-controls {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  gap: 4px;
+  font-size: 14px;
+  color: #78350f;
+}
+.debt-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+.players-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(900px, calc(100dvh - 108px));
+  background: #fff;
+  border: 1px solid #d5e0d8;
+  border-radius: 10px;
+  overflow: hidden;
+  color: #172b24;
+}
+.player-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  min-height: 0;
+}
+.player-summary {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.player-summary:hover {
+  background: #f1f5f3;
+}
+.player-summary.player-deciding {
+  background: #eff6ff;
+  border-color: #93baf7;
+}
+.game-details {
+  flex-shrink: 0;
+}
+
+@container board-center (height < 420px) {
+  .board-center-content {
+    padding: 6px;
+  }
+  .center-layout {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 5px;
+    padding: 8px;
+    border-radius: 8px;
+  }
+  .center-history {
+    display: none;
+  }
+  .center-latest {
+    display: block;
+  }
+  .turn-status {
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .decision-description {
+    font-size: 11px;
+  }
+  .strategy-objective {
+    font-size: 11px;
+    margin-top: 3px;
+    padding: 3px 5px;
+  }
+  .actor-last-action {
+    display: none;
+  }
+  .center-status-row {
+    gap: 5px;
+  }
+  .center-actions {
+    gap: 5px;
+  }
+  .game-button {
+    font-size: 12px;
+    min-height: 32px;
+    padding: 4px 7px;
+  }
+  .primary-decision > p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .jail-decisions {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .jail-decisions > :last-child {
+    grid-column: 1 / -1;
+  }
+  .waiting-hint,
+  .last-roll-summary {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .debt-controls {
+    font-size: 12px;
+  }
+  .center-dice > div {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+  }
+  .center-dice .dice-result {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .players-panel {
+    max-height: 300px;
+  }
+}
+@media (max-width: 479px) {
+  .game-nav {
+    padding-inline: 8px;
+  }
+  .game-page {
+    padding: 6px 6px 12px;
+  }
+  .game-page-header {
+    gap: 8px;
+    min-height: 36px;
+  }
+  .game-page-header h1 {
+    font-size: 11px;
+  }
+  .game-page-header > div {
+    font-size: 11px;
+    gap: 4px;
+  }
+  .your-turn-pill {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .board-fit .board-center-content {
+    padding: 5px;
+  }
 }

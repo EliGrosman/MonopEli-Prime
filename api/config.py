@@ -6,6 +6,7 @@ All settings can be overridden via environment variables prefixed with MONOPELI_
 
 from functools import lru_cache
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -38,6 +39,26 @@ class Settings(BaseSettings):
 
     # AI (Phase 3 Week 5)
     ai_think_delay_ms: int = 500  # Artificial delay for AI moves
+
+    # Guided Jev provider (server-side only)
+    typesafe_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="TYPESAFE_API_KEY",
+        exclude=True,
+        repr=False,
+    )
+    jev_enabled: bool = False
+    jev_model: str = "jev-1.13.0"
+    jev_attempt_timeout_seconds: float = 5.0
+    jev_connect_timeout_seconds: float = 2.0
+    jev_max_retries: int = 1
+    jev_max_concurrent_requests: int = 2
+    jev_game_max_requests: int = 2000
+    jev_game_max_input_tokens: int = 5_000_000
+    jev_game_max_cost_usd: float = 0.25
+    jev_process_max_requests: int = 20_000
+    jev_process_max_input_tokens: int = 50_000_000
+    jev_process_max_cost_usd: float = 3.0
 
     # Rate limiting (Phase 3 Week 6)
     rate_limit_per_minute: int = 60  # Requests per minute per IP

@@ -1,7 +1,9 @@
 """Local browser test server. Never import this fixture app in production."""
 
+from agents.jev import FakeProvider, JevRuntime
 from api.config import Settings
 from api.main import create_app
+from evaluation.jev_runner import deterministic_fake_answer
 from monopoly_engine.cards import CardType
 from monopoly_engine.foundation import charge, settle
 
@@ -13,7 +15,16 @@ async def scenario_game(scenario: str):
     manager = app.state.game_manager
     rules_id = (
         "foundation-trade-v1"
-        if scenario in {"trade", "trade-human-bot", "trade-bot-human", "trade-debt"}
+        if scenario
+        in {
+            "trade",
+            "trade-human-bot",
+            "trade-bot-human",
+            "trade-debt",
+            "jev-human-bot",
+            "jev-bot-human",
+            "jev-timeout",
+        }
         else "foundation-v1"
     )
     game_id = await manager.create_game(num_players=2, seed=4, rules_id=rules_id)
@@ -46,7 +57,13 @@ async def scenario_game(scenario: str):
         game.state.roll_owed = True
         game.last_roll = (3, 3)
         game.doubles_count = 1
-    elif scenario in {"trade", "trade-human-bot", "trade-bot-human"}:
+    elif scenario in {
+        "trade",
+        "trade-human-bot",
+        "trade-bot-human",
+        "jev-human-bot",
+        "jev-bot-human",
+    }:
         game.state.phase = "asset_management"
         game.state.roll_owed = False
         game.property_manager.properties[1].owner = 0
@@ -57,11 +74,45 @@ async def scenario_game(scenario: str):
         if scenario == "trade-human-bot":
             app.state.ai_manager.create_agent(game_id, 1, "trading_rule_based")
             return {"game_id": game_id, "session_id": session_id}
+        if scenario == "jev-human-bot":
+            app.state.ai_manager._runtime = app.state.ai_manager._build_runtime(
+                FakeProvider(default_step=deterministic_fake_answer)
+            )
+            app.state.ai_manager.create_agent(game_id, 1, "jev")
+            active.player_slots[1].is_ai = True
+            active.player_slots[1].ai_type = "jev"
+            return {"game_id": game_id, "session_id": session_id}
         recipient_session_id = "browser-recipient-" + game_id
         await manager.claim_player_slot(game_id, 1, recipient_session_id)
         if scenario == "trade-bot-human":
             app.state.ai_manager.create_agent(game_id, 0, "trading_rule_based")
             await app.state.ai_manager.process_ai_turns_for_game(manager, game_id)
+        elif scenario == "jev-bot-human":
+            app.state.ai_manager._runtime = app.state.ai_manager._build_runtime(
+                FakeProvider(default_step=deterministic_fake_answer)
+            )
+            app.state.ai_manager.create_agent(game_id, 0, "jev")
+            active.player_slots[0].is_ai = True
+            active.player_slots[0].ai_type = "jev"
+            await app.state.ai_manager.process_ai_turns_for_game(manager, game_id)
+        return {
+            "game_id": game_id,
+            "session_id": session_id,
+            "recipient_session_id": recipient_session_id,
+        }
+    elif scenario == "jev-timeout":
+        game.property_manager.properties[1].owner = 0
+        recipient_session_id = "browser-recipient-" + game_id
+        await manager.claim_player_slot(game_id, 1, recipient_session_id)
+        app.state.ai_manager._runtime = JevRuntime(
+            FakeProvider(default_step=deterministic_fake_answer, delay_seconds=0.1),
+            max_retries=0,
+            attempt_timeout_seconds=0.01,
+        )
+        app.state.ai_manager.create_agent(game_id, 0, "jev")
+        active.player_slots[0].is_ai = True
+        active.player_slots[0].ai_type = "jev"
+        await app.state.ai_manager.process_ai_turn(manager, game_id, 0, max_actions=1)
         return {
             "game_id": game_id,
             "session_id": session_id,

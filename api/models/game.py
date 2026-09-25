@@ -22,6 +22,8 @@ class PlayerState(BaseModel):
     jail_cards: int
     bankrupt: bool
     properties: list[int]  # Property positions owned
+    is_ai: bool = False
+    ai_type: str | None = None
 
 
 class PropertyState(BaseModel):
@@ -45,6 +47,45 @@ class PlayerSlot(BaseModel):
     disconnected_at: datetime | None = None  # For reconnection window tracking
 
 
+class AgentInspectionState(BaseModel):
+    """Small public projection of a guided agent's current state."""
+
+    player_id: int
+    sequence: int
+    basis_revision: int
+    status: str
+    short_term_objective: str
+    long_term_objective: str
+    cash_reserve_target: int
+    latest_summary: str
+    fallback_reason: str | None = None
+
+
+class AgentActivity(BaseModel):
+    """Public, bounded record of one server-side agent command."""
+
+    actor: int
+    before_revision: int
+    after_revision: int
+    source: str
+    summary: str
+    action_type: str
+    fallback_reason: str | None = None
+
+
+class GameActivity(BaseModel):
+    """One confirmed action and its public outcomes, shared by all viewers."""
+
+    id: str
+    actor: int
+    revision: int
+    turn_number: int
+    action_type: str
+    summary: str
+    details: list[str] = Field(default_factory=list)
+    occurred_at: datetime
+
+
 class GameState(BaseModel):
     """Full game state sent to clients."""
 
@@ -66,12 +107,18 @@ class GameState(BaseModel):
     winner: int | None
     event_log: list[str]
     decision_contract: dict[str, Any]
+    agent_inspections: dict[int, AgentInspectionState] = Field(default_factory=dict)
+    agent_activity: list[AgentActivity] = Field(default_factory=list)
+    game_activity: list[GameActivity] = Field(default_factory=list)
 
     @classmethod
     def from_engine(
         cls,
         game: MonopolyGame,
         player_slots: dict[int, PlayerSlot] | None = None,
+        agent_inspections: dict[int, dict[str, Any]] | None = None,
+        agent_activity: list[dict[str, Any]] | None = None,
+        game_activity: list[dict[str, Any]] | None = None,
     ) -> "GameState":
         """Convert from engine game state.
 
@@ -106,6 +153,16 @@ class GameState(BaseModel):
                     jail_cards=p["jail_cards"],
                     bankrupt=p["bankrupt"],
                     properties=pm.get_owned_by(p["id"]),
+                    is_ai=(
+                        player_slots[p["id"]].is_ai
+                        if player_slots and p["id"] in player_slots
+                        else False
+                    ),
+                    ai_type=(
+                        player_slots[p["id"]].ai_type
+                        if player_slots and p["id"] in player_slots
+                        else None
+                    ),
                 )
                 for p in state["players"]
             ],
@@ -128,6 +185,9 @@ class GameState(BaseModel):
             winner=state["winner"],
             event_log=state["event_log"],
             decision_contract=game.decision_view(None).to_dict(),
+            agent_inspections=agent_inspections or {},
+            agent_activity=agent_activity or [],
+            game_activity=[GameActivity.model_validate(row) for row in game_activity or []],
         )
 
 

@@ -3,6 +3,7 @@ import { BoardSpace } from './BoardSpace';
 import { PlayerToken } from './PlayerToken';
 import { useResponsive } from '@/hooks';
 import type { PlayerState, PropertyState } from '@/types';
+import type { ReactNode } from 'react';
 
 interface BoardProps {
   players?: PlayerState[];
@@ -11,6 +12,9 @@ interface BoardProps {
   highlightedSpaces?: number[];
   /** Allow scrolling/panning on mobile */
   enableMobileScroll?: boolean;
+  /** Interactive content rendered inside the board instead of the decorative title. */
+  centerContent?: ReactNode;
+  fitToContainer?: boolean;
 }
 
 /**
@@ -33,6 +37,8 @@ export function Board({
   onSpaceClick,
   highlightedSpaces = [],
   enableMobileScroll = true,
+  centerContent,
+  fitToContainer = false,
 }: BoardProps) {
   const { isMobile, isTablet } = useResponsive();
 
@@ -49,7 +55,7 @@ export function Board({
     'board-container',
     isMobile && enableMobileScroll ? 'overflow-auto touch-pan-x touch-pan-y' : '',
     isTablet ? 'flex justify-center' : '',
-    'p-2 sm:p-4',
+    fitToContainer ? 'board-fit' : 'p-2 sm:p-4',
   ]
     .filter(Boolean)
     .join(' ');
@@ -60,13 +66,12 @@ export function Board({
         className="board-grid relative mx-auto"
         style={{
           display: 'grid',
-          gridTemplateColumns:
-            'var(--corner-size) repeat(9, var(--space-width)) var(--corner-size)',
-          gridTemplateRows: 'var(--corner-size) repeat(9, var(--space-width)) var(--corner-size)',
+          gridTemplateColumns: 'repeat(11, minmax(0, 1fr))',
+          gridTemplateRows: 'repeat(11, minmax(0, 1fr))',
           width: 'var(--board-size)',
           height: 'var(--board-size)',
-          minWidth: isMobile ? '320px' : undefined,
-          minHeight: isMobile ? '320px' : undefined,
+          minWidth: isMobile && !fitToContainer ? '320px' : undefined,
+          minHeight: isMobile && !fitToContainer ? '320px' : undefined,
           backgroundColor: 'var(--color-board-bg)',
           border: isMobile
             ? '2px solid var(--color-board-border)'
@@ -217,24 +222,30 @@ export function Board({
 
         {/* Center area */}
         <div
-          className="board-center flex flex-col items-center justify-center px-2"
+          className="board-center min-w-0 min-h-0 overflow-hidden"
           style={{
             gridColumn: '2 / 11',
             gridRow: '2 / 11',
           }}
         >
-          <h1
-            className="font-bold text-board-border mb-1 sm:mb-2 md:mb-4 text-center"
-            style={{ fontSize: 'var(--board-title-size)' }}
-          >
-            MONOPOLY
-          </h1>
-          <p
-            className="text-gray-600 text-center hidden sm:block"
-            style={{ fontSize: 'var(--board-subtitle-size)' }}
-          >
-            The Classic Property Trading Game
-          </p>
+          {centerContent ? (
+            <div className="board-center-content h-full w-full">{centerContent}</div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center px-2">
+              <h1
+                className="font-bold text-board-border mb-1 sm:mb-2 md:mb-4 text-center"
+                style={{ fontSize: 'var(--board-title-size)' }}
+              >
+                MONOPOLY
+              </h1>
+              <p
+                className="text-gray-600 text-center hidden sm:block"
+                style={{ fontSize: 'var(--board-subtitle-size)' }}
+              >
+                The Classic Property Trading Game
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

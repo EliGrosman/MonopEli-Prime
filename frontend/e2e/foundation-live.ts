@@ -4,8 +4,8 @@ for (const scenario of [
   { name: 'jail-fine', button: /Pay 50 dollar fine/ },
   { name: 'jail-card', button: /Use Get Out of Jail Free Card/ },
   { name: 'jail-roll', button: /roll/i },
-  { name: 'debt', button: /Mortgage Property · property 39/ },
-  { name: 'trade-debt', button: /Mortgage Property · property 39/ },
+  { name: 'debt', button: /Mortgage Property · Boardwalk/ },
+  { name: 'trade-debt', button: /Mortgage Property · Boardwalk/ },
   { name: 'purchase', button: /Pass on buying/ },
 ]) {
   test(`live engine/API/browser: ${scenario.name}`, async ({ page, request }) => {
@@ -72,6 +72,7 @@ test('live engine/API/browser: human trade proposal and response', async ({ brow
     );
   }, proposerSession);
   await proposer.goto(`/game/${id}`);
+  await proposer.getByRole('button', { name: 'Open trading' }).click();
   await expect(proposer.getByRole('region', { name: 'Compose trade' })).toBeVisible();
   await proposer.getByLabel('Recipient').selectOption('1');
   await proposer.getByRole('checkbox', { name: /Mediterranean Avenue/ }).check();
@@ -106,7 +107,8 @@ test('live engine/API/browser: human trade proposal and response', async ({ brow
       return [state.game_phase, state.properties['1'].owner, state.properties['3'].owner];
     })
     .toEqual(['asset_management', 1, 0]);
-  await expect(proposer.getByRole('region', { name: 'Compose trade' })).toBeVisible();
+  await expect(proposer.getByRole('dialog')).toHaveCount(0);
+  await expect(proposer.getByRole('button', { name: 'Open trading' })).toBeEnabled();
 });
 
 test('live engine/API/browser: human offer receives a bot response', async ({ page, request }) => {
@@ -119,6 +121,7 @@ test('live engine/API/browser: human offer receives a bot response', async ({ pa
     );
   }, session);
   await page.goto(`/game/${id}`);
+  await page.getByRole('button', { name: 'Open trading' }).click();
   await page.getByLabel('Recipient').selectOption('1');
   await page.getByRole('checkbox', { name: /Oriental Avenue/ }).check();
   await page.getByRole('checkbox', { name: /Baltic Avenue/ }).check();
@@ -150,4 +153,79 @@ test('live engine/API/browser: human rejects a bot offer', async ({ page, reques
       return [state.properties['6'].owner, state.properties['3'].owner];
     })
     .toEqual([0, 1]);
+});
+
+test('live engine/API/browser: human offer receives a guided Jev response', async ({
+  page,
+  request,
+}) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/jev-human-bot');
+  const { game_id: id, session_id: session } = await response.json();
+  await page.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 1' }, version: 0 })
+    );
+  }, session);
+  await page.goto(`/game/${id}`);
+  await expect(page.getByText('Jev')).toBeVisible();
+  await page.getByRole('button', { name: 'Open trading' }).click();
+  await page.getByLabel('Recipient').selectOption('1');
+  await page.getByRole('checkbox', { name: /Mediterranean Avenue/ }).check();
+  await page.getByRole('checkbox', { name: /Baltic Avenue/ }).check();
+  await page.getByRole('button', { name: 'Review and send offer' }).click();
+  await page.getByRole('button', { name: 'Send offer' }).click();
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return [state.game_phase, state.properties['1'].owner, state.properties['3'].owner];
+    })
+    .toEqual(['asset_management', 1, 0]);
+  await expect(page.getByText(/accepted .* trade/i).first()).toBeVisible();
+});
+
+test('live engine/API/browser: human rejects a guided Jev offer after reconnect', async ({
+  page,
+  request,
+}) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/jev-bot-human');
+  const { game_id: id, recipient_session_id: session } = await response.json();
+  await page.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 2' }, version: 0 })
+    );
+  }, session);
+  await page.goto(`/game/${id}`);
+  await expect(page.getByText('Your response')).toBeVisible();
+  await expect(page.getByText('Jev')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Reject' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reject' }).click();
+  await expect
+    .poll(async () => {
+      const state = await (await request.get(`http://127.0.0.1:18000/api/games/${id}`)).json();
+      return state.game_phase;
+    })
+    .toBe('asset_management');
+});
+
+test('live engine/API/browser: timeout fallback remains visible after reconnect', async ({
+  page,
+  request,
+}) => {
+  const response = await request.post('http://127.0.0.1:18000/__scenario/jev-timeout');
+  const { game_id: id, recipient_session_id: session } = await response.json();
+  await page.addInitScript((sessionId) => {
+    localStorage.setItem(
+      'monopoly-session',
+      JSON.stringify({ state: { sessionId, displayName: 'Player 2' }, version: 0 })
+    );
+  }, session);
+  await page.goto(`/game/${id}`);
+  await page.getByRole('button', { name: /View Player 1 details/ }).click();
+  await expect(page.getByText('Fallback: timeout')).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: /View Player 1 details/ }).click();
+  await expect(page.getByText('Fallback: timeout')).toBeVisible();
 });

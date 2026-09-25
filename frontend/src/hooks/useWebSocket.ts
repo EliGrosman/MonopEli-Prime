@@ -8,6 +8,7 @@ import type {
   ClientMessage,
   IdentityMessage,
   ActionResultMessage,
+  AgentInspection,
 } from '@/types';
 
 function getWsBaseUrl(): string {
@@ -60,7 +61,8 @@ export function useWebSocket({
   autoConnect = true,
 }: UseWebSocketOptions): UseWebSocketReturn {
   const sessionId = useSessionStore((s) => s.sessionId);
-  const { setConnected, updateGameState, setError, setPendingRequest } = useGameStore();
+  const { setConnected, updateGameState, updateAgentInspection, setError, setPendingRequest } =
+    useGameStore();
 
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -115,6 +117,7 @@ export function useWebSocket({
     }
 
     isManualDisconnectRef.current = false;
+    useGameStore.getState().setGameId(gameId);
     stateReadyRef.current = false;
     acknowledgedRevisionRef.current = null;
     setConnected(false);
@@ -172,6 +175,11 @@ export function useWebSocket({
                 acknowledgedRevisionRef.current = null;
                 setPendingRequest(null);
               }
+            }
+            break;
+          case 'agent_update':
+            if (message.data && typeof message.data === 'object') {
+              updateAgentInspection(message.data as AgentInspection);
             }
             break;
           case 'action_result':
@@ -254,6 +262,7 @@ export function useWebSocket({
     playerId,
     setConnected,
     updateGameState,
+    updateAgentInspection,
     setError,
     setPendingRequest,
     onMessage,
